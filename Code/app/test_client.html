@@ -98,14 +98,12 @@
     #fish {
       position: absolute;
       left: 66.66%;
-      transform: translateX(-50%);
-      width: 20vw;
+      width: clamp(100px, 20vw, 200px);
       z-index: 3;
+      /* centred on the curve tip via transform */
       top: var(--fish-y, 50%);
-      margin-top: calc(var(--fish-half, 40px) * -1);
-      /* transition: top 0.08s linear; */
+      transform: translateX(-50%) translateY(-50%);
       filter: drop-shadow(0 4px 10px rgba(0,100,160,0.2));
-      /* animation: wag 1.4s ease-in-out infinite; */
     }
 
     @keyframes wag {
@@ -135,7 +133,6 @@
     const history = new Float32Array(HISTORY_LEN);
     let   histIdx = 0;
     let   sampleCount = 0;
-    let   fishY   = 0.5;
 
     const statusDot  = document.getElementById("status-dot");
     const statusText = document.getElementById("status-text");
@@ -189,11 +186,10 @@
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // move fish to latest sample position
+      // snap fish directly to the live tip of the trace — no lag
       const latestNorm = (history[(histIdx + HISTORY_LEN - 1) % HISTORY_LEN] - min) / range;
-      fishY += (1 - latestNorm - fishY) * 0.12;
-      fish.style.setProperty("--fish-y",
-        ((PADDING + fishY * (1 - 2 * PADDING)) * 100).toFixed(2) + "%");
+      const targetY = h - pad - latestNorm * usable;
+      fish.style.setProperty("--fish-y", targetY.toFixed(2) + "px");
 
       requestAnimationFrame(draw);
     }
