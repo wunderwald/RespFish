@@ -27,9 +27,10 @@ from pylsl import StreamInlet, resolve_byprop
 # CONSTANTS
 # #########
 
-STREAM_NAME = "resp_belt"   # LSL stream name to subscribe to
-WS_HOST     = "localhost"
-WS_PORT     = 8765
+STREAM_NAME     = "resp_belt"   # LSL stream name to subscribe to
+WS_HOST         = "localhost"
+WS_PORT         = 8765
+LOG_SAMPLE_RATE = True          # log measured sample rate every second
 
 # #######
 # LOGGING
@@ -123,6 +124,9 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
         await _broadcast(state, {"type": "connected", "stream": info})
 
         # read loop 
+        sample_count = 0
+        last_log     = asyncio.get_event_loop().time()
+
         try:
             while True:
                 sample, timestamp = await asyncio.get_event_loop().run_in_executor(
@@ -135,6 +139,14 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
                     continue
 
                 value = sample[0]
+                sample_count += 1
+
+                if LOG_SAMPLE_RATE:
+                    now = asyncio.get_event_loop().time()
+                    if now - last_log >= 1.0:
+                        log.info(f"Sample rate: {sample_count} Hz")
+                        sample_count = 0
+                        last_log     = now
 
                 await _broadcast(state, {
                     "type": "sample",
