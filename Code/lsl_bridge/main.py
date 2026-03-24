@@ -21,7 +21,7 @@ import asyncio
 import json
 import logging
 import websockets
-from pylsl import StreamInlet, resolve_byprop, LostError
+from pylsl import StreamInlet, resolve_byprop
 
 # #########
 # CONSTANTS
@@ -142,10 +142,11 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
                     "timestamp": timestamp,
                 })
 
-        except LostError:
-            log.warning("LSL stream lost — attempting reconnect …")
         except Exception as exc:
-            log.error(f"Unexpected error in read loop: {exc}")
+            if "lost" in str(exc).lower():
+                log.warning("LSL stream lost — attempting reconnect …")
+            else:
+                log.error(f"Unexpected error in read loop: {exc}")
         finally:
             state.connected = False
             state.stream_info = None
