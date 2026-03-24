@@ -151,7 +151,13 @@
       statusText.textContent = text;
     }
 
-    setInterval(() => { spsEl.textContent = sampleCount; sampleCount = 0; }, 1000);
+    let lastTick = performance.now();
+    setInterval(() => {
+      const elapsed = performance.now() - lastTick;
+      lastTick = performance.now();
+      spsEl.textContent = (sampleCount / elapsed * 1000).toFixed(0);
+      sampleCount = 0;
+    }, 1000);
 
     function draw() {
       const w = canvas.width  = canvas.offsetWidth;
