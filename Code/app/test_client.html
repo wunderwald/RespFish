@@ -2,210 +2,227 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>LSL Bridge — Test Client</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RespFish</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: monospace;
-      background: #0f1117;
-      color: #e0e0e0;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 300;
+      background: #c8e8f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
       padding: 24px;
     }
-    h1 { color: #7eb8f7; margin-bottom: 16px; font-size: 1.1rem; }
 
-    #status {
-      display: inline-block;
-      padding: 4px 12px;
+    /* ── stats bar ─────────────────────────────────────────────────────── */
+    #stats {
+      display: flex;
+      gap: 24px;
+      background: rgba(255,255,255,0.45);
+      backdrop-filter: blur(8px);
       border-radius: 99px;
-      font-size: 0.8rem;
-      margin-bottom: 20px;
-      background: #2a2a2a;
-      color: #888;
+      padding: 8px 24px;
+      font-size: 0.78rem;
+      color: #4a7a99;
+      letter-spacing: 0.04em;
     }
-    #status.connected    { background: #1a3a2a; color: #4caf7d; }
-    #status.disconnected { background: #3a1a1a; color: #e06060; }
-    #status.searching    { background: #2a2a1a; color: #d4a843; }
+    #stats span { white-space: nowrap; }
+    #stats .label { opacity: 0.6; margin-right: 4px; }
+    #status-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #b0cfe0;
+      margin-right: 6px;
+      vertical-align: middle;
+      transition: background 0.4s;
+    }
+    #status-dot.connected    { background: #5bc98a; }
+    #status-dot.disconnected { background: #e07878; }
+    #status-dot.searching    { background: #f0c060;
+      animation: pulse 1.2s ease-in-out infinite; }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 20px;
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
     }
-    .card {
-      background: #1a1d26;
-      border: 1px solid #2a2d36;
-      border-radius: 8px;
-      padding: 14px 16px;
-    }
-    .card .label { font-size: 0.7rem; color: #666; margin-bottom: 4px; }
-    .card .value { font-size: 1.4rem; color: #fff; }
-    .card .value.bpm  { color: #7eb8f7; }
-    .card .value.rate { color: #4caf7d; }
 
-    canvas {
-      display: block;
+    /* ── scene container ───────────────────────────────────────────────── */
+    #scene {
+      position: relative;
       width: 100%;
-      height: 120px;
-      background: #1a1d26;
-      border: 1px solid #2a2d36;
-      border-radius: 8px;
-      margin-bottom: 20px;
+      max-width: 820px;
+      height: clamp(280px, 44vh, 420px);
+      border-radius: 28px;
+      overflow: hidden;
+
+      background: linear-gradient(
+        180deg,
+        #b8e4f7 0%,
+        #8dcfef 40%,
+        #6bbde8 100%
+      );
+      box-shadow:
+        0 8px 32px rgba(80,160,210,0.18),
+        inset 0 1px 0 rgba(255,255,255,0.5);
     }
 
-    #log {
-      background: #1a1d26;
-      border: 1px solid #2a2d36;
-      border-radius: 8px;
-      padding: 12px;
-      height: 180px;
-      overflow-y: auto;
-      font-size: 0.75rem;
-      line-height: 1.6;
+    /* subtle caustic shimmer overlay */
+    #scene::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 30% 20%,
+          rgba(255,255,255,0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 30% at 70% 60%,
+          rgba(255,255,255,0.10) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 1;
     }
-    .log-sample      { color: #888; }
-    .log-connected   { color: #4caf7d; }
-    .log-disconnected{ color: #e06060; }
-    .log-searching   { color: #d4a843; }
-    .log-error       { color: #f07070; }
+
+    /* ── wave canvas ───────────────────────────────────────────────────── */
+    #wave {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      z-index: 2;
+    }
+
+    /* ── fish ──────────────────────────────────────────────────────────── */
+    #fish {
+      position: absolute;
+      left: 66.66%;
+      transform: translateX(-50%);
+      width: clamp(80px, 12vw, 130px);
+      z-index: 3;
+      top: var(--fish-y, 50%);
+      margin-top: calc(var(--fish-half, 40px) * -1);
+      transition: top 0.08s linear;
+      filter: drop-shadow(0 4px 10px rgba(0,100,160,0.2));
+      animation: wag 1.4s ease-in-out infinite;
+    }
+
+    @keyframes wag {
+      0%, 100% { transform: translateX(-50%) rotate(-2deg); }
+      50%       { transform: translateX(-50%) rotate( 2deg); }
+    }
   </style>
 </head>
 <body>
-  <h1>LSL → WebSocket Bridge — Test Client</h1>
-  <div id="status">Connecting…</div>
 
-  <div class="grid">
-    <div class="card">
-      <div class="label">Raw value</div>
-      <div class="value" id="val">—</div>
-    </div>
-    <div class="card">
-      <div class="label">Breath rate</div>
-      <div class="value bpm" id="bpm">—</div>
-    </div>
-    <div class="card">
-      <div class="label">Samples / sec</div>
-      <div class="value rate" id="sps">—</div>
-    </div>
+  <div id="stats">
+    <span><span id="status-dot"></span><span id="status-text">connecting…</span></span>
+    <span><span class="label">value</span><span id="val">—</span></span>
+    <span><span class="label">samples/s</span><span id="sps">—</span></span>
   </div>
 
-  <canvas id="wave"></canvas>
-
-  <div id="log"></div>
+  <div id="scene">
+    <canvas id="wave"></canvas>
+    <img id="fish" src="fish.png" alt="fish" />
+  </div>
 
   <script>
-    // ── config ────────────────────────────────────────────────────────────
     const WS_URL      = "ws://localhost:8765";
-    const HISTORY_LEN = 300;   // samples to draw on the canvas
+    const HISTORY_LEN = 300;
+    const PADDING     = 0.08;
 
-    // ── state ─────────────────────────────────────────────────────────────
     const history = new Float32Array(HISTORY_LEN);
     let   histIdx = 0;
     let   sampleCount = 0;
+    let   fishY   = 0.5;
 
-    // ── DOM refs ──────────────────────────────────────────────────────────
-    const statusEl = document.getElementById("status");
-    const valEl    = document.getElementById("val");
-    const bpmEl    = document.getElementById("bpm");
-    const spsEl    = document.getElementById("sps");
-    const logEl    = document.getElementById("log");
-    const canvas   = document.getElementById("wave");
-    const ctx      = canvas.getContext("2d");
+    const statusDot  = document.getElementById("status-dot");
+    const statusText = document.getElementById("status-text");
+    const valEl      = document.getElementById("val");
+    const spsEl      = document.getElementById("sps");
+    const fish       = document.getElementById("fish");
+    const canvas     = document.getElementById("wave");
+    const ctx        = canvas.getContext("2d");
 
-    // ── logging ───────────────────────────────────────────────────────────
-    function addLog(text, cls = "") {
-      const line = document.createElement("div");
-      line.textContent = `[${new Date().toISOString().slice(11,23)}] ${text}`;
-      if (cls) line.className = cls;
-      logEl.appendChild(line);
-      logEl.scrollTop = logEl.scrollHeight;
+    function setStatus(cls, text) {
+      statusDot.className    = cls;
+      statusText.textContent = text;
     }
 
-    // ── canvas draw ───────────────────────────────────────────────────────
-    function drawWave() {
-      const w = canvas.width  = canvas.offsetWidth;
-      const h = canvas.height = canvas.offsetHeight;
-      ctx.clearRect(0, 0, w, h);
+    setInterval(() => { spsEl.textContent = sampleCount; sampleCount = 0; }, 1000);
 
+    function normHistory() {
       let min = Infinity, max = -Infinity;
       for (let i = 0; i < HISTORY_LEN; i++) {
         if (history[i] < min) min = history[i];
         if (history[i] > max) max = history[i];
       }
-      const range = max - min || 1;
+      return { min, range: (max - min) || 1 };
+    }
 
+    function draw() {
+      const w = canvas.width  = canvas.offsetWidth;
+      const h = canvas.height = canvas.offsetHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      const { min, range } = normHistory();
+      const pad    = PADDING * h;
+      const usable = h - pad * 2;
+
+      ctx.shadowColor = "rgba(255,255,255,0.6)";
+      ctx.shadowBlur  = 8;
       ctx.beginPath();
-      ctx.strokeStyle = "#7eb8f7";
-      ctx.lineWidth   = 1.5;
+      ctx.strokeStyle = "rgba(255,255,255,0.75)";
+      ctx.lineWidth   = 2.5;
+      ctx.lineJoin    = "round";
+      ctx.lineCap     = "round";
 
       for (let i = 0; i < HISTORY_LEN; i++) {
-        const idx = (histIdx + i) % HISTORY_LEN;
-        const x = (i / (HISTORY_LEN - 1)) * w;
-        const y = h - ((history[idx] - min) / range) * h * 0.85 - h * 0.075;
+        const idx  = (histIdx + i) % HISTORY_LEN;
+        const x    = (i / (HISTORY_LEN - 1)) * w;
+        const norm = (history[idx] - min) / range;
+        const y    = h - pad - norm * usable;
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.stroke();
-      requestAnimationFrame(drawWave);
+      ctx.shadowBlur = 0;
+
+      // move fish to latest sample position
+      const latestNorm = (history[(histIdx + HISTORY_LEN - 1) % HISTORY_LEN] - min) / range;
+      fishY += (1 - latestNorm - fishY) * 0.12;
+      fish.style.setProperty("--fish-y",
+        ((PADDING + fishY * (1 - 2 * PADDING)) * 100).toFixed(2) + "%");
+
+      requestAnimationFrame(draw);
     }
-    requestAnimationFrame(drawWave);
+    requestAnimationFrame(draw);
 
-    // ── samples/sec counter ───────────────────────────────────────────────
-    setInterval(() => {
-      spsEl.textContent = sampleCount;
-      sampleCount = 0;
-    }, 1000);
-
-    // ── WebSocket ─────────────────────────────────────────────────────────
     function connect() {
       const ws = new WebSocket(WS_URL);
 
-      ws.onopen = () => {
-        statusEl.textContent = "Socket open — waiting for stream…";
-        statusEl.className   = "searching";
-        addLog("WebSocket opened", "log-connected");
-      };
+      ws.onopen = () => setStatus("searching", "waiting for stream…");
 
       ws.onmessage = ({ data }) => {
         const msg = JSON.parse(data);
-
         if (msg.type === "sample") {
           history[histIdx] = msg.value;
           histIdx = (histIdx + 1) % HISTORY_LEN;
           sampleCount++;
-          valEl.textContent = msg.value.toFixed(4);
-          if (msg.breath_rate !== null)
-            bpmEl.textContent = msg.breath_rate.toFixed(1) + " bpm";
-
+          valEl.textContent = msg.value.toFixed(3);
         } else if (msg.type === "connected") {
-          const s = msg.stream;
-          statusEl.textContent = `Connected — ${s.name}  (${s.sample_rate} Hz, ${s.channel_count} ch)`;
-          statusEl.className   = "connected";
-          addLog(`Stream connected: ${JSON.stringify(s)}`, "log-connected");
-
+          setStatus("connected", msg.stream.name);
         } else if (msg.type === "disconnected") {
-          statusEl.textContent = "Stream disconnected — waiting…";
-          statusEl.className   = "disconnected";
-          bpmEl.textContent    = "—";
-          addLog(`Disconnected: ${msg.reason}`, "log-disconnected");
-
+          setStatus("disconnected", "stream lost…");
+          valEl.textContent = "—";
         } else if (msg.type === "searching") {
-          statusEl.textContent = `Searching for '${msg.stream_name}'…`;
-          statusEl.className   = "searching";
-          addLog(`Searching for LSL stream: ${msg.stream_name}`, "log-searching");
-
-        } else if (msg.type === "error") {
-          addLog(`Error: ${msg.message}`, "log-error");
+          setStatus("searching", "searching…");
         }
       };
 
-      ws.onerror = (e) => {
-        addLog("WebSocket error", "log-error");
-      };
-
       ws.onclose = () => {
-        statusEl.textContent = "Socket closed — reconnecting…";
-        statusEl.className   = "disconnected";
-        addLog("WebSocket closed — retrying in 3 s…", "log-disconnected");
+        setStatus("disconnected", "reconnecting…");
         setTimeout(connect, 3000);
       };
     }
