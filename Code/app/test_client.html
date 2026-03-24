@@ -125,7 +125,7 @@
 
   <div id="scene">
     <canvas id="wave"></canvas>
-    <img id="fish" src="fish.png" alt="fish" />
+    <img id="fish" src="fishy.png" alt="fish" />
   </div>
 
   <script>
@@ -179,9 +179,10 @@
       ctx.lineJoin    = "round";
       ctx.lineCap     = "round";
 
+      const traceEnd = w * (2 / 3);
       for (let i = 0; i < HISTORY_LEN; i++) {
         const idx  = (histIdx + i) % HISTORY_LEN;
-        const x    = (i / (HISTORY_LEN - 1)) * w;
+        const x    = (i / (HISTORY_LEN - 1)) * traceEnd;
         const norm = (history[idx] - min) / range;
         const y    = h - pad - norm * usable;
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
