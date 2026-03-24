@@ -18,12 +18,6 @@ Dependencies:
   pip install pylsl websockets scipy
 """
 
-# ── configuration ─────────────────────────────────────────────────────────────
-
-STREAM_NAME = "MyRespirationBelt"   # LSL stream name to subscribe to
-WS_HOST     = "localhost"
-WS_PORT     = 8765
-
 import asyncio
 import json
 import logging
@@ -34,7 +28,17 @@ import websockets
 from pylsl import StreamInlet, resolve_byprop, LostError
 from scipy.signal import find_peaks
 
-# ── logging ──────────────────────────────────────────────────────────────────
+# #########
+# CONSTANTS
+# #########
+
+STREAM_NAME = "MyRespirationBelt"   # LSL stream name to subscribe to
+WS_HOST     = "localhost"
+WS_PORT     = 8765
+
+# #######
+# LOGGING
+# #######
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,7 +47,9 @@ logging.basicConfig(
 log = logging.getLogger("lsl_bridge")
 
 
-# ── bridge state ──────────────────────────────────────────────────────────────
+# ############
+# BRIDGE STATE
+# ############
 
 class BridgeState:
     """Shared mutable state passed between the LSL reader and WS broadcaster."""
@@ -54,7 +60,9 @@ class BridgeState:
         self.connected: bool = False
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+# #######
+# HELPERS
+# #######
 
 def _stream_info_dict(inlet: StreamInlet) -> dict:
     info = inlet.info()
@@ -77,8 +85,9 @@ async def _broadcast(state: BridgeState, message: dict) -> None:
         return_exceptions=True,
     )
 
-
-# ── LSL reader loop ───────────────────────────────────────────────────────────
+# ##########
+# LSL READER
+# ##########
 
 async def lsl_reader(stream_name: str, state: BridgeState) -> None:
     """
@@ -89,7 +98,7 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
     PULL_TIMEOUT    = 2.0   # seconds to wait for a single sample
 
     while True:
-        # ── resolve ──────────────────────────────────────────────────────────
+        # resolv
         log.info(f"Searching for LSL stream '{stream_name}' …")
         await _broadcast(state, {
             "type": "searching",
@@ -110,7 +119,7 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
                 log.warning(f"Resolve failed: {exc} — retrying …")
                 await asyncio.sleep(2.0)
 
-        # ── connected ────────────────────────────────────────────────────────
+        # connected 
         info = _stream_info_dict(inlet)
         state.stream_info = info
         state.connected = True
@@ -118,7 +127,7 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
         log.info(f"Connected: {info}")
         await _broadcast(state, {"type": "connected", "stream": info})
 
-        # ── read loop ────────────────────────────────────────────────────────
+        # read loop 
         try:
             while True:
                 sample, timestamp = await asyncio.get_event_loop().run_in_executor(
@@ -155,8 +164,9 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
             })
             await asyncio.sleep(1.0)
 
-
-# ── WebSocket handler ─────────────────────────────────────────────────────────
+# ##################
+# WEBSOCKETS HANDLER
+# ##################
 
 async def ws_handler(
     websocket: websockets.WebSocketServerProtocol,
@@ -189,7 +199,9 @@ async def ws_handler(
         log.info(f"Client disconnected: {remote}  (total: {len(state.clients)})")
 
 
-# ── entry point ───────────────────────────────────────────────────────────────
+# ####
+# MAIN
+# ####
 
 async def main() -> None:
     state = BridgeState()
