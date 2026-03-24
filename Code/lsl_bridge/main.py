@@ -42,60 +42,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("lsl_bridge")
 
-# ── breath-rate estimator ─────────────────────────────────────────────────────
-
-class BreathRateEstimator:
-    """
-    Estimates breathing rate (breaths per minute) from a rolling window
-    of raw respiration samples using peak detection.
-
-    Args:
-        window_seconds: How many seconds of signal to keep in the buffer.
-        sample_rate:    Nominal sample rate of the LSL stream (Hz).
-    """
-
-    def __init__(self, window_seconds: float = 30.0, sample_rate: float = 100.0):
-        self.window_size = int(window_seconds * sample_rate)
-        self.sample_rate = sample_rate
-        self._buf: deque[float] = deque(maxlen=self.window_size)
-        self._last_rate: float | None = None
-
-    def update(self, sample_rate: float) -> None:
-        """Call if the stream's actual sample rate becomes known at runtime."""
-        self.sample_rate = sample_rate
-        self.window_size = int(30.0 * sample_rate)
-        self._buf = deque(self._buf, maxlen=self.window_size)
-
-    def push(self, value: float) -> float | None:
-        """
-        Add one sample. Returns the current breath rate estimate (BPM),
-        or None if the buffer does not yet hold enough data.
-        """
-        self._buf.append(value)
-
-        # Need at least 10 s of data before estimating
-        min_samples = int(10.0 * self.sample_rate)
-        if len(self._buf) < min_samples:
-            return None
-
-        signal = list(self._buf)
-
-        # Peak distance: no two breaths closer than 1.5 s apart
-        min_distance = int(1.5 * self.sample_rate)
-        peaks, _ = find_peaks(signal, distance=min_distance, prominence=0.05)
-
-        if len(peaks) < 2:
-            return self._last_rate
-
-        # Duration covered by the peaks (not the whole buffer)
-        duration_seconds = (peaks[-1] - peaks[0]) / self.sample_rate
-        if duration_seconds <= 0:
-            return self._last_rate
-
-        bpm = (len(peaks) - 1) / duration_seconds * 60.0
-        self._last_rate = round(bpm, 2)
-        return self._last_rate
-
 
 # ── bridge state ──────────────────────────────────────────────────────────────
 
@@ -139,7 +85,6 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
     Continuously resolves the named LSL stream, reads samples, and
     broadcasts them.  Automatically reconnects on disconnect.
     """
-    estimator = BreathRateEstimator()
     RESOLVE_TIMEOUT = 5.0   # seconds per resolve attempt
     PULL_TIMEOUT    = 2.0   # seconds to wait for a single sample
 
@@ -169,7 +114,6 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
         info = _stream_info_dict(inlet)
         state.stream_info = info
         state.connected = True
-        estimator.update(info["sample_rate"] or 100.0)
 
         log.info(f"Connected: {info}")
         await _broadcast(state, {"type": "connected", "stream": info})
@@ -187,13 +131,11 @@ async def lsl_reader(stream_name: str, state: BridgeState) -> None:
                     continue
 
                 value = sample[0]
-                breath_rate = estimator.push(value)
 
                 await _broadcast(state, {
                     "type": "sample",
                     "value": value,
                     "timestamp": timestamp,
-                    "breath_rate": breath_rate,
                 })
 
         except LostError:
