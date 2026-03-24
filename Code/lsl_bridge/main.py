@@ -5,8 +5,7 @@ Discovers an LSL stream by name, pulls samples, and broadcasts them
 to all connected WebSocket clients on ws://localhost:<port>.
 
 Message types (JSON):
-  { "type": "sample",  "value": float, "timestamp": float,
-    "breath_rate": float | null }
+  { "type": "sample",  "value": float, "timestamp": float }
   { "type": "connected",    "stream": { name, channel_count, sample_rate } }
   { "type": "disconnected", "reason": str }
   { "type": "error",        "message": str }
@@ -15,24 +14,20 @@ Usage:
   python bridge.py
 
 Dependencies:
-  pip install pylsl websockets scipy
+  pip install pylsl websockets
 """
 
 import asyncio
 import json
 import logging
-import time
-from collections import deque
-
 import websockets
 from pylsl import StreamInlet, resolve_byprop, LostError
-from scipy.signal import find_peaks
 
 # #########
 # CONSTANTS
 # #########
 
-STREAM_NAME = "MyRespirationBelt"   # LSL stream name to subscribe to
+STREAM_NAME = "resp_belt"   # LSL stream name to subscribe to
 WS_HOST     = "localhost"
 WS_PORT     = 8765
 
