@@ -98,11 +98,10 @@
     #fish {
       position: absolute;
       left: 66.66%;
+      transform: translateX(-50%) translateY(-50%);
       width: clamp(100px, 20vw, 200px);
       z-index: 3;
-      /* centred on the curve tip via transform */
       top: var(--fish-y, 50%);
-      transform: translateX(-50%) translateY(-50%);
       filter: drop-shadow(0 4px 10px rgba(0,100,160,0.2));
     }
 
@@ -134,6 +133,11 @@
     let   histIdx = 0;
     let   sampleCount = 0;
 
+    // slow-adapting range — expands instantly, shrinks at SHRINK_RATE per frame
+    const SHRINK_RATE = 0.0002;
+    let   adaptMin =  0.5;
+    let   adaptMax = -0.5;
+
     const statusDot  = document.getElementById("status-dot");
     const statusText = document.getElementById("status-text");
     const valEl      = document.getElementById("val");
@@ -149,21 +153,25 @@
 
     setInterval(() => { spsEl.textContent = sampleCount; sampleCount = 0; }, 1000);
 
-    function normHistory() {
-      let min = Infinity, max = -Infinity;
-      for (let i = 0; i < HISTORY_LEN; i++) {
-        if (history[i] < min) min = history[i];
-        if (history[i] > max) max = history[i];
-      }
-      return { min, range: (max - min) || 1 };
-    }
-
     function draw() {
       const w = canvas.width  = canvas.offsetWidth;
       const h = canvas.height = canvas.offsetHeight;
       ctx.clearRect(0, 0, w, h);
 
-      const { min, range } = normHistory();
+      // find true min/max of current buffer
+      let bufMin = Infinity, bufMax = -Infinity;
+      for (let i = 0; i < HISTORY_LEN; i++) {
+        if (history[i] < bufMin) bufMin = history[i];
+        if (history[i] > bufMax) bufMax = history[i];
+      }
+      // expand immediately, shrink very slowly
+      if (bufMin < adaptMin) adaptMin = bufMin;
+      else                   adaptMin += (bufMin - adaptMin) * SHRINK_RATE;
+      if (bufMax > adaptMax) adaptMax = bufMax;
+      else                   adaptMax -= (adaptMax - bufMax) * SHRINK_RATE;
+
+      const min   = adaptMin;
+      const range = (adaptMax - adaptMin) || 1;
       const pad    = PADDING * h;
       const usable = h - pad * 2;
 
@@ -186,7 +194,7 @@
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // snap fish directly to the live tip of the trace — no lag
+      // snap fish to the live tip of the trace
       const latestNorm = (history[(histIdx + HISTORY_LEN - 1) % HISTORY_LEN] - min) / range;
       const targetY = h - pad - latestNorm * usable;
       fish.style.setProperty("--fish-y", targetY.toFixed(2) + "px");
