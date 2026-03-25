@@ -31,17 +31,17 @@ STREAM_NAME   = "resp_belt"     # LSL stream name (drop-in replacement)
 LSL_RATE      = 50              # Hz — output sample rate pushed to LSL
 
 # --- bandpass filter (Hz) ---
-BP_LOW        = 0.1             # low  cut — removes DC drift
-BP_HIGH       = 1.0             # high cut — removes everything above ~1 breath/s
+BP_LOW        = 60             
+BP_HIGH       = 1000             
 
 # --- RMS envelope ---
-RMS_WINDOW_MS = 200             # ms — RMS window length
+RMS_WINDOW_MS = 50             # ms — RMS window length
 
 # --- smoothing ---
-SMOOTH_WINDOW = 15              # samples at LSL_RATE — rolling mean window
+SMOOTH_WINDOW = 3              # samples at LSL_RATE — rolling mean window
 
 # --- input gain ---
-INPUT_GAIN    = 5.0             # multiply raw mic signal before processing
+INPUT_GAIN    = 10.0            
 
 # --- dynamic normalisation ---
 ADAPT_RATE    = 0.0001          # per output sample — how fast range shrinks back
