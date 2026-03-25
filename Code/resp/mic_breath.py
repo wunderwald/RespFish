@@ -31,30 +31,30 @@ STREAM_NAME = "resp_belt"     # LSL stream name (drop-in replacement)
 LSL_RATE = 50              # Hz — output sample rate pushed to LSL
 
 # --- bandpass filter (Hz) ---
-BP_LOW = 60
-BP_HIGH = 1000
+BP_LOW = 80
+BP_HIGH = 300
 
 # --- RMS envelope ---
-RMS_WINDOW_MS = 50             # ms — RMS window length
+RMS_WINDOW_MS = 100             # ms — RMS window length
 
 # --- smoothing ---
-SMOOTH_WINDOW = 3              # samples at LSL_RATE — rolling mean window
+SMOOTH_WINDOW = 25              # samples at LSL_RATE — rolling mean window
 
 # --- input gain ---
-INPUT_GAIN = 10.0
+INPUT_GAIN = 12.0
 
 # --- normalisation ---
-CALIBRATE = True            # if True: record 15s and derive range, then run
-CALIB_SECS = 15              # calibration recording duration
+CALIBRATE = False            # if True: record 15s and derive range, then run
+CALIB_SECS = 20              # calibration recording duration
 FIXED_MIN = 0.0             # used when CALIBRATE = False
-FIXED_MAX = 0.1             # used when CALIBRATE = False
+FIXED_MAX = 0.03             # used when CALIBRATE = False
 
 # #########
 # INTERNALS
 # #########
 
 AUDIO_RATE = 44100           # mic sample rate (fixed)
-BP_ORDER = 4               # butterworth order
+BP_ORDER = 4               
 
 
 # ########
