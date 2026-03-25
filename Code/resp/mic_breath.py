@@ -27,12 +27,12 @@ from pylsl import StreamInfo, StreamOutlet, cf_float32
 # CONSTANTS
 # #########
 
-STREAM_NAME = "resp_belt"     # LSL stream name (drop-in replacement)
-LSL_RATE = 50              # Hz — output sample rate pushed to LSL
+STREAM_NAME   = "resp_belt"     # LSL stream name (drop-in replacement)
+LSL_RATE      = 50              # Hz — output sample rate pushed to LSL
 
 # --- bandpass filter (Hz) ---
-BP_LOW = 0.1             # low  cut — removes DC drift
-BP_HIGH = 1.0             # high cut — removes everything above ~1 breath/s
+BP_LOW        = 0.1             # low  cut — removes DC drift
+BP_HIGH       = 1.0             # high cut — removes everything above ~1 breath/s
 
 # --- RMS envelope ---
 RMS_WINDOW_MS = 200             # ms — RMS window length
@@ -41,20 +41,17 @@ RMS_WINDOW_MS = 200             # ms — RMS window length
 SMOOTH_WINDOW = 15              # samples at LSL_RATE — rolling mean window
 
 # --- input gain ---
-INPUT_GAIN = 5.0             # multiply raw mic signal before processing
+INPUT_GAIN    = 5.0             # multiply raw mic signal before processing
 
 # --- dynamic normalisation ---
-ADAPT_RATE = 0.0001          # per output sample — how fast range shrinks back
-
-# --- terminal readout ---
-LIVE_PRINT = False            # print one-line live readout to terminal
+ADAPT_RATE    = 0.0001          # per output sample — how fast range shrinks back
 
 # #########
 # INTERNALS
 # #########
 
-AUDIO_RATE = 44100           # mic sample rate (fixed)
-BP_ORDER = 4               # butterworth order
+AUDIO_RATE    = 44100           # mic sample rate (fixed)
+BP_ORDER      = 4               # butterworth order
 
 
 # ########
@@ -72,29 +69,29 @@ class BreathPipeline:
         self.sos, self.zi = self._make_bandpass()
 
         # RMS envelope buffer
-        self.rms_len = max(1, int(AUDIO_RATE * RMS_WINDOW_MS / 1000))
-        self.rms_buf = np.zeros(self.rms_len)
-        self.rms_idx = 0
+        self.rms_len  = max(1, int(AUDIO_RATE * RMS_WINDOW_MS / 1000))
+        self.rms_buf  = np.zeros(self.rms_len)
+        self.rms_idx  = 0
 
         # smoothing buffer (at LSL_RATE)
         self.smooth_buf = np.zeros(SMOOTH_WINDOW)
         self.smooth_idx = 0
 
         # dynamic range
-        self.adapt_min = 0.5
+        self.adapt_min =  0.5
         self.adapt_max = -0.5
 
         # accumulate audio samples between LSL output ticks
-        self._accum = []
+        self._accum      = []
         self._accum_lock = threading.Lock()
-        self.latest = 0.0
+        self.latest      = 0.0
 
     def _make_bandpass(self):
         nyq = AUDIO_RATE / 2.0
         sos = butter(BP_ORDER,
                      [BP_LOW / nyq, BP_HIGH / nyq],
                      btype="band", output="sos")
-        zi = sosfilt_zi(sos)[:, :, np.newaxis]  # shape for mono
+        zi  = sosfilt_zi(sos)[:, :, np.newaxis]  # shape for mono
         return sos, zi
 
     def push_audio(self, block: np.ndarray):
@@ -133,14 +130,10 @@ class BreathPipeline:
         smoothed = float(np.mean(self.smooth_buf))
 
         # dynamic normalisation
-        if smoothed < self.adapt_min:
-            self.adapt_min = smoothed
-        else:
-            self.adapt_min += (smoothed - self.adapt_min) * ADAPT_RATE
-        if smoothed > self.adapt_max:
-            self.adapt_max = smoothed
-        else:
-            self.adapt_max -= (self.adapt_max - smoothed) * ADAPT_RATE
+        if smoothed < self.adapt_min: self.adapt_min  = smoothed
+        else:                         self.adapt_min += (smoothed - self.adapt_min) * ADAPT_RATE
+        if smoothed > self.adapt_max: self.adapt_max  = smoothed
+        else:                         self.adapt_max -= (self.adapt_max - smoothed) * ADAPT_RATE
 
         r = self.adapt_max - self.adapt_min
         normalised = (smoothed - self.adapt_min) / r if r > 1e-6 else 0.0
@@ -158,8 +151,8 @@ if __name__ == "__main__":
     pipeline = BreathPipeline()
 
     # LSL outlet
-    info = StreamInfo(STREAM_NAME, "Respiration", 1,
-                      LSL_RATE, cf_float32, f"{STREAM_NAME}_mic")
+    info   = StreamInfo(STREAM_NAME, "Respiration", 1,
+                        LSL_RATE, cf_float32, f"{STREAM_NAME}_mic")
     outlet = StreamOutlet(info)
 
     # sounddevice callback — runs in audio thread
@@ -169,8 +162,8 @@ if __name__ == "__main__":
         pipeline.push_audio(indata)
 
     interval = 1.0 / LSL_RATE
-    pushed = 0
-    t_start = time.perf_counter()
+    pushed   = 0
+    t_start  = time.perf_counter()
 
     print(f"[mic_breath] streaming '{STREAM_NAME}' at {LSL_RATE} Hz")
     print(f"[mic_breath] bandpass {BP_LOW}–{BP_HIGH} Hz  |  "
@@ -190,14 +183,6 @@ if __name__ == "__main__":
                 value = pipeline.tick()
                 outlet.push_sample([value])
                 pushed += 1
-
-                if LIVE_PRINT and pushed % LSL_RATE == 0:
-                    bar_len = 30
-                    filled = int(value * bar_len)
-                    bar = "█" * filled + "░" * (bar_len - filled)
-                    print(f"\r  {bar}  {value:.3f}  "
-                          f"[range {pipeline.adapt_min:.3f}–{pipeline.adapt_max:.3f}]"
-                          f"  {pushed}smp  ", end="", flush=True)
 
         except KeyboardInterrupt:
             print("\n[mic_breath] Stopped.")
