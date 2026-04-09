@@ -1,0 +1,12 @@
+{
+  "name": "respfish",
+  "version": "0.1.0",
+  "description": "Respiration visualizer powered by LSL",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^35.0.0"
+  }
+}

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RespFish</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      font-weight: 300;
+      background: #0f485f;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 24px;
+    }
+
+    /* ── stream selector ───────────────────────────────────────────────── */
+    #stream-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(150, 150, 150, 0.45);
+      backdrop-filter: blur(8px);
+      border-radius: 99px;
+      padding: 8px 20px;
+      font-size: 0.78rem;
+      color: #aed4ed;
+      letter-spacing: 0.04em;
+    }
+    #stream-bar .label { opacity: 0.6; }
+
+    #stream-select {
+      background: transparent;
+      border: none;
+      color: #aed4ed;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 300;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      outline: none;
+      min-width: 140px;
+    }
+    #stream-select option {
+      background: #0f485f;
+      color: #aed4ed;
+    }
+    #stream-select option[data-offline="true"] {
+      color: #e07878;
+    }
+
+    /* ── stats bar ─────────────────────────────────────────────────────── */
+    #stats {
+      display: flex;
+      gap: 24px;
+      background: rgba(150, 150, 150, 0.45);
+      backdrop-filter: blur(8px);
+      border-radius: 99px;
+      padding: 8px 24px;
+      font-size: 0.78rem;
+      color: #aed4ed;
+      letter-spacing: 0.04em;
+    }
+    #stats span { white-space: nowrap; }
+    #stats .label { opacity: 0.6; margin-right: 4px; }
+    #status-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #b0cfe0;
+      margin-right: 6px;
+      vertical-align: middle;
+      transition: background 0.4s;
+    }
+    #status-dot.connected    { background: #5bc98a; }
+    #status-dot.disconnected { background: #e07878; }
+    #status-dot.searching    { background: #f0c060;
+      animation: pulse 1.2s ease-in-out infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── scene container ───────────────────────────────────────────────── */
+    #scene {
+      position: relative;
+      width: 90vw;
+      height: 80vh;
+      border-radius: 28px;
+      overflow: hidden;
+
+      background: linear-gradient(
+        180deg,
+        #b8e4f7 0%,
+        #8dcfef 40%,
+        #6bbde8 100%
+      );
+      box-shadow:
+        0 8px 32px rgba(80,160,210,0.18),
+        inset 0 1px 0 rgba(255,255,255,0.5);
+    }
+
+    /* subtle caustic shimmer overlay */
+    #scene::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 30% 20%,
+          rgba(255,255,255,0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 30% at 70% 60%,
+          rgba(255,255,255,0.10) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── wave canvas ───────────────────────────────────────────────────── */
+    #wave {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      z-index: 2;
+    }
+
+    /* ── fish ──────────────────────────────────────────────────────────── */
+    #fish {
+      position: absolute;
+      left: 66.66%;
+      transform: translateX(-50%) translateY(-50%);
+      width: clamp(100px, 20vw, 200px);
+      z-index: 3;
+      top: var(--fish-y, 50%);
+      filter: drop-shadow(0 4px 10px rgba(0,100,160,0.2));
+    }
+
+    @keyframes wag {
+      0%, 100% { transform: translateX(-50%) rotate(-2deg); }
+      50%       { transform: translateX(-50%) rotate( 2deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="stream-bar">
+    <span class="label">stream</span>
+    <select id="stream-select">
+      <option value="" disabled selected>no streams found</option>
+    </select>
+  </div>
+
+  <div id="stats">
+    <span><span id="status-dot"></span><span id="status-text">connecting…</span></span>
+    <span><span class="label">value</span><span id="val">—</span></span>
+    <span><span class="label">samples/s</span><span id="sps">—</span></span>
+  </div>
+
+  <div id="scene">
+    <canvas id="wave"></canvas>
+    <img id="fish" src="fishy.png" alt="fish" />
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
