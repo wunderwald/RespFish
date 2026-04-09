@@ -14,3 +14,17 @@ body {
   gap: 16px;
   padding: 24px;
 }
+
+/* ── Scene container — layout shared by all frontends ─────────────────────── */
+/* Each frontend CSS provides its own background gradient for #scene.          */
+
+#scene {
+  position: relative;
+  width: 90vw;
+  height: 80vh;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow:
+    0 8px 32px rgba(80,160,210,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+}

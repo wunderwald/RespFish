@@ -9,7 +9,10 @@
  */
 
 import { StreamManager } from "./modules/stream.js";
-import { Visualizer }    from "./modules/visualizer.js";
+import { Game }          from "./modules/game.js";
+// To switch frontends, replace the import above and the constructor below.
+// Any module that implements pushSample(value) and setStatus({ type, text })
+// can be used as a frontend.
 
 // ── mount points (defined in index.html) ─────────────────────────────────────
 const streamContainer = document.getElementById("stream-bar");
@@ -18,7 +21,7 @@ const sceneContainer  = document.getElementById("scene");
 
 // ── instantiate modules ───────────────────────────────────────────────────────
 const stream   = new StreamManager({ container: streamContainer });
-const frontend = new Visualizer({ statsContainer, sceneContainer });
+const frontend = new Game({ statsContainer, sceneContainer });
 
 // ── wire stream events → frontend ─────────────────────────────────────────────
 stream.on("sample", ({ value }) => frontend.pushSample(value));

@@ -1,0 +1,60 @@
+/* game.css — Breath game frontend (modules/game.js) */
+
+/* ── HUD bar (reuses #stats mount) ────────────────────────────────────────── */
+
+#stats {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  background: rgba(150, 150, 150, 0.45);
+  backdrop-filter: blur(8px);
+  border-radius: 99px;
+  padding: 8px 24px;
+  font-size: 0.78rem;
+  color: #aed4ed;
+  letter-spacing: 0.04em;
+}
+#stats span { white-space: nowrap; }
+#stats .label { opacity: 0.6; margin-right: 4px; }
+
+#game-start-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 99px;
+  color: #aed4ed;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  padding: 4px 18px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+#game-start-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+#game-start-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ── Scene — daytime sky (overrides water gradient from base layout) ──────── */
+
+#scene {
+  background: linear-gradient(
+    180deg,
+    #e8f4fc 0%,
+    #c6e2f5 40%,
+    #a8d4f0 100%
+  );
+}
+
+/* ── Game canvas ───────────────────────────────────────────────────────────── */
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
