@@ -1,0 +1,35 @@
+/* stream.css — stream selection bar (modules/stream.js) */
+
+#stream-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(150, 150, 150, 0.45);
+  backdrop-filter: blur(8px);
+  border-radius: 99px;
+  padding: 8px 20px;
+  font-size: 0.78rem;
+  color: #aed4ed;
+  letter-spacing: 0.04em;
+}
+#stream-bar .label { opacity: 0.6; }
+
+#stream-select {
+  background: transparent;
+  border: none;
+  color: #aed4ed;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  outline: none;
+  min-width: 140px;
+}
+#stream-select option {
+  background: #0f485f;
+  color: #aed4ed;
+}
+#stream-select option[data-offline="true"] {
+  color: #e07878;
+}
