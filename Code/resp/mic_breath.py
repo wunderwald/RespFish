@@ -28,7 +28,7 @@ from pylsl import StreamInfo, StreamOutlet, cf_float32
 # #########
 
 STREAM_NAME = "mic"     # LSL stream name (drop-in replacement)
-LSL_RATE = 50              # Hz — output sample rate pushed to LSL
+LSL_RATE = 100              # Hz — output sample rate pushed to LSL
 
 # --- bandpass filter (Hz) ---
 BP_LOW = 80
@@ -38,10 +38,10 @@ BP_HIGH = 300
 RMS_WINDOW_MS = 100             # ms — RMS window length
 
 # --- smoothing ---
-SMOOTH_WINDOW = 25              # samples at LSL_RATE — rolling mean window
+SMOOTH_WINDOW = 5              # samples at LSL_RATE — rolling mean window
 
 # --- input gain ---
-INPUT_GAIN = 12.0
+INPUT_GAIN = 6.0
 
 # --- normalisation ---
 CALIBRATE = False            # if True: record 15s and derive range, then run
