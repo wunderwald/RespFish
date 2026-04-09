@@ -27,7 +27,7 @@ from pylsl import StreamInfo, StreamOutlet, cf_float32
 # CONSTANTS
 # #########
 
-STREAM_NAME = "resp_belt"     # LSL stream name (drop-in replacement)
+STREAM_NAME = "mic"     # LSL stream name (drop-in replacement)
 LSL_RATE = 50              # Hz — output sample rate pushed to LSL
 
 # --- bandpass filter (Hz) ---
@@ -103,7 +103,7 @@ class BreathPipeline:
 
         # bandpass
         filtered, self.zi = sosfilt(self.sos, block,
-                                    zi=self.zi.reshape(self.sos.shape[0], 2))
+                                    zi=self.zi.reshape(self.sos.shape[0], 2)) # type: ignore
         self.zi = self.zi[:, :, np.newaxis]
 
         with self._accum_lock:

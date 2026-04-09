@@ -23,7 +23,7 @@ from pylsl import StreamInfo, StreamOutlet, cf_float32
 # CONSTANTS
 # #########
 
-STREAM_NAME = "resp_belt"   # must match STREAM_NAME in bridge.py
+STREAM_NAME = "resp_belt_sim"   
 SAMPLE_RATE = 500           # Hz
 BPM         = 10.0          # simulated breathing rate
 
