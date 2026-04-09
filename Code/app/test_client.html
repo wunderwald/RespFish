@@ -21,6 +21,41 @@
       padding: 24px;
     }
 
+    /* ── stream selector ───────────────────────────────────────────────── */
+    #stream-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(150, 150, 150, 0.45);
+      backdrop-filter: blur(8px);
+      border-radius: 99px;
+      padding: 8px 20px;
+      font-size: 0.78rem;
+      color: #aed4ed;
+      letter-spacing: 0.04em;
+    }
+    #stream-bar .label { opacity: 0.6; }
+
+    #stream-select {
+      background: transparent;
+      border: none;
+      color: #aed4ed;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 300;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      outline: none;
+      min-width: 140px;
+    }
+    #stream-select option {
+      background: #0f485f;
+      color: #aed4ed;
+    }
+    #stream-select option[data-offline="true"] {
+      color: #e07878;
+    }
+
     /* ── stats bar ─────────────────────────────────────────────────────── */
     #stats {
       display: flex;
@@ -113,6 +148,13 @@
 </head>
 <body>
 
+  <div id="stream-bar">
+    <span class="label">stream</span>
+    <select id="stream-select">
+      <option value="" disabled selected>no streams found</option>
+    </select>
+  </div>
+
   <div id="stats">
     <span><span id="status-dot"></span><span id="status-text">connecting…</span></span>
     <span><span class="label">value</span><span id="val">—</span></span>
@@ -138,13 +180,14 @@
     let   adaptMin =  0.5;
     let   adaptMax = -0.5;
 
-    const statusDot  = document.getElementById("status-dot");
-    const statusText = document.getElementById("status-text");
-    const valEl      = document.getElementById("val");
-    const spsEl      = document.getElementById("sps");
-    const fish       = document.getElementById("fish");
-    const canvas     = document.getElementById("wave");
-    const ctx        = canvas.getContext("2d");
+    const statusDot   = document.getElementById("status-dot");
+    const statusText  = document.getElementById("status-text");
+    const valEl       = document.getElementById("val");
+    const spsEl       = document.getElementById("sps");
+    const fish        = document.getElementById("fish");
+    const canvas      = document.getElementById("wave");
+    const ctx         = canvas.getContext("2d");
+    const streamSelect = document.getElementById("stream-select");
 
     function setStatus(cls, text) {
       statusDot.className    = cls;
@@ -209,29 +252,114 @@
     }
     requestAnimationFrame(draw);
 
+    // ── stream selector state ─────────────────────────────────────────────
+    let ws                = null;
+    let selectedStream    = null;   // name string or null
+    let streamConnected   = false;
+    let currentStreams     = [];    // latest list from server
+
+    function sendMsg(obj) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(obj));
+      }
+    }
+
+    function rebuildDropdown() {
+      const prev = streamSelect.value;
+      streamSelect.innerHTML = "";
+
+      const onlineNames = new Set(currentStreams.map(s => s.name));
+      const isOffline   = selectedStream && !streamConnected;
+
+      // If selected stream is currently offline, show it first with a badge
+      if (isOffline) {
+        const opt = document.createElement("option");
+        opt.value              = selectedStream;
+        opt.textContent        = selectedStream + " (offline)";
+        opt.dataset.offline    = "true";
+        streamSelect.appendChild(opt);
+      }
+
+      // Add all discovered streams (skip if already shown as offline above)
+      for (const s of currentStreams) {
+        if (isOffline && s.name === selectedStream) continue;
+        const opt = document.createElement("option");
+        opt.value       = s.name;
+        opt.textContent = s.name;
+        streamSelect.appendChild(opt);
+      }
+
+      // Fallback: no entries at all
+      if (streamSelect.options.length === 0) {
+        const opt = document.createElement("option");
+        opt.value    = "";
+        opt.disabled = true;
+        opt.textContent = "no streams found";
+        streamSelect.appendChild(opt);
+        streamSelect.value = "";
+        return;
+      }
+
+      if (selectedStream) {
+        streamSelect.value = selectedStream;
+      } else if (currentStreams.length > 0) {
+        // Auto-select first available stream
+        const first = currentStreams[0].name;
+        streamSelect.value = first;
+        selectedStream = first;
+        sendMsg({ type: "select_stream", name: first });
+      }
+    }
+
+    streamSelect.addEventListener("change", () => {
+      const name = streamSelect.value;
+      if (name) {
+        selectedStream  = name;
+        streamConnected = false;
+        rebuildDropdown();
+        sendMsg({ type: "select_stream", name });
+      }
+    });
+
+    // ── websocket ─────────────────────────────────────────────────────────
     function connect() {
-      const ws = new WebSocket(WS_URL);
+      ws = new WebSocket(WS_URL);
 
       ws.onopen = () => setStatus("searching", "waiting for stream…");
 
       ws.onmessage = ({ data }) => {
         const msg = JSON.parse(data);
-        if (msg.type === "sample") {
+
+        if (msg.type === "streams") {
+          currentStreams = msg.streams;
+          rebuildDropdown();
+
+        } else if (msg.type === "sample") {
           history[histIdx] = msg.value;
           histIdx = (histIdx + 1) % HISTORY_LEN;
           sampleCount++;
           valEl.textContent = msg.value.toFixed(3);
+
         } else if (msg.type === "connected") {
+          streamConnected = true;
+          selectedStream  = msg.stream.name;
+          rebuildDropdown();
           setStatus("connected", msg.stream.name);
+
         } else if (msg.type === "disconnected") {
+          streamConnected = false;
+          rebuildDropdown();
           setStatus("disconnected", "stream lost…");
           valEl.textContent = "—";
+
         } else if (msg.type === "searching") {
           setStatus("searching", "searching…");
         }
       };
 
       ws.onclose = () => {
+        streamConnected = false;
+        rebuildDropdown();
         setStatus("disconnected", "reconnecting…");
         setTimeout(connect, 3000);
       };
