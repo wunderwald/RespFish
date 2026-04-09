@@ -139,33 +139,14 @@
       top: var(--fish-y, 50%);
       filter: drop-shadow(0 4px 10px rgba(0,100,160,0.2));
     }
-
-    @keyframes wag {
-      0%, 100% { transform: translateX(-50%) rotate(-2deg); }
-      50%       { transform: translateX(-50%) rotate( 2deg); }
-    }
   </style>
 </head>
 <body>
+  <!-- mount containers — modules inject their DOM here -->
+  <div id="stream-bar"></div>
+  <div id="stats"></div>
+  <div id="scene"></div>
 
-  <div id="stream-bar">
-    <span class="label">stream</span>
-    <select id="stream-select">
-      <option value="" disabled selected>no streams found</option>
-    </select>
-  </div>
-
-  <div id="stats">
-    <span><span id="status-dot"></span><span id="status-text">connecting…</span></span>
-    <span><span class="label">value</span><span id="val">—</span></span>
-    <span><span class="label">samples/s</span><span id="sps">—</span></span>
-  </div>
-
-  <div id="scene">
-    <canvas id="wave"></canvas>
-    <img id="fish" src="fishy.png" alt="fish" />
-  </div>
-
-  <script src="renderer.js"></script>
+  <script type="module" src="renderer.js"></script>
 </body>
 </html>
