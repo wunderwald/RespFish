@@ -15,14 +15,14 @@
 
 export const CONFIG = {
   // Breathing rhythm
-  TARGET_BPM:          6,      // target breaths per minute
+  TARGET_BPM:          15,      // target breaths per minute
 
   // Game duration
   GAME_DURATION_SECS:  60,     // seconds the playing phase lasts
 
   // Calibration
-  CALIBRATION_SECS:    10,     // seconds of signal to record before playing
-  BREATH_THRESHOLD:    0.80,   // normalised level that counts as an exhale
+  CALIBRATION_SECS:    8,     // seconds of signal to record before playing
+  BREATH_THRESHOLD:    0.40,   // normalised level that counts as an exhale
   BREATH_DEBOUNCE_MS:  1500,   // minimum ms between two breath triggers
 
   // Timing windows (ms from the perfect moment)
