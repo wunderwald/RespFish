@@ -1,4 +1,74 @@
-// Preload runs in a privileged context with contextIsolation=true.
-// The renderer only uses the native WebSocket API so nothing extra is needed here.
-// This file exists as a placeholder for future IPC bridging (e.g. exposing
-// app version, native dialogs, or bridge health state to the renderer).
+/**
+ * preload.js
+ * ==========
+ * Runs in the privileged preload context (contextIsolation: true).
+ * Exposes a minimal, explicit API to the renderer via window.api.
+ *
+ * File I/O
+ * --------
+ * All three calls return a Promise that resolves to { ok: boolean, error?: string }.
+ *
+ *   window.api.ensureDir(dirPath)
+ *     Creates dirPath (and any missing parents) if it does not exist.
+ *
+ *   window.api.writeCSV(filePath, content)
+ *     Writes content to filePath, overwriting any existing file.
+ *     Parent directories are created automatically.
+ *
+ *   window.api.appendCSV(filePath, content)
+ *     Appends content to filePath.  Creates the file if it does not exist.
+ *     Use this to write frame-data rows incrementally during a trial.
+ *
+ * All paths may be absolute or relative to the electron/ app directory.
+ *
+ * Usage example (renderer):
+ *
+ *   // Write a header row when a trial starts
+ *   await window.api.writeCSV(
+ *     'subjectData/P01/frameData_1.csv',
+ *     'trialIndex,timestamp,gaze_x,gaze_y,breathLevel_input,breathLevel_scaled,stimulusLevel\n'
+ *   );
+ *
+ *   // Append one row per frame during the trial
+ *   await window.api.appendCSV(
+ *     'subjectData/P01/frameData_1.csv',
+ *     `1,2024-01-01T12:00:00.000Z,640,400,0.42,0.61,0.55\n`
+ *   );
+ *
+ *   // Write the trial summary after the trial ends
+ *   await window.api.writeCSV(
+ *     'subjectData/P01/trialData.csv',
+ *     header + rows
+ *   );
+ */
+
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("api", {
+  /**
+   * Creates a directory (and parents) if it does not exist.
+   * @param {string} dirPath
+   * @returns {Promise<{ ok: boolean, error?: string }>}
+   */
+  ensureDir: (dirPath) =>
+    ipcRenderer.invoke("ensure-dir", dirPath),
+
+  /**
+   * Writes a full CSV string to filePath (overwrites).
+   * @param {string} filePath
+   * @param {string} content  – complete file content including header
+   * @returns {Promise<{ ok: boolean, error?: string }>}
+   */
+  writeCSV: (filePath, content) =>
+    ipcRenderer.invoke("write-csv", filePath, content),
+
+  /**
+   * Appends a string to filePath (creates file if needed).
+   * Designed for incremental per-frame writes during a trial.
+   * @param {string} filePath
+   * @param {string} content  – one or more CSV rows, newline-terminated
+   * @returns {Promise<{ ok: boolean, error?: string }>}
+   */
+  appendCSV: (filePath, content) =>
+    ipcRenderer.invoke("append-csv", filePath, content),
+});
