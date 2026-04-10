@@ -5,7 +5,7 @@ const { spawn } = require("child_process");
 let bridgeProcess = null;
 let mainWindow = null;
 
-// ── Python bridge ─────────────────────────────────────────────────────────────
+// Python bridge 
 
 function startBridge() {
   // Use the venv Python; fall back to system python3
@@ -40,7 +40,7 @@ function killBridge() {
   }
 }
 
-// ── Window ────────────────────────────────────────────────────────────────────
+// Window 
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -61,7 +61,7 @@ function createWindow() {
   mainWindow.on("closed", () => (mainWindow = null));
 }
 
-// ── App lifecycle ─────────────────────────────────────────────────────────────
+// App lifecycle
 
 app.whenReady().then(() => {
   startBridge();

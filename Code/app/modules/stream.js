@@ -17,12 +17,12 @@
  */
 
 export class StreamManager {
-  #ws               = null;
-  #handlers         = {};
-  #selectedStream   = null;
-  #streamConnected  = false;
-  #currentStreams   = [];
-  #selectEl         = null;
+  #ws = null;
+  #handlers = {};
+  #selectedStream = null;
+  #streamConnected = false;
+  #currentStreams = [];
+  #selectEl = null;
   #wsUrl;
 
   constructor({ container, wsUrl = "ws://localhost:8765" }) {
@@ -31,14 +31,14 @@ export class StreamManager {
     this.#connect();
   }
 
-  // ── public event API ────────────────────────────────────────────────────────
+  // public event API
 
   on(event, cb) {
     (this.#handlers[event] ??= []).push(cb);
     return this;
   }
 
-  // ── UI ───────────────────────────────────────────────────────────────────────
+  // UI
 
   #buildUI(container) {
     container.innerHTML = `
@@ -51,22 +51,22 @@ export class StreamManager {
     this.#selectEl.addEventListener("change", () => {
       const name = this.#selectEl.value;
       if (!name) return;
-      this.#selectedStream   = name;
-      this.#streamConnected  = false;
+      this.#selectedStream = name;
+      this.#streamConnected = false;
       this.#rebuildDropdown();
       this.#send({ type: "select_stream", name });
     });
   }
 
   #rebuildDropdown() {
-    const sel       = this.#selectEl;
+    const sel = this.#selectEl;
     const isOffline = this.#selectedStream && !this.#streamConnected;
-    sel.innerHTML   = "";
+    sel.innerHTML = "";
 
     if (isOffline) {
       const opt = document.createElement("option");
-      opt.value           = this.#selectedStream;
-      opt.textContent     = `${this.#selectedStream} (offline)`;
+      opt.value = this.#selectedStream;
+      opt.textContent = `${this.#selectedStream} (offline)`;
       opt.dataset.offline = "true";
       sel.appendChild(opt);
     }
@@ -74,14 +74,14 @@ export class StreamManager {
     for (const s of this.#currentStreams) {
       if (isOffline && s.name === this.#selectedStream) continue;
       const opt = document.createElement("option");
-      opt.value       = s.name;
+      opt.value = s.name;
       opt.textContent = s.name;
       sel.appendChild(opt);
     }
 
     if (sel.options.length === 0) {
       const opt = document.createElement("option");
-      opt.value    = "";
+      opt.value = "";
       opt.disabled = true;
       opt.textContent = "no streams found";
       sel.appendChild(opt);
@@ -93,13 +93,13 @@ export class StreamManager {
       sel.value = this.#selectedStream;
     } else if (this.#currentStreams.length > 0) {
       const first = this.#currentStreams[0].name;
-      sel.value            = first;
+      sel.value = first;
       this.#selectedStream = first;
       this.#send({ type: "select_stream", name: first });
     }
   }
 
-  // ── WebSocket ────────────────────────────────────────────────────────────────
+  // WebSocket
 
   #send(obj) {
     if (this.#ws?.readyState === WebSocket.OPEN)
@@ -132,7 +132,7 @@ export class StreamManager {
 
         case "connected":
           this.#streamConnected = true;
-          this.#selectedStream  = msg.stream.name;
+          this.#selectedStream = msg.stream.name;
           this.#rebuildDropdown();
           this.#emit("status", {
             type: "connected",

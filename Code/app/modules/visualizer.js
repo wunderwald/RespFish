@@ -15,29 +15,29 @@
  */
 
 const HISTORY_LEN = 300;
-const PADDING     = 0.08;
+const PADDING = 0.08;
 const SHRINK_RATE = 0.0002;  // how fast the auto-range shrinks per frame
 
 export class Visualizer {
   // ring buffer
-  #history   = new Float32Array(HISTORY_LEN);
-  #histIdx   = 0;
+  #history = new Float32Array(HISTORY_LEN);
+  #histIdx = 0;
 
   // adaptive y-range
-  #adaptMin  =  0.5;
-  #adaptMax  = -0.5;
+  #adaptMin = 0.5;
+  #adaptMax = -0.5;
 
   // stats
   #sampleCount = 0;
 
   // DOM refs
-  #canvas     = null;
-  #ctx        = null;
-  #fish       = null;
-  #statusDot  = null;
+  #canvas = null;
+  #ctx = null;
+  #fish = null;
+  #statusDot = null;
   #statusText = null;
-  #valEl      = null;
-  #spsEl      = null;
+  #valEl = null;
+  #spsEl = null;
 
   constructor({ statsContainer, sceneContainer }) {
     this.#buildStats(statsContainer);
@@ -46,7 +46,7 @@ export class Visualizer {
     requestAnimationFrame(() => this.#draw());
   }
 
-  // ── public frontend interface ────────────────────────────────────────────────
+  // public frontend interface
 
   pushSample(value) {
     this.#history[this.#histIdx] = value;
@@ -56,12 +56,12 @@ export class Visualizer {
   }
 
   setStatus({ type, text }) {
-    this.#statusDot.className    = type;
+    this.#statusDot.className = type;
     this.#statusText.textContent = text;
     if (type === "disconnected") this.#valEl.textContent = "—";
   }
 
-  // ── DOM construction ─────────────────────────────────────────────────────────
+  // DOM construction
 
   #buildStats(container) {
     container.innerHTML = `
@@ -72,10 +72,10 @@ export class Visualizer {
       <span><span class="label">value</span><span id="val">—</span></span>
       <span><span class="label">samples/s</span><span id="sps">—</span></span>
     `;
-    this.#statusDot  = container.querySelector("#status-dot");
+    this.#statusDot = container.querySelector("#status-dot");
     this.#statusText = container.querySelector("#status-text");
-    this.#valEl      = container.querySelector("#val");
-    this.#spsEl      = container.querySelector("#sps");
+    this.#valEl = container.querySelector("#val");
+    this.#spsEl = container.querySelector("#sps");
   }
 
   #buildScene(container) {
@@ -84,11 +84,11 @@ export class Visualizer {
       <img id="fish" src="fishy.png" alt="fish" />
     `;
     this.#canvas = container.querySelector("#wave");
-    this.#ctx    = this.#canvas.getContext("2d");
-    this.#fish   = container.querySelector("#fish");
+    this.#ctx = this.#canvas.getContext("2d");
+    this.#fish = container.querySelector("#fish");
   }
 
-  // ── internals ────────────────────────────────────────────────────────────────
+  // internals
 
   #startSpsCounter() {
     let lastTick = performance.now();
@@ -102,12 +102,12 @@ export class Visualizer {
 
   #draw() {
     const canvas = this.#canvas;
-    const ctx    = this.#ctx;
-    const w = canvas.width  = canvas.offsetWidth;
+    const ctx = this.#ctx;
+    const w = canvas.width = canvas.offsetWidth;
     const h = canvas.height = canvas.offsetHeight;
     ctx.clearRect(0, 0, w, h);
 
-    // ── adaptive range ────────────────────────────────────────────────────────
+    // adaptive range
     let bufMin = Infinity, bufMax = -Infinity;
     for (let i = 0; i < HISTORY_LEN; i++) {
       if (this.#history[i] < bufMin) bufMin = this.#history[i];
@@ -118,32 +118,32 @@ export class Visualizer {
     if (bufMax > this.#adaptMax) this.#adaptMax = bufMax;
     else this.#adaptMax -= (this.#adaptMax - bufMax) * SHRINK_RATE;
 
-    const min    = this.#adaptMin;
-    const range  = (this.#adaptMax - this.#adaptMin) || 1;
-    const pad    = PADDING * h;
+    const min = this.#adaptMin;
+    const range = (this.#adaptMax - this.#adaptMin) || 1;
+    const pad = PADDING * h;
     const usable = h - pad * 2;
 
-    // ── waveform trace ────────────────────────────────────────────────────────
+    // waveform trace
     ctx.shadowColor = "rgba(255,255,255,0.6)";
-    ctx.shadowBlur  = 8;
+    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.strokeStyle = "rgba(255,255,255,0.75)";
-    ctx.lineWidth   = 2.5;
-    ctx.lineJoin    = "round";
-    ctx.lineCap     = "round";
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
 
     const traceEnd = w * (2 / 3);
     for (let i = 0; i < HISTORY_LEN; i++) {
-      const idx  = (this.#histIdx + i) % HISTORY_LEN;
-      const x    = (i / (HISTORY_LEN - 1)) * traceEnd;
+      const idx = (this.#histIdx + i) % HISTORY_LEN;
+      const x = (i / (HISTORY_LEN - 1)) * traceEnd;
       const norm = (this.#history[idx] - min) / range;
-      const y    = h - pad - norm * usable;
+      const y = h - pad - norm * usable;
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // ── fish position ─────────────────────────────────────────────────────────
+    // fish position
     const latestNorm =
       (this.#history[(this.#histIdx + HISTORY_LEN - 1) % HISTORY_LEN] - min) / range;
     const targetY = h - pad - latestNorm * usable;
