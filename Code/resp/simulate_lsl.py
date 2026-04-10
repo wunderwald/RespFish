@@ -82,10 +82,10 @@ def breath_sample(phase: float, amp: float) -> float:
     Generate a single breath sample from a normalised cycle phase ∈ [0, 1).
 
     The waveform has four landmarks:
-      0.0                 — start of inhale (trough)
+      0.0                 — start of inhale
       INHALE_FRACTION     — peak of inhale
       INHALE_FRACTION+ε   — start of exhale (brief hold, not modelled)
-      1.0                 — end of exhale (trough again)
+      1.0                 — end of exhale
 
     Each segment is a cubic ease-in/ease-out curve so transitions are smooth.
     """
@@ -124,7 +124,7 @@ class BreathState:
 
         # Amplitude jitter
         jitter = random.uniform(-AMP_JITTER_FRAC, AMP_JITTER_FRAC)
-        amp    = 1.0 + jitter
+        amp    = .7 + jitter
 
         # Occasional deep breath
         if random.random() < DEEP_BREATH_PROB:
