@@ -1,16 +1,22 @@
 /**
  * gazeCalibration.js — WebGazer wrapper
  * ======================================
- * Key insight: WebGazer requires its internal <video> element to exist in the
- * DOM before it will open the camera. Calling showVideoPreview(false) before
- * begin() prevents the video element from being created, so getUserMedia is
- * never called and the camera light never turns on.
+ * Key design decisions:
  *
- * Fix: let WebGazer create its video element freely (don't suppress it before
- * begin()), then hide it via CSS after the camera is running.
+ * 1. We do NOT call getUserMedia ourselves before WebGazer starts.
+ *    The earlier #checkCamera() was releasing the stream track, which
+ *    caused a brief camera-off period before WebGazer could re-open it.
+ *
+ * 2. webgazer.begin() is called at the START of the calibration UI, not
+ *    after it. This means the face tracker is already running while the
+ *    user clicks dots, so recordScreenPosition() actually trains the model
+ *    with live eye data — which is required for predictions to work.
+ *
+ * 3. showVideoPreview(false) is called immediately after begin() so the
+ *    WebGazer video/canvas elements are hidden from the start.
  */
 
-const CLICKS_REQUIRED = 5;
+const CLICKS_REQUIRED = 1;
 
 const CALIB_POINTS = [
   [0.1, 0.1], [0.5, 0.1], [0.9, 0.1],
@@ -27,7 +33,6 @@ export class GazeManager {
   #overlay      = null;
   #resolveCalib = null;
   #active       = false;
-  #calibPoints  = [];
   #dotCanvas    = null;
   #dotCtx       = null;
   #dotVisible   = false;
@@ -42,25 +47,15 @@ export class GazeManager {
   // ── Public API ──────────────────────────────────────────────────────────────
 
   async runCalibration() {
-    const camOk = await this.#checkCamera();
-    if (!camOk) {
-      await this.#showCameraError();
-      return;
-    }
-    return new Promise((resolve) => {
-      this.#resolveCalib = resolve;
-      this.#showCalibrationUI();
-    });
-  }
-
-  async start() {
-    if (this.#active) return;
     if (typeof webgazer === 'undefined') {
       console.error('[GazeManager] webgazer not defined — is lib/webgazer.js loaded?');
       return;
     }
+
+    // Start WebGazer FIRST so the face tracker is live during calibration.
+    // Training clicks only work when the camera is already running.
     try {
-      console.log('[GazeManager] calling webgazer.begin()…');
+      console.log('[GazeManager] starting WebGazer before calibration…');
 
       webgazer.setGazeListener((data) => {
         if (!data) return;
@@ -68,33 +63,34 @@ export class GazeManager {
         window.gazeState.y = data.y;
       });
 
-      // Do NOT call showVideoPreview(false) before begin().
-      // WebGazer needs to create its <video> element in the DOM
-      // before getUserMedia will fire. We hide it via CSS instead.
       await webgazer.begin();
 
-      console.log('[GazeManager] webgazer.begin() resolved');
-
-      // Now it's safe to hide the preview — camera is already open
+      // Hide UI elements immediately — camera stays open
       webgazer.showVideoPreview(false);
       webgazer.showPredictionPoints(false);
-
-      // Hide any residual WebGazer DOM elements that may still be visible
       this.#hideWebGazerDOM();
 
-      // Replay calibration clicks
-      for (const { x, y } of this.#calibPoints) {
-        webgazer.recordScreenPosition(x, y, 'click');
-      }
-
-      this.#active = true;
-      window.gazeState.active = true;
-      this.#showDot();
-      console.log('[GazeManager] active, replayed', this.#calibPoints.length, 'points');
+      console.log('[GazeManager] WebGazer running, showing calibration UI');
     } catch (err) {
       console.error('[GazeManager] begin() failed:', err);
-      this.#showErrorToast(`Gaze tracking failed: ${err.message}`);
+      await this.#showCameraError(err.message);
+      return;
     }
+
+    return new Promise((resolve) => {
+      this.#resolveCalib = resolve;
+      this.#showCalibrationUI();
+    });
+  }
+
+  async start() {
+    // WebGazer is already running after runCalibration().
+    // Just activate gaze state and show the dot.
+    if (this.#active) return;
+    this.#active = true;
+    window.gazeState.active = true;
+    this.#showDot();
+    console.log('[GazeManager] gaze tracking active');
   }
 
   stop() {
@@ -105,73 +101,45 @@ export class GazeManager {
     this.#hideDot();
   }
 
-  // ── Camera permission check ─────────────────────────────────────────────────
+  // ── WebGazer DOM cleanup ────────────────────────────────────────────────────
 
-  async #checkCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach(t => t.stop());
-      console.log('[GazeManager] camera access OK');
-      return true;
-    } catch (err) {
-      console.error('[GazeManager] camera denied:', err.name, err.message);
-      return false;
-    }
-  }
-
-  // Hide WebGazer's own DOM elements (video, canvas overlays) without
-  // stopping the camera. Must be called AFTER begin() resolves.
   #hideWebGazerDOM() {
-    const ids = ['webgazerVideoFeed', 'webgazerVideoCanvas',
-                 'webgazerFaceOverlay', 'webgazerFaceFeedbackBox'];
+    const ids = [
+      'webgazerVideoContainer', 'webgazerVideoFeed', 'webgazerVideoCanvas',
+      'webgazerFaceOverlay', 'webgazerFaceFeedbackBox', 'webgazerGazeDot',
+    ];
     for (const id of ids) {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     }
-    // Also catch any elements WebGazer appended to body by class/tag
-    document.querySelectorAll('video[id^="webgazer"]').forEach(el => {
-      el.style.display = 'none';
-    });
   }
 
-  #showCameraError() {
+  // ── Camera error UI ─────────────────────────────────────────────────────────
+
+  #showCameraError(msg = '') {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.id = 'gaze-calib-overlay';
       overlay.innerHTML = `
         <div id="gaze-calib-header">
           <h2>Camera Access Failed</h2>
-          <p id="gaze-cam-msg">Requesting camera details…</p>
+          <p>
+            Could not open the webcam.<br><br>
+            <strong>Error:</strong> <code>${msg}</code><br><br>
+            macOS: System Preferences → Privacy &amp; Security → Camera →
+            enable <strong>Electron</strong>, then restart the app.
+          </p>
         </div>
         <div id="gaze-calib-footer">
           <button id="gaze-calib-skip">Continue without gaze tracking</button>
         </div>
       `;
       document.body.appendChild(overlay);
-      navigator.mediaDevices.getUserMedia({ video: true }).catch(err => {
-        const el = overlay.querySelector('#gaze-cam-msg');
-        if (el) el.innerHTML = `
-          Could not access the webcam.<br><br>
-          <strong>Error:</strong> <code>${err.name}: ${err.message}</code><br><br>
-          macOS: System Preferences → Privacy &amp; Security → Camera →
-          enable <strong>Electron</strong>, then restart.
-        `;
-      });
       overlay.querySelector('#gaze-calib-skip').addEventListener('click', () => {
         overlay.remove();
         resolve();
       });
     });
-  }
-
-  #showErrorToast(msg) {
-    const t = document.createElement('div');
-    t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-      background:rgba(180,50,50,0.92);color:#fff;padding:10px 24px;border-radius:8px;
-      font-family:Nunito,sans-serif;font-size:0.82rem;z-index:9999;pointer-events:none`;
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 7000);
   }
 
   // ── Calibration UI ──────────────────────────────────────────────────────────
@@ -182,8 +150,8 @@ export class GazeManager {
     overlay.innerHTML = `
       <div id="gaze-calib-header">
         <h2>Gaze Calibration</h2>
-        <p>Click each dot <strong>${CLICKS_REQUIRED} times</strong> while
-           looking directly at it. All dots must turn green before continuing.</p>
+        <p>Click each dot while looking directly at it.
+           All dots must turn green before continuing.</p>
       </div>
       <div id="gaze-calib-points"></div>
       <div id="gaze-calib-footer">
@@ -196,6 +164,7 @@ export class GazeManager {
 
     const container = overlay.querySelector('#gaze-calib-points');
     const dots = [];
+
     for (const [fx, fy] of CALIB_POINTS) {
       const dot = document.createElement('button');
       dot.className      = 'gaze-calib-dot';
@@ -206,6 +175,7 @@ export class GazeManager {
       container.appendChild(dot);
       dots.push(dot);
     }
+
     overlay.querySelector('#gaze-calib-accept').addEventListener('click', () => {
       this.#finishCalibration();
     });
@@ -217,21 +187,25 @@ export class GazeManager {
   #onDotClick(dot, allDots, overlay) {
     const clicks = parseInt(dot.dataset.clicks) + 1;
     dot.dataset.clicks = clicks;
+
+    // Record position with the LIVE face tracker — this is what trains the model
     const rect = dot.getBoundingClientRect();
-    this.#calibPoints.push({
-      x: rect.left + rect.width  / 2,
-      y: rect.top  + rect.height / 2,
-    });
+    const cx   = rect.left + rect.width  / 2;
+    const cy   = rect.top  + rect.height / 2;
+    webgazer.recordScreenPosition(cx, cy, 'click');
+
     dot.style.setProperty('--calib-progress', Math.min(clicks / CLICKS_REQUIRED, 1));
     if (clicks >= CLICKS_REQUIRED) { dot.classList.add('done'); dot.disabled = true; }
+
     const allDone = allDots.every(d => parseInt(d.dataset.clicks) >= CLICKS_REQUIRED);
     overlay.querySelector('#gaze-calib-accept').disabled = !allDone;
   }
 
-  async #finishCalibration() {
+  #finishCalibration() {
     this.#overlay?.remove();
     this.#overlay = null;
-    await this.start();
+    // Activate gaze state — WebGazer is already running
+    this.start();
     this.#resolveCalib?.();
     this.#resolveCalib = null;
   }
@@ -239,6 +213,7 @@ export class GazeManager {
   #skipCalibration() {
     this.#overlay?.remove();
     this.#overlay = null;
+    // WebGazer is running but we won't mark it active or show the dot
     this.#resolveCalib?.();
     this.#resolveCalib = null;
   }

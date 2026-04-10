@@ -55,9 +55,8 @@ async function init() {
   const gaze = new GazeManager();
   if (GAZE_ENABLED) {
     await gaze.runCalibration();
-    // Ensure tracking is active regardless of how calibration was completed.
-    // #finishCalibration() calls start() internally, but this is a safety net
-    // for the skip path and any edge cases where start() may not have fired.
+    // runCalibration() calls start() internally on Accept.
+    // This is a safety net for the skip path.
     if (!gaze.isActive) gaze.start();
   }
 
