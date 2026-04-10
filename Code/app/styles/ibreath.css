@@ -83,9 +83,8 @@
 
 /* ── Scene ────────────────────────────────────────────────────────────────── */
 
-/* Neutral grey background matching original MATLAB BACKGROUND_COLOR [216,216,216] */
 #scene {
-  background: rgb(216, 216, 216);
+  background: rgb(118, 126, 192);
 }
 
 /* ── Canvas ───────────────────────────────────────────────────────────────── */

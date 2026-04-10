@@ -25,7 +25,7 @@ import { GazeManager   } from "./modules/gazeCalibration.js";
 // Change this value to switch frontends.
 // 'visualizer' | 'game' | 'ibreath' | 'gazetest'
 
-const FRONTEND = 'gazetest';
+const FRONTEND = 'ibreath';
 
 // ── Gaze tracking ─────────────────────────────────────────────────────────────
 //
