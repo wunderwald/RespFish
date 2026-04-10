@@ -14,15 +14,15 @@ import { Game }          from "./modules/game.js";
 // Any module that implements pushSample(value) and setStatus({ type, text })
 // can be used as a frontend.
 
-// ── mount points (defined in index.html) ─────────────────────────────────────
+// mount points (defined in index.html)
 const streamContainer = document.getElementById("stream-bar");
 const statsContainer  = document.getElementById("stats");
 const sceneContainer  = document.getElementById("scene");
 
-// ── instantiate modules ───────────────────────────────────────────────────────
+// instantiate modules
 const stream   = new StreamManager({ container: streamContainer });
 const frontend = new Game({ statsContainer, sceneContainer });
 
-// ── wire stream events → frontend ─────────────────────────────────────────────
+// wire stream events → frontend
 stream.on("sample", ({ value }) => frontend.pushSample(value));
 stream.on("status", (event)     => frontend.setStatus(event));

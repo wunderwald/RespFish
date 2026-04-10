@@ -2,9 +2,9 @@
  * game.js — Breath-controlled cloud game
  * =======================================
  * Guitar-Hero-style: clouds spawn at the screen edge and fly toward a center
- * ring along a squiggly path.  The player "blows them away" by exhaling
- * (signal entering the top fraction of the calibrated range) at the right
- * moment.  Score depends on timing accuracy.
+ * ring along a squiggly path.  The player "blows them away" at exhale onset —
+ * the moment the signal starts rising from its resting baseline.
+ * Score depends on timing accuracy.
  *
  * Implements the standard frontend interface:
  *   pushSample(value: number) → void
@@ -22,7 +22,7 @@ export const CONFIG = {
 
   // Calibration
   CALIBRATION_SECS:    8,     // seconds of signal to record before playing
-  BREATH_THRESHOLD:    0.40,   // normalised level that counts as an exhale
+  EXHALE_ONSET_THRESHOLD: 0.20, // rising edge across this level triggers exhale onset
   BREATH_DEBOUNCE_MS:  1500,   // minimum ms between two breath triggers
 
   // Timing windows (ms from the perfect moment)
@@ -274,17 +274,19 @@ export class Game {
   #tickBreath(value) {
     const { min, max } = this.#calRange;
     const norm = (value - min) / ((max - min) || 1);
-    const above = norm >= CONFIG.BREATH_THRESHOLD;
 
-    // Rising-edge: only trigger once per breath
-    if (above && !this.#inBreath) {
+    // Exhale onset: rising edge crossing EXHALE_ONSET_THRESHOLD.
+    // Triggers at the start of the exhale rise, not after it peaks.
+    const rising = norm >= CONFIG.EXHALE_ONSET_THRESHOLD;
+
+    if (rising && !this.#inBreath) {
       const now = performance.now();
       if (now - this.#lastBreathMs > CONFIG.BREATH_DEBOUNCE_MS) {
         this.#lastBreathMs = now;
         this.#onBreath(now);
       }
     }
-    this.#inBreath = above;
+    this.#inBreath = rising;
   }
 
   #onBreath(now) {
@@ -524,13 +526,15 @@ export class Game {
 
   /**
    * A soft pulsing circle that guides the user's breathing rhythm.
-   * Expands on inhale (0 → 0.5 of beat), contracts on exhale (0.5 → 1).
-   * Clouds arrive at beat boundary (t = 0), which is the exhale peak.
+   * Phase 0 = exhale onset (cloud arrives, ring flashes).
+   * Phase 0 → 0.5 = EXHALE  — guide circle expands.
+   * Phase 0.5 → 1 = INHALE  — guide circle contracts.
+   * breathNorm = sin(phase·π): smoothly arcs 0 → 1 → 0 over one beat.
    */
   #drawBreathGuide(ctx, cx, cy, now) {
     const beatPhase  = ((now - this.#gameStartTime) % this.#beatMs) / this.#beatMs;
-    const breathNorm = Math.sin(beatPhase * Math.PI * 2) * 0.5 + 0.5; // 0→1→0
-    const label      = beatPhase < 0.5 ? 'INHALE' : 'EXHALE';
+    const breathNorm = Math.sin(beatPhase * Math.PI); // 0 at onset, peaks mid-exhale, 0 at inhale end
+    const label      = beatPhase < 0.5 ? 'EXHALE' : 'INHALE';
 
     // Soft expanding/contracting circle
     const guideR = CONFIG.RING_RADIUS * (0.45 + breathNorm * 0.35);
@@ -548,8 +552,8 @@ export class Game {
   }
 
   /**
-   * The target ring in the center.  Pulses brightly at each beat boundary
-   * (the moment a cloud should be hit).
+   * The target ring in the center.  Flashes at phase 0 (exhale onset /
+   * cloud arrival) and quickly decays — reinforcing the blow-now moment.
    */
   #drawRing(ctx, cx, cy, now) {
     const beatPhase = ((now - this.#gameStartTime) % this.#beatMs) / this.#beatMs;
