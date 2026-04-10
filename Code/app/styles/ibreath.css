@@ -1,0 +1,98 @@
+/* ibreath.css — iBreath experiment frontend */
+
+/* ── HUD bar ──────────────────────────────────────────────────────────────── */
+
+#stats {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: rgba(150, 150, 150, 0.45);
+  backdrop-filter: blur(8px);
+  border-radius: 99px;
+  padding: 8px 24px;
+  font-size: 0.78rem;
+  color: #aed4ed;
+  letter-spacing: 0.04em;
+}
+
+#stats span { white-space: nowrap; }
+#stats .label { opacity: 0.6; margin-right: 4px; }
+
+/* Subject code input */
+#ib-subject {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(174, 212, 237, 0.4);
+  color: #aed4ed;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  width: 90px;
+  outline: none;
+  padding: 1px 2px;
+  transition: border-color 0.2s;
+}
+#ib-subject:focus {
+  border-bottom-color: rgba(174, 212, 237, 0.9);
+}
+#ib-subject:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* HUD buttons */
+#ib-controls {
+  display: flex;
+  gap: 8px;
+}
+
+#ib-controls button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 99px;
+  color: #aed4ed;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  padding: 4px 16px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+#ib-controls button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.48);
+}
+
+#ib-controls button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Abort button — distinct colour so it's easy to find in a hurry */
+#ib-abort-btn {
+  border-color: rgba(224, 120, 120, 0.45) !important;
+  color: #e09898 !important;
+}
+#ib-abort-btn:hover:not(:disabled) {
+  background: rgba(224, 120, 120, 0.15) !important;
+  border-color: rgba(224, 120, 120, 0.7) !important;
+}
+
+/* ── Scene ────────────────────────────────────────────────────────────────── */
+
+/* Neutral grey background matching original MATLAB BACKGROUND_COLOR [216,216,216] */
+#scene {
+  background: rgb(216, 216, 216);
+}
+
+/* ── Canvas ───────────────────────────────────────────────────────────────── */
+
+#ib-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
