@@ -18,6 +18,7 @@
  */
 
 import { StreamManager } from "./modules/stream.js";
+import { GazeManager   } from "./modules/gazeCalibration.js";
 
 // ── Active frontend ───────────────────────────────────────────────────────────
 //
@@ -25,6 +26,17 @@ import { StreamManager } from "./modules/stream.js";
 // 'visualizer' | 'game' | 'ibreath'
 
 const FRONTEND = 'game';
+
+// ── Gaze tracking ─────────────────────────────────────────────────────────────
+//
+// Set GAZE_ENABLED = true to show the 9-point calibration screen on startup
+// and stream gaze data into window.gazeState for the iBreath CSV logger.
+// Set to false to skip entirely (no webcam needed — useful for game/visualizer
+// or when testing ibreath without eye tracking).
+//
+// The G key toggles gaze on/off at any point regardless of this setting.
+
+const GAZE_ENABLED = true;
 
 // ── Mount points (defined in index.html) ─────────────────────────────────────
 
@@ -39,13 +51,21 @@ async function init() {
   //    DOM is already styled when the constructor runs.
   injectCSS(`styles/${FRONTEND}.css`);
 
-  // 2. Dynamically import the frontend module.
+  // 2. Run gaze calibration if enabled.
+  //    This blocks until the experimenter accepts or skips calibration,
+  //    so the frontend is not yet visible during this phase.
+  const gaze = new GazeManager();
+  if (GAZE_ENABLED) {
+    await gaze.runCalibration();
+  }
+
+  // 3. Dynamically import the frontend module.
   const { default: FrontendClass } = await import(`./modules/${FRONTEND}.js`);
 
-  // 3. Instantiate — every frontend receives the same two containers.
+  // 4. Instantiate — every frontend receives the same two containers.
   const frontend = new FrontendClass({ statsContainer, sceneContainer });
 
-  // 4. Instantiate the stream manager and wire its events to the frontend.
+  // 5. Instantiate the stream manager and wire its events to the frontend.
   const stream = new StreamManager({ container: streamContainer });
   stream.on("sample", ({ value }) => frontend.pushSample(value));
   stream.on("status", (event)     => frontend.setStatus(event));
