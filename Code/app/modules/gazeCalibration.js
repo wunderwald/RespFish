@@ -21,6 +21,12 @@
 // How many clicks each calibration point needs before it turns green
 const CLICKS_REQUIRED = 5;
 
+// Gaze debug dot
+const DOT_RADIUS     = 10;
+const DOT_COLOR      = 'rgba(255, 80, 80, 0.82)';
+const DOT_RING_COLOR = 'rgba(255, 80, 80, 0.30)';
+const DOT_RING_R     = 22;
+
 // The 9 calibration points as [xFraction, yFraction] of the viewport
 const CALIB_POINTS = [
   [0.1, 0.1], [0.5, 0.1], [0.9, 0.1],
@@ -35,11 +41,17 @@ export class GazeManager {
   #overlay      = null;   // fullscreen calibration overlay element
   #resolveCalib = null;   // resolve fn for the calibration promise
 
+  // Gaze debug dot
+  #dotCanvas    = null;   // fullscreen overlay canvas
+  #dotCtx       = null;
+  #dotVisible   = false;
+  #dotRafId     = null;
+
   constructor() {
     // Initialise global gaze state readable by any frontend
     window.gazeState = { x: 0, y: 0, active: false };
 
-    // G key: toggle gaze on/off
+    // G key: toggle gaze on/off (and dot visibility when gaze is active)
     window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyG') this.toggle();
     });
@@ -84,6 +96,7 @@ export class GazeManager {
 
     this.#active = true;
     window.gazeState.active = true;
+    this.#showDot();
     console.log('[GazeManager] gaze tracking started');
   }
 
@@ -95,6 +108,7 @@ export class GazeManager {
     if (typeof webgazer !== 'undefined') webgazer.pause();
     this.#active = false;
     window.gazeState.active = false;
+    this.#hideDot();
     console.log('[GazeManager] gaze tracking paused');
   }
 
@@ -219,6 +233,84 @@ export class GazeManager {
     this.#resolveCalib?.();
     this.#resolveCalib = null;
     console.log('[GazeManager] calibration skipped — gaze tracking disabled');
+  }
+
+  // ── Gaze debug dot ──────────────────────────────────────────────────────────
+  //
+  // A small red crosshair dot drawn on a fullscreen canvas overlay, showing
+  // exactly where WebGazer thinks the participant is looking.
+  // Automatically shown when gaze tracking starts, hidden when it stops.
+  // The G-key toggle shows/hides both tracking and dot together.
+
+  #showDot() {
+    if (this.#dotVisible) return;
+
+    // Create or reuse the overlay canvas
+    if (!this.#dotCanvas) {
+      const canvas = document.createElement('canvas');
+      canvas.id = 'gaze-dot-canvas';
+      document.body.appendChild(canvas);
+      this.#dotCanvas = canvas;
+      this.#dotCtx    = canvas.getContext('2d');
+    }
+
+    this.#dotCanvas.style.display = 'block';
+    this.#dotVisible = true;
+    this.#dotRafId   = requestAnimationFrame(() => this.#drawDotLoop());
+  }
+
+  #hideDot() {
+    if (!this.#dotVisible) return;
+    this.#dotVisible = false;
+    if (this.#dotRafId) {
+      cancelAnimationFrame(this.#dotRafId);
+      this.#dotRafId = null;
+    }
+    if (this.#dotCanvas) {
+      this.#dotCanvas.style.display = 'none';
+      // Clear any residual drawing
+      this.#dotCtx.clearRect(0, 0, this.#dotCanvas.width, this.#dotCanvas.height);
+    }
+  }
+
+  #drawDotLoop() {
+    if (!this.#dotVisible) return;
+
+    const canvas = this.#dotCanvas;
+    const ctx    = this.#dotCtx;
+
+    // Keep canvas sized to viewport
+    if (canvas.width  !== window.innerWidth)  canvas.width  = window.innerWidth;
+    if (canvas.height !== window.innerHeight) canvas.height = window.innerHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const { x, y, active } = window.gazeState;
+    if (active && x !== 0 && y !== 0) {
+      // Outer ring
+      ctx.beginPath();
+      ctx.arc(x, y, DOT_RING_R, 0, Math.PI * 2);
+      ctx.strokeStyle = DOT_RING_COLOR;
+      ctx.lineWidth   = 2;
+      ctx.stroke();
+
+      // Inner filled dot
+      ctx.beginPath();
+      ctx.arc(x, y, DOT_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = DOT_COLOR;
+      ctx.fill();
+
+      // Crosshair lines
+      ctx.strokeStyle = DOT_COLOR;
+      ctx.lineWidth   = 1.5;
+      const arm = DOT_RING_R + 6;
+      ctx.beginPath();
+      ctx.moveTo(x - arm, y); ctx.lineTo(x + arm, y);
+      ctx.moveTo(x, y - arm); ctx.lineTo(x, y + arm);
+      ctx.stroke();
+    }
+
+    this.#dotRafId = requestAnimationFrame(() => this.#drawDotLoop());
   }
 
   // ── Toast notification ──────────────────────────────────────────────────────
