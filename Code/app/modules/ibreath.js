@@ -314,6 +314,9 @@ export default class IBreath {
     this.#startBtn.disabled = true;
     this.#subjectInput.disabled = true;
     this.#stateEl.textContent = 'calibrating…';
+
+    // Create subject directory and trialData.csv header now, before any trial
+    this.#initCSVFiles();
   }
 
   #finishCalibration() {
@@ -389,6 +392,9 @@ export default class IBreath {
     this.#trialStartTime = performance.now();
     trial.startTime = new Date().toISOString();
 
+    // Write frameData header now — so a mid-trial crash still leaves a valid file
+    this.#initFrameCSV(trial.trialIndex);
+
     this.#state = STATE.TRIAL;
     this.#nextBtn.style.display  = 'none';
     this.#abortBtn.style.display = '';
@@ -431,8 +437,8 @@ export default class IBreath {
       this.#syncStimulusRange = [lvlMin, lvlMax];
     }
 
-    // Write CSVs (WP6 will wire these up fully; stubs are in place)
-    this.#writeFrameCSV(trial);
+    // Write CSVs
+    this.#flushFrameCSV(trial);
     this.#appendTrialDataCSV(trial);
 
     this.#trialData.push({ ...trial });
@@ -678,37 +684,130 @@ export default class IBreath {
     this.#imgCache[src] = img;
   }
 
-  // ── CSV output (stubs — fully wired in WP6) ────────────────────────────────
+  // ── CSV output ────────────────────────────────────────────────────────────
+  //
+  // Two files per subject, written to CONFIG.DATA_DIR/<subjectCode>/:
+  //
+  //   trialData.csv   — one row per trial (appended after each trial ends)
+  //   frameData_N.csv — one row per animation frame for trial N
+  //
+  // Columns match the MATLAB ibreath_main_v2.m output exactly.
+  //
+  // Strategy:
+  //   • Subject directory + trialData.csv header are created at calibration
+  //     start (#initCSVFiles), before any trial runs.
+  //   • frameData_N.csv header is written when a trial starts (#initFrameCSV),
+  //     so even a crash mid-trial leaves a valid (partial) file.
+  //   • Frame rows are buffered in #frameRows during the trial, then flushed
+  //     as a single write at trial end (#flushFrameCSV).  This avoids hundreds
+  //     of IPC calls per trial while still keeping memory bounded.
+  //   • All errors are caught, logged to console, and shown in the HUD
+  //     status text so the experimenter is aware immediately.
 
-  async #writeFrameCSV(trial) {
-    if (!window.api) return;
-    const dir  = `${CONFIG.DATA_DIR}/${this.#subjectCode}`;
-    const file = `${dir}/frameData_${trial.trialIndex}.csv`;
-    const header = 'trialIndex,timestamp,gaze_x,gaze_y,' +
-                   'breathLevel_input,breathLevel_scaled,stimulusLevel\n';
-    const rows = this.#frameRows.map(r =>
-      `${trial.trialIndex},${r.t},${r.gaze_x},${r.gaze_y},` +
-      `${r.raw.toFixed(6)},${r.scaled.toFixed(6)},${r.stim.toFixed(6)}`
-    ).join('\n');
-    await window.api.writeCSV(file, header + rows + '\n');
-  }
+  // Column headers — must match MATLAB csvColumns exactly
+  static #FRAME_HEADER =
+    'trialIndex,timestamp,gaze_x,gaze_y,' +
+    'breathLevel_input,breathLevel_scaled,stimulusLevel\n';
 
-  async #appendTrialDataCSV(trial) {
-    if (!window.api) return;
-    const dir  = `${CONFIG.DATA_DIR}/${this.#subjectCode}`;
-    const file = `${dir}/trialData.csv`;
-    const header = 'trialIndex,subject,synchronous,img,lr,slowfast,' +
-                   'ITI,startTime,endTime,aborted\n';
+  static #TRIAL_HEADER =
+    'trialIndex,subject,synchronous,img,lr,slowfast,' +
+    'ITI,startTime,endTime,aborted\n';
 
-    // Write header only for first trial
-    if (this.#trialIndex === 1) {
-      await window.api.writeCSV(file, header);
+  /** Called at the start of #beginCalibration — creates dir + trialData header. */
+  async #initCSVFiles() {
+    if (!window.api) {
+      console.warn('[CSV] window.api not available — file I/O disabled');
+      return;
+    }
+    const dir = `${CONFIG.DATA_DIR}/${this.#subjectCode}`;
+
+    // Ensure subject directory exists
+    const dirResult = await window.api.ensureDir(dir);
+    if (!dirResult.ok) {
+      this.#csvWarn(`Could not create data dir: ${dirResult.error}`);
+      return;
     }
 
+    // Write trialData.csv header (overwrites any previous TEST file)
+    const trialFile = `${dir}/trialData.csv`;
+    const result = await window.api.writeCSV(trialFile, IBreath.#TRIAL_HEADER);
+    if (!result.ok) {
+      this.#csvWarn(`Could not init trialData.csv: ${result.error}`);
+    } else {
+      console.log(`[CSV] initialised ${trialFile}`);
+    }
+  }
+
+  /** Called at the start of each trial — writes frameData_N.csv header. */
+  async #initFrameCSV(trialIndex) {
+    if (!window.api) return;
+    const file = this.#frameCSVPath(trialIndex);
+    const result = await window.api.writeCSV(file, IBreath.#FRAME_HEADER);
+    if (!result.ok) {
+      this.#csvWarn(`Could not init frameData_${trialIndex}.csv: ${result.error}`);
+    }
+  }
+
+  /** Called at the end of each trial — flushes buffered frame rows. */
+  async #flushFrameCSV(trial) {
+    if (!window.api || this.#frameRows.length === 0) return;
+
+    const rows = this.#frameRows.map(r =>
+      `${trial.trialIndex},${r.t},` +
+      `${r.gaze_x.toFixed(1)},${r.gaze_y.toFixed(1)},` +
+      `${r.raw.toFixed(6)},${r.scaled.toFixed(6)},${r.stim.toFixed(6)}`
+    ).join('\n') + '\n';
+
+    const result = await window.api.appendCSV(this.#frameCSVPath(trial.trialIndex), rows);
+    if (!result.ok) {
+      this.#csvWarn(`Could not write frameData_${trial.trialIndex}.csv: ${result.error}`);
+    } else {
+      console.log(`[CSV] wrote ${this.#frameRows.length} frame rows for trial ${trial.trialIndex}`);
+    }
+  }
+
+  /** Called at the end of each trial — appends one row to trialData.csv. */
+  async #appendTrialDataCSV(trial) {
+    if (!window.api) return;
+
     const row =
-      `${trial.trialIndex},${this.#subjectCode},${trial.synchronous},` +
-      `${trial.img},${trial.lr},${trial.slowfast ?? ''},` +
-      `${trial.ITI},${trial.startTime},${trial.endTime},${trial.aborted}\n`;
-    await window.api.appendCSV(file, row);
+      `${trial.trialIndex},` +
+      `${this.#subjectCode},` +
+      `${trial.synchronous},` +
+      `${trial.img},` +
+      `${trial.lr},` +
+      `${trial.slowfast ?? ''},` +
+      `${trial.ITI},` +
+      `${trial.startTime ?? ''},` +
+      `${trial.endTime   ?? ''},` +
+      `${trial.aborted}\n`;
+
+    const result = await window.api.appendCSV(
+      `${CONFIG.DATA_DIR}/${this.#subjectCode}/trialData.csv`,
+      row
+    );
+    if (!result.ok) {
+      this.#csvWarn(`Could not append to trialData.csv: ${result.error}`);
+    }
+  }
+
+  /** Convenience: full path for a trial's frameData CSV. */
+  #frameCSVPath(trialIndex) {
+    return `${CONFIG.DATA_DIR}/${this.#subjectCode}/frameData_${trialIndex}.csv`;
+  }
+
+  /** Shows a CSV error in the HUD status text (non-fatal). */
+  #csvWarn(msg) {
+    console.error('[CSV]', msg);
+    if (this.#stateEl) {
+      const prev = this.#stateEl.textContent;
+      this.#stateEl.textContent = `⚠ CSV: ${msg}`;
+      this.#stateEl.style.color = '#e09898';
+      // Restore after 5 s so the experimenter sees it but it doesn't persist
+      setTimeout(() => {
+        this.#stateEl.textContent  = prev;
+        this.#stateEl.style.color  = '';
+      }, 5000);
+    }
   }
 }
