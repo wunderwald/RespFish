@@ -1,0 +1,162 @@
+/* gaze.css — WebGazer calibration overlay + gaze toggle toast */
+
+/* ── Calibration overlay ─────────────────────────────────────────────────── */
+
+#gaze-calib-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #111a1f;
+  /* Points are positioned absolutely relative to this */
+}
+
+#gaze-calib-header {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  padding: 32px 24px 0;
+  color: rgba(174, 212, 237, 0.9);
+  pointer-events: none;
+  user-select: none;
+}
+
+#gaze-calib-header h2 {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 1.25rem;
+  margin-bottom: 8px;
+  letter-spacing: 0.06em;
+}
+
+#gaze-calib-header p {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 200;
+  font-size: 0.82rem;
+  opacity: 0.7;
+  line-height: 1.5;
+}
+
+#gaze-calib-header strong {
+  font-weight: 400;
+  color: #aed4ed;
+}
+
+/* ── Calibration point container ─────────────────────────────────────────── */
+
+#gaze-calib-points {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* dots handle their own pointer events */
+}
+
+/* ── Individual calibration dot ──────────────────────────────────────────── */
+
+.gaze-calib-dot {
+  --calib-progress: 0;         /* 0 → 1, set via JS */
+  --dot-size: 28px;
+
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width:  var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 50%;
+  border: 2px solid rgba(174, 212, 237, 0.55);
+  background: conic-gradient(
+    rgba(91, 201, 138, 0.85) calc(var(--calib-progress) * 360deg),
+    rgba(174, 212, 237, 0.12) 0deg
+  );
+  cursor: pointer;
+  pointer-events: all;
+  transition: border-color 0.2s, transform 0.1s;
+  outline: none;
+}
+
+.gaze-calib-dot:hover:not(:disabled) {
+  transform: translate(-50%, -50%) scale(1.25);
+  border-color: rgba(174, 212, 237, 0.9);
+}
+
+.gaze-calib-dot:active:not(:disabled) {
+  transform: translate(-50%, -50%) scale(0.95);
+}
+
+.gaze-calib-dot.done {
+  border-color: rgba(91, 201, 138, 0.8);
+  background: rgba(91, 201, 138, 0.35);
+  cursor: default;
+}
+
+/* ── Footer buttons ──────────────────────────────────────────────────────── */
+
+#gaze-calib-footer {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+#gaze-calib-footer button {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  border-radius: 99px;
+  padding: 8px 28px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+  outline: none;
+}
+
+#gaze-calib-accept {
+  background: rgba(91, 201, 138, 0.15);
+  border: 1px solid rgba(91, 201, 138, 0.5);
+  color: rgba(91, 201, 138, 0.9);
+}
+
+#gaze-calib-accept:hover:not(:disabled) {
+  background: rgba(91, 201, 138, 0.28);
+  border-color: rgba(91, 201, 138, 0.8);
+}
+
+#gaze-calib-accept:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+#gaze-calib-skip {
+  background: transparent;
+  border: 1px solid rgba(174, 212, 237, 0.2);
+  color: rgba(174, 212, 237, 0.45);
+}
+
+#gaze-calib-skip:hover {
+  background: rgba(174, 212, 237, 0.06);
+  border-color: rgba(174, 212, 237, 0.4);
+  color: rgba(174, 212, 237, 0.7);
+}
+
+/* ── Gaze toggle toast ───────────────────────────────────────────────────── */
+
+#gaze-toast {
+  position: fixed;
+  bottom: 28px;
+  right: 32px;
+  z-index: 900;
+  background: rgba(15, 72, 95, 0.88);
+  border: 1px solid rgba(174, 212, 237, 0.25);
+  border-radius: 99px;
+  padding: 7px 22px;
+  color: rgba(174, 212, 237, 0.85);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
