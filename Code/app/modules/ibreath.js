@@ -56,12 +56,9 @@ export const CONFIG = {
   ADD_NOISE_ASYNC: true,
   MAP_ASYNC_RANGE_TO_SYNC_RANGE: true,
 
-  // Image layout
-  STIMULUS_HALF_WIDTH: true,      // image fills one half of the scene (left or right)
-
-  // Zoom
-  // zoomRect.m: factor 0 → original, factor 1 → 1/maxZoom of original
-  ZOOM_MAX_FACTOR: 2,             // matches maxZoom = 2 in zoomRect.m
+  // Cloud stimulus size (fraction of the shorter half-scene dimension)
+  CLOUD_SIZE_MIN: 0.10,   // at stimulusLevel = 0
+  CLOUD_SIZE_MAX: 0.45,   // at stimulusLevel = 1
 
   // Data output base directory (relative to electron/ app dir)
   DATA_DIR: "subjectData",
@@ -103,11 +100,6 @@ function makeTrialParams(numTrials) {
   const numAsync = Math.floor(numTrials / 2);
   const sfSeq = balancedSeq(numAsync, 4);           // slow/fast (async only)
 
-  // Two stimulus images — one for sync, one for async (randomised assignment)
-  const imgNums = Math.random() < 0.5 ? [1, 2] : [2, 1];
-  const syncImg  = `media/stimulus_${imgNums[0]}.png`;
-  const asyncImg = `media/stimulus_${imgNums[1]}.png`;
-
   const trials = [];
   let asyncIdx = 0;
 
@@ -119,10 +111,10 @@ function makeTrialParams(numTrials) {
     const trial = {
       trialIndex:   i + 1,
       synchronous:  sync,
-      img:          sync ? syncImg : asyncImg,
-      lr:           lrSeq[i],          // true = left, false = right
-      ITI:          iti,               // ms
-      slowfast:     null,              // only set for async trials
+      img:          'cloud',            // CSV field — no image file used
+      lr:           lrSeq[i],           // true = left, false = right
+      ITI:          iti,                // ms
+      slowfast:     null,               // only set for async trials
       startTime:    null,
       endTime:      null,
     };
@@ -135,20 +127,6 @@ function makeTrialParams(numTrials) {
     trials.push(trial);
   }
   return trials;
-}
-
-// ── zoomRect helper ───────────────────────────────────────────────────────────
-// Port of zoomRect.m — returns a sub-rectangle that "zooms in" as factor → 1.
-// rect = { x, y, w, h }  (source image coordinates)
-
-function zoomRect(rect, factor) {
-  const maxZoom = CONFIG.ZOOM_MAX_FACTOR;
-  factor = Math.max(0, Math.min(1, factor));
-  const zw = rect.w - (factor * (1 / maxZoom) * rect.w);
-  const zh = rect.h - (factor * (1 / maxZoom) * rect.h);
-  const zx = rect.x + (rect.w - zw);
-  const zy = rect.y + (rect.h - zh);
-  return { x: zx, y: zy, w: zw, h: zh };
 }
 
 // ── IBreath ───────────────────────────────────────────────────────────────────
@@ -186,10 +164,6 @@ export default class IBreath {
   // ── ITI ────────────────────────────────────────────────────────────────────
   #itiStartTime   = null;
   #itiDuration    = 0;
-
-  // ── image cache ────────────────────────────────────────────────────────────
-  #imgCache       = {};          // url → HTMLImageElement
-  #currentImg     = null;
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
   #canvas         = null;
@@ -367,9 +341,6 @@ export default class IBreath {
         );
       }
     }
-
-    // Pre-load the trial image
-    this.#loadImage(trial.img);
 
     // Reset per-trial buffers
     this.#syncSignal         = [];
@@ -557,8 +528,8 @@ export default class IBreath {
   }
 
   #drawTrial(ctx, w, h, now) {
-    const trial     = this.#trials[this.#trialIndex];
-    const tSecs     = (now - this.#trialStartTime) / 1000;
+    const trial   = this.#trials[this.#trialIndex];
+    const tSecs   = (now - this.#trialStartTime) / 1000;
 
     // Compute stimulus level
     let stimLevel;
@@ -568,8 +539,6 @@ export default class IBreath {
       stimLevel = this.#asyncGen.sample(tSecs);
       this.#stimulusLevel = stimLevel;
     }
-
-    // Clamp to [0, 1]
     stimLevel = Math.max(0, Math.min(1, stimLevel));
 
     // Record frame data for CSV
@@ -588,31 +557,27 @@ export default class IBreath {
       return;
     }
 
-    // Draw stimulus image with zoom
-    const img = this.#currentImg;
-    if (!img || !img.complete) {
-      this.#centreText(ctx, w / 2, h / 2, 'loading…',
-        'rgba(255,255,255,0.3)', 16);
-      return;
-    }
+    // Cloud occupies the correct half of the scene (left or right)
+    const halfW  = w / 2;
+    const centreX = trial.lr
+      ? halfW / 2          // centre of left half
+      : halfW + halfW / 2; // centre of right half
+    const centreY = h / 2;
 
-    // Destination rect: left or right half of scene
-    const destX = trial.lr ? 0 : w / 2;
-    const destW = w / 2;
-    const destH = h;
+    // Size: stimulusLevel [0,1] maps to [MIN_SIZE, MAX_SIZE] in px
+    const minSize = Math.min(halfW, h) * CONFIG.CLOUD_SIZE_MIN;
+    const maxSize = Math.min(halfW, h) * CONFIG.CLOUD_SIZE_MAX;
+    const size    = minSize + stimLevel * (maxSize - minSize);
 
-    // Source rect: zoomRect applied to full image
-    const src = { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
-    const z   = zoomRect(src, stimLevel);
+    this.#drawCloud(ctx, centreX, centreY, size, 1);
 
-    ctx.drawImage(
-      img,
-      z.x, z.y, z.w, z.h,        // source (zoomed crop)
-      destX, 0, destW, destH      // destination (half screen)
-    );
-
-    // Soft vignette overlay on image half
-    this.#drawVignette(ctx, destX, 0, destW, destH);
+    // Subtle dividing line between the two halves
+    ctx.beginPath();
+    ctx.moveTo(halfW, 0);
+    ctx.lineTo(halfW, h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth   = 1;
+    ctx.stroke();
   }
 
   #drawITI(ctx, w, h, now) {
@@ -639,18 +604,37 @@ export default class IBreath {
   // ── Scene helpers ──────────────────────────────────────────────────────────
 
   /**
-   * Soft radial vignette over the stimulus area — adds visual polish without
-   * altering the perceived zoom effect.
+   * Procedural cloud — five overlapping circles with a white-to-light-blue
+   * radial gradient. Ported from game.js #drawCloud.
+   * size = base radius in px, driven by stimulusLevel.
    */
-  #drawVignette(ctx, x, y, w, h) {
+  #drawCloud(ctx, x, y, size, alpha) {
+    ctx.globalAlpha = alpha;
+
+    const blobs = [
+      { dx: 0,           dy: 0,            r: size * 0.55 },
+      { dx: -size * 0.42, dy:  size * 0.12, r: size * 0.42 },
+      { dx:  size * 0.42, dy:  size * 0.12, r: size * 0.40 },
+      { dx: -size * 0.20, dy: -size * 0.28, r: size * 0.34 },
+      { dx:  size * 0.22, dy: -size * 0.24, r: size * 0.32 },
+    ];
+
     const grd = ctx.createRadialGradient(
-      x + w / 2, y + h / 2, h * 0.25,
-      x + w / 2, y + h / 2, h * 0.8
+      x, y - size * 0.15, 0,
+      x, y, size * 0.8
     );
-    grd.addColorStop(0, 'rgba(0,0,0,0)');
-    grd.addColorStop(1, 'rgba(0,0,0,0.18)');
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(1, 'rgba(210,230,248,0.88)');
+
+    ctx.beginPath();
+    for (const b of blobs) {
+      ctx.moveTo(x + b.dx + b.r, y + b.dy);
+      ctx.arc(x + b.dx, y + b.dy, b.r, 0, Math.PI * 2);
+    }
     ctx.fillStyle = grd;
-    ctx.fillRect(x, y, w, h);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
   }
 
   /**
@@ -662,26 +646,6 @@ export default class IBreath {
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, x, y);
-  }
-
-  // ── Image loading ──────────────────────────────────────────────────────────
-
-  #loadImage(src) {
-    if (this.#imgCache[src]) {
-      this.#currentImg = this.#imgCache[src];
-      return;
-    }
-    const img = new Image();
-    img.src = src;
-    img.onload = () => {
-      this.#imgCache[src] = img;
-      if (this.#trials[this.#trialIndex]?.img === src) {
-        this.#currentImg = img;
-      }
-    };
-    // Show placeholder while loading
-    this.#currentImg = null;
-    this.#imgCache[src] = img;
   }
 
   // ── CSV output ────────────────────────────────────────────────────────────

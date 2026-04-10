@@ -34,7 +34,7 @@ const FRONTEND = 'ibreath';
 // Set to false to skip entirely (no webcam needed — useful for game/visualizer
 // or when testing ibreath without eye tracking).
 
-const GAZE_ENABLED = true;
+const GAZE_ENABLED = false;
 
 // ── Mount points (defined in index.html) ─────────────────────────────────────
 
