@@ -33,8 +33,6 @@ const FRONTEND = 'gazetest';
 // and stream gaze data into window.gazeState for the iBreath CSV logger.
 // Set to false to skip entirely (no webcam needed — useful for game/visualizer
 // or when testing ibreath without eye tracking).
-//
-// The G key toggles gaze on/off at any point regardless of this setting.
 
 const GAZE_ENABLED = true;
 
@@ -57,6 +55,10 @@ async function init() {
   const gaze = new GazeManager();
   if (GAZE_ENABLED) {
     await gaze.runCalibration();
+    // Ensure tracking is active regardless of how calibration was completed.
+    // #finishCalibration() calls start() internally, but this is a safety net
+    // for the skip path and any edge cases where start() may not have fired.
+    if (!gaze.isActive) gaze.start();
   }
 
   // 3. Dynamically import the frontend module.

@@ -325,7 +325,7 @@ export default class GazeTest {
     ctx.font         = '200 16px Nunito, sans-serif';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Gaze tracking inactive — press G to enable', w / 2, h / 2);
+    ctx.fillText('Gaze tracking inactive', w / 2, h / 2);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

@@ -37,24 +37,22 @@ const CALIB_POINTS = [
 // ── GazeManager ───────────────────────────────────────────────────────────────
 
 export class GazeManager {
-  #active       = false;
-  #overlay      = null;   // fullscreen calibration overlay element
-  #resolveCalib = null;   // resolve fn for the calibration promise
+  #active          = false;
+  #webgazerStarted = false;  // has webgazer.begin() ever been called?
+  #overlay         = null;   // fullscreen calibration overlay element
+  #resolveCalib    = null;   // resolve fn for the calibration promise
 
   // Gaze debug dot
-  #dotCanvas    = null;   // fullscreen overlay canvas
-  #dotCtx       = null;
-  #dotVisible   = false;
-  #dotRafId     = null;
+  #dotCanvas = null;
+  #dotCtx    = null;
+  #dotVisible = false;
+  #dotRafId   = null;
 
   constructor() {
     // Initialise global gaze state readable by any frontend
     window.gazeState = { x: 0, y: 0, active: false };
-
-    // G key: toggle gaze on/off (and dot visibility when gaze is active)
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyG') this.toggle();
-    });
+    // Note: G-key toggle removed intentionally.
+    // Gaze is controlled programmatically via start() / stop() only.
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────
@@ -73,24 +71,32 @@ export class GazeManager {
 
   /**
    * Starts the WebGazer listener and begins populating window.gazeState.
-   * Call this after runCalibration() resolves.
+   * Safe to call multiple times — idempotent on the WebGazer side.
    */
   start() {
-    if (this.#active) return;
     if (typeof webgazer === 'undefined') {
       console.warn('[GazeManager] WebGazer not loaded — gaze tracking disabled');
       return;
     }
 
-    webgazer
-      .setGazeListener((data) => {
-        if (!data) return;
-        window.gazeState.x = data.x;
-        window.gazeState.y = data.y;
-      })
-      .begin();
+    // Always re-wire the listener so gazeState updates regardless of whether
+    // WebGazer was paused, already running, or freshly started.
+    webgazer.setGazeListener((data) => {
+      if (!data) return;
+      window.gazeState.x = data.x;
+      window.gazeState.y = data.y;
+    });
 
-    // Hide the built-in WebGazer video/prediction dot overlays
+    if (!this.#webgazerStarted) {
+      // First call — full initialisation
+      webgazer.begin();
+      this.#webgazerStarted = true;
+    } else {
+      // Subsequent calls — resume from paused state
+      webgazer.resume();
+    }
+
+    // Always suppress built-in overlays (WebGazer re-shows them on resume)
     webgazer.showVideoPreview(false);
     webgazer.showPredictionPoints(false);
 
@@ -110,14 +116,6 @@ export class GazeManager {
     window.gazeState.active = false;
     this.#hideDot();
     console.log('[GazeManager] gaze tracking paused');
-  }
-
-  /**
-   * Toggles gaze tracking on/off (bound to G key).
-   */
-  toggle() {
-    this.#active ? this.stop() : this.start();
-    this.#showToggleToast();
   }
 
   /** Whether gaze tracking is currently active. */
@@ -204,20 +202,27 @@ export class GazeManager {
   }
 
   #startWebGazerBackground() {
+    // During calibration we only need WebGazer to accept recordScreenPosition()
+    // training clicks. We do NOT call begin() here — that belongs to start().
+    // Instead, call begin() once now so the model trains during calibration,
+    // and mark it started so start() knows to call resume() later.
     if (typeof webgazer === 'undefined') return;
+    if (this.#webgazerStarted) return;
     try {
       webgazer.begin();
       webgazer.showVideoPreview(false);
       webgazer.showPredictionPoints(false);
+      this.#webgazerStarted = true;
     } catch (e) {
-      console.warn('[GazeManager] WebGazer failed to start:', e);
+      console.warn('[GazeManager] WebGazer failed to start during calibration:', e);
     }
   }
 
   #finishCalibration() {
     this.#overlay?.remove();
     this.#overlay = null;
-    // WebGazer is already running — just wire the listener
+    // WebGazer is already running from #startWebGazerBackground —
+    // start() will call resume() rather than begin() again.
     this.start();
     this.#resolveCalib?.();
     this.#resolveCalib = null;
@@ -239,8 +244,7 @@ export class GazeManager {
   //
   // A small red crosshair dot drawn on a fullscreen canvas overlay, showing
   // exactly where WebGazer thinks the participant is looking.
-  // Automatically shown when gaze tracking starts, hidden when it stops.
-  // The G-key toggle shows/hides both tracking and dot together.
+  // Shown automatically when start() is called, hidden when stop() is called.
 
   #showDot() {
     if (this.#dotVisible) return;
@@ -313,23 +317,4 @@ export class GazeManager {
     this.#dotRafId = requestAnimationFrame(() => this.#drawDotLoop());
   }
 
-  // ── Toast notification ──────────────────────────────────────────────────────
-
-  #showToggleToast() {
-    // Remove any existing toast
-    document.getElementById('gaze-toast')?.remove();
-
-    const toast = document.createElement('div');
-    toast.id = 'gaze-toast';
-    toast.textContent = this.#active
-      ? 'Gaze tracking ON  (G to toggle)'
-      : 'Gaze tracking OFF  (G to toggle)';
-    document.body.appendChild(toast);
-
-    // Fade out after 2 s
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 400);
-    }, 2000);
-  }
 }

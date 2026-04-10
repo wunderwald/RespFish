@@ -149,24 +149,3 @@
   pointer-events: none;  /* never intercepts clicks */
   display: none;         /* shown/hidden by GazeManager */
 }
-
-/* ── Gaze toggle toast ───────────────────────────────────────────────────── */
-
-#gaze-toast {
-  position: fixed;
-  bottom: 28px;
-  right: 32px;
-  z-index: 900;
-  background: rgba(15, 72, 95, 0.88);
-  border: 1px solid rgba(174, 212, 237, 0.25);
-  border-radius: 99px;
-  padding: 7px 22px;
-  color: rgba(174, 212, 237, 0.85);
-  font-family: 'Nunito', sans-serif;
-  font-weight: 300;
-  font-size: 0.78rem;
-  letter-spacing: 0.05em;
-  pointer-events: none;
-  opacity: 1;
-  transition: opacity 0.4s ease;
-}
