@@ -9,7 +9,6 @@
  *   class  AutocorrEstimator       — autocorrelation-based estimator (default impl)
  *   class  AsyncSignalGenerator    — sine + Perlin noise async stimulus
  *   function mapRange(v, from, to) — linear range mapping
- *   function logScale(x, depth)    — logarithmic [0,1]→[0,1] scaling
  *   function perlin1d(len)         — 1-D Perlin-ish noise array
  */
 
@@ -29,31 +28,6 @@ export function mapRange(value, from, to) {
   return to[0] + factor * (to[1] - to[0]);
 }
 
-
-// ── logScale ──────────────────────────────────────────────────────────────────
-// Direct port of logScale.m
-
-/**
- * Maps x ∈ [0, 1] → y ∈ [0, 1] with a logarithmic curve.
- * Higher depth = more aggressive scaling of small values.
- * Recommended depth: 500 (matching the MATLAB experiment).
- * @param {number} x
- * @param {number} depth  must be ≥ 2
- * @returns {number}
- */
-export function logScale(x, depth) {
-  if (x <= 0) return 0;
-  if (x >= 1) return 1;
-  if (depth < 2) depth = 2;
-
-  const xMin = 1;
-  const xMax = depth;
-  const yMin = Math.log(xMin);
-  const yMax = Math.log(xMax);
-
-  const scaled = xMin + x * (xMax - xMin);       // map [0,1] → [1, depth]
-  return (Math.log(scaled) - yMin) / (yMax - yMin); // log-transform → normalise
-}
 
 
 // ── perlin1d ──────────────────────────────────────────────────────────────────

@@ -20,8 +20,6 @@ import {
   GaussianSmoother,
   AutocorrEstimator,
   AsyncSignalGenerator,
-  logScale,
-  mapRange,
 } from "./signalUtils.js";
 
 // ── Configuration ─────────────────────────────────────────────────────────────
@@ -187,9 +185,7 @@ export default class IBreath {
 
   pushSample(rawValue) {
     // rawValue is already in [0, 1] from the LSL bridge
-    // Apply log scaling matching the MATLAB pipeline
-    const scaled = logScale(rawValue, CONFIG.LOG_SCALE_DEPTH)
-                   * CONFIG.BREATH_SCALE_BASE_LOG;
+    const scaled = rawValue;
 
     this.#lastRawSample    = rawValue;
     this.#lastScaledSample = scaled;
