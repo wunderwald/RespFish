@@ -11,6 +11,19 @@
   <link rel="stylesheet" href="styles/stream.css" />
 
   <!-- Frontend stylesheet is injected dynamically by renderer.js -->
+  <link rel="stylesheet" href="styles/gaze.css" />
+
+  <!--
+    WebGazer — webcam-based gaze estimation.
+    Loaded as a plain script (not a module) because WebGazer uses a UMD build
+    and attaches itself to window.webgazer.
+    The local copy lives at lib/webgazer.js — download once with:
+      curl -L https://cdn.jsdelivr.net/npm/webgazer@3.0.1/dist/webgazer.min.js \
+           -o electron/lib/webgazer.js
+    To use the CDN directly during development, swap the src below to:
+      https://cdn.jsdelivr.net/npm/webgazer@3.0.1/dist/webgazer.min.js
+  -->
+  <script src="lib/webgazer.js" defer></script>
 </head>
 <body>
   <!-- mount containers — modules inject their DOM here -->
