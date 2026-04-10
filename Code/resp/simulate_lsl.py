@@ -43,7 +43,7 @@ from pylsl import StreamInfo, StreamOutlet, cf_float32
 # ── Default configuration ─────────────────────────────────────────────────────
 
 DEFAULT_STREAM_NAME = "resp_belt_sim"
-DEFAULT_SAMPLE_RATE = 500       # Hz  — matches original
+DEFAULT_SAMPLE_RATE = 100       # Hz  — matches original
 DEFAULT_BPM         = 12.0      # breaths per minute at rest
 
 
