@@ -1,14 +1,30 @@
-/* gaze.css — WebGazer calibration overlay + gaze toggle toast */
+/* gaze.css — calibration overlay + validation + gaze dot */
 
-/* ── Calibration overlay ─────────────────────────────────────────────────── */
+/* ── Fullscreen overlay ──────────────────────────────────────────────────── */
 
 #gaze-calib-overlay {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: #111a1f;
-  /* Points are positioned absolutely relative to this */
+  background: #0d1f2a;
 }
+
+/* Canvas fills the overlay for drawing calibration points */
+#gaze-calib-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* clicks pass through to overlay itself */
+  cursor: crosshair;
+}
+
+/* Make canvas clickable during calibration phase */
+#gaze-calib-overlay.clickable #gaze-calib-canvas {
+  pointer-events: all;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
 
 #gaze-calib-header {
   position: absolute;
@@ -20,6 +36,7 @@
   color: rgba(174, 212, 237, 0.9);
   pointer-events: none;
   user-select: none;
+  z-index: 2;
 }
 
 #gaze-calib-header h2 {
@@ -35,7 +52,7 @@
   font-weight: 200;
   font-size: 0.82rem;
   opacity: 0.7;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 #gaze-calib-header strong {
@@ -43,49 +60,40 @@
   color: #aed4ed;
 }
 
-/* ── Calibration point container ─────────────────────────────────────────── */
+/* ── Progress indicator ──────────────────────────────────────────────────── */
 
-#gaze-calib-points {
+#gaze-calib-progress {
   position: absolute;
-  inset: 0;
-  pointer-events: none; /* dots handle their own pointer events */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% + 80px));
+  font-family: 'Nunito', sans-serif;
+  font-weight: 200;
+  font-size: 0.78rem;
+  color: rgba(174, 212, 237, 0.35);
+  letter-spacing: 0.1em;
+  pointer-events: none;
+  z-index: 2;
 }
 
-/* ── Individual calibration dot ──────────────────────────────────────────── */
+/* ── Validation accuracy badge ───────────────────────────────────────────── */
 
-.gaze-calib-dot {
-  --calib-progress: 0;         /* 0 → 1, set via JS */
-  --dot-size: 28px;
-
+#gaze-val-badge {
   position: absolute;
-  transform: translate(-50%, -50%);
-  width:  var(--dot-size);
-  height: var(--dot-size);
-  border-radius: 50%;
-  border: 2px solid rgba(174, 212, 237, 0.55);
-  background: conic-gradient(
-    rgba(91, 201, 138, 0.85) calc(var(--calib-progress) * 360deg),
-    rgba(174, 212, 237, 0.12) 0deg
-  );
-  cursor: pointer;
-  pointer-events: all;
-  transition: border-color 0.2s, transform 0.1s;
-  outline: none;
+  bottom: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  color: rgba(174, 212, 237, 0.7);
+  pointer-events: none;
+  z-index: 2;
 }
 
-.gaze-calib-dot:hover:not(:disabled) {
-  transform: translate(-50%, -50%) scale(1.25);
-  border-color: rgba(174, 212, 237, 0.9);
-}
-
-.gaze-calib-dot:active:not(:disabled) {
-  transform: translate(-50%, -50%) scale(0.95);
-}
-
-.gaze-calib-dot.done {
-  border-color: rgba(91, 201, 138, 0.8);
-  background: rgba(91, 201, 138, 0.35);
-  cursor: default;
+#gaze-val-badge strong {
+  font-weight: 400;
 }
 
 /* ── Footer buttons ──────────────────────────────────────────────────────── */
@@ -98,6 +106,7 @@
   display: flex;
   gap: 16px;
   align-items: center;
+  z-index: 2;
 }
 
 #gaze-calib-footer button {
@@ -118,14 +127,9 @@
   color: rgba(91, 201, 138, 0.9);
 }
 
-#gaze-calib-accept:hover:not(:disabled) {
+#gaze-calib-accept:hover {
   background: rgba(91, 201, 138, 0.28);
   border-color: rgba(91, 201, 138, 0.8);
-}
-
-#gaze-calib-accept:disabled {
-  opacity: 0.3;
-  cursor: default;
 }
 
 #gaze-calib-skip {
@@ -141,27 +145,22 @@
 }
 
 /* ── Hide WebGazer's own DOM elements ────────────────────────────────────── */
-/* WebGazer appends a <video> and several <canvas> elements to <body>.        */
-/* We must NOT suppress them before begin() — the camera won't open.          */
-/* Instead we hide them here after begin() resolves via #hideWebGazerDOM().   */
-/* These rules are a safety net for anything that CSS can catch directly.      */
 
+#webgazerVideoContainer,
 #webgazerVideoFeed,
 #webgazerVideoCanvas,
 #webgazerFaceOverlay,
-#webgazerFaceFeedbackBox {
+#webgazerFaceFeedbackBox,
+#webgazerGazeDot {
   display: none !important;
 }
 
-
+/* ── Gaze debug dot canvas ───────────────────────────────────────────────── */
 
 #gaze-dot-canvas {
   position: fixed;
   inset: 0;
-  z-index: 800;          /* above scene, below calibration overlay (1000) */
-  pointer-events: none;  /* never intercepts clicks */
-  display: none;         /* shown/hidden by GazeManager */
+  z-index: 800;
+  pointer-events: none;
+  display: none;
 }
-
-/* ── Gaze toggle toast ───────────────────────────────────────────────────── */
-/* (removed — gaze is no longer toggled via keypress) */
