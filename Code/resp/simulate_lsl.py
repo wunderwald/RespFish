@@ -63,7 +63,7 @@ DEEP_BREATH_PROB      = 0.08   # probability of a deep breath per cycle
 DEEP_BREATH_FACTOR    = 1.40   # amplitude multiplier for deep breaths
 
 # Additive noise
-NOISE_SIGMA           = 0.008  # Gaussian noise standard deviation
+NOISE_SIGMA           = 0.003  # Gaussian noise standard deviation
 WANDER_FREQ           = 0.05   # Hz of slow baseline wander sinusoid
 WANDER_AMP            = 0.03   # amplitude of baseline wander
 
