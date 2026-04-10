@@ -151,6 +151,12 @@ function setupPermissions() {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
+// WebGazer requires a secure context (https). In Electron we load via file://
+// so we must tell Chromium to treat it as secure.
+app.commandLine.appendSwitch(
+  'unsafely-treat-insecure-origin-as-secure', 'file://'
+);
+
 app.whenReady().then(() => {
   setupPermissions();
   startBridge();

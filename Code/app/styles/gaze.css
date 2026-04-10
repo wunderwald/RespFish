@@ -140,7 +140,20 @@
   color: rgba(174, 212, 237, 0.7);
 }
 
-/* ── Gaze debug dot canvas ───────────────────────────────────────────────── */
+/* ── Hide WebGazer's own DOM elements ────────────────────────────────────── */
+/* WebGazer appends a <video> and several <canvas> elements to <body>.        */
+/* We must NOT suppress them before begin() — the camera won't open.          */
+/* Instead we hide them here after begin() resolves via #hideWebGazerDOM().   */
+/* These rules are a safety net for anything that CSS can catch directly.      */
+
+#webgazerVideoFeed,
+#webgazerVideoCanvas,
+#webgazerFaceOverlay,
+#webgazerFaceFeedbackBox {
+  display: none !important;
+}
+
+
 
 #gaze-dot-canvas {
   position: fixed;
@@ -149,3 +162,6 @@
   pointer-events: none;  /* never intercepts clicks */
   display: none;         /* shown/hidden by GazeManager */
 }
+
+/* ── Gaze toggle toast ───────────────────────────────────────────────────── */
+/* (removed — gaze is no longer toggled via keypress) */

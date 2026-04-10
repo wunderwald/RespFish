@@ -1,13 +1,13 @@
 /**
  * gazeCalibration.js — WebGazer wrapper
  * ======================================
- * Simplified design:
- *   1. #checkCamera() calls getUserMedia() first — surfaces permission errors
- *      immediately with a clear message instead of silently failing.
- *   2. Calibration UI collects click positions but does NOT start WebGazer.
- *   3. webgazer.begin() is called ONCE, after the overlay is dismissed.
- *      Calibration clicks are replayed into the model after begin().
- *   4. window.gazeState = { x, y, active } is updated by the gaze listener.
+ * Key insight: WebGazer requires its internal <video> element to exist in the
+ * DOM before it will open the camera. Calling showVideoPreview(false) before
+ * begin() prevents the video element from being created, so getUserMedia is
+ * never called and the camera light never turns on.
+ *
+ * Fix: let WebGazer create its video element freely (don't suppress it before
+ * begin()), then hide it via CSS after the camera is running.
  */
 
 const CLICKS_REQUIRED = 5;
@@ -27,7 +27,7 @@ export class GazeManager {
   #overlay      = null;
   #resolveCalib = null;
   #active       = false;
-  #calibPoints  = [];   // { x, y } collected during calibration for replay
+  #calibPoints  = [];
   #dotCanvas    = null;
   #dotCtx       = null;
   #dotVisible   = false;
@@ -60,26 +60,37 @@ export class GazeManager {
       return;
     }
     try {
+      console.log('[GazeManager] calling webgazer.begin()…');
+
       webgazer.setGazeListener((data) => {
         if (!data) return;
         window.gazeState.x = data.x;
         window.gazeState.y = data.y;
       });
 
+      // Do NOT call showVideoPreview(false) before begin().
+      // WebGazer needs to create its <video> element in the DOM
+      // before getUserMedia will fire. We hide it via CSS instead.
       await webgazer.begin();
 
-      // Replay calibration clicks into the now-running model
+      console.log('[GazeManager] webgazer.begin() resolved');
+
+      // Now it's safe to hide the preview — camera is already open
+      webgazer.showVideoPreview(false);
+      webgazer.showPredictionPoints(false);
+
+      // Hide any residual WebGazer DOM elements that may still be visible
+      this.#hideWebGazerDOM();
+
+      // Replay calibration clicks
       for (const { x, y } of this.#calibPoints) {
         webgazer.recordScreenPosition(x, y, 'click');
       }
 
-      webgazer.showVideoPreview(false);
-      webgazer.showPredictionPoints(false);
-
       this.#active = true;
       window.gazeState.active = true;
       this.#showDot();
-      console.log('[GazeManager] started ok, replayed', this.#calibPoints.length, 'points');
+      console.log('[GazeManager] active, replayed', this.#calibPoints.length, 'points');
     } catch (err) {
       console.error('[GazeManager] begin() failed:', err);
       this.#showErrorToast(`Gaze tracking failed: ${err.message}`);
@@ -108,6 +119,21 @@ export class GazeManager {
     }
   }
 
+  // Hide WebGazer's own DOM elements (video, canvas overlays) without
+  // stopping the camera. Must be called AFTER begin() resolves.
+  #hideWebGazerDOM() {
+    const ids = ['webgazerVideoFeed', 'webgazerVideoCanvas',
+                 'webgazerFaceOverlay', 'webgazerFaceFeedbackBox'];
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    }
+    // Also catch any elements WebGazer appended to body by class/tag
+    document.querySelectorAll('video[id^="webgazer"]').forEach(el => {
+      el.style.display = 'none';
+    });
+  }
+
   #showCameraError() {
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
@@ -122,18 +148,15 @@ export class GazeManager {
         </div>
       `;
       document.body.appendChild(overlay);
-
-      // Surface the real error message
       navigator.mediaDevices.getUserMedia({ video: true }).catch(err => {
         const el = overlay.querySelector('#gaze-cam-msg');
         if (el) el.innerHTML = `
           Could not access the webcam.<br><br>
           <strong>Error:</strong> <code>${err.name}: ${err.message}</code><br><br>
-          On macOS: System Preferences → Privacy &amp; Security → Camera →
-          enable <strong>Electron</strong>, then restart the app.
+          macOS: System Preferences → Privacy &amp; Security → Camera →
+          enable <strong>Electron</strong>, then restart.
         `;
       });
-
       overlay.querySelector('#gaze-calib-skip').addEventListener('click', () => {
         overlay.remove();
         resolve();
@@ -173,7 +196,6 @@ export class GazeManager {
 
     const container = overlay.querySelector('#gaze-calib-points');
     const dots = [];
-
     for (const [fx, fy] of CALIB_POINTS) {
       const dot = document.createElement('button');
       dot.className      = 'gaze-calib-dot';
@@ -184,7 +206,6 @@ export class GazeManager {
       container.appendChild(dot);
       dots.push(dot);
     }
-
     overlay.querySelector('#gaze-calib-accept').addEventListener('click', () => {
       this.#finishCalibration();
     });
@@ -196,17 +217,13 @@ export class GazeManager {
   #onDotClick(dot, allDots, overlay) {
     const clicks = parseInt(dot.dataset.clicks) + 1;
     dot.dataset.clicks = clicks;
-
-    // Record position for later replay (no WebGazer calls here)
     const rect = dot.getBoundingClientRect();
     this.#calibPoints.push({
       x: rect.left + rect.width  / 2,
       y: rect.top  + rect.height / 2,
     });
-
     dot.style.setProperty('--calib-progress', Math.min(clicks / CLICKS_REQUIRED, 1));
     if (clicks >= CLICKS_REQUIRED) { dot.classList.add('done'); dot.disabled = true; }
-
     const allDone = allDots.every(d => parseInt(d.dataset.clicks) >= CLICKS_REQUIRED);
     overlay.querySelector('#gaze-calib-accept').disabled = !allDone;
   }
