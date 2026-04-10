@@ -477,7 +477,7 @@ export default class IBreath {
   }
 
   #drawIdle(ctx, w, h) {
-    this.#centreText(ctx, w, h, 'waiting for stream…', 'rgba(255,255,255,0.4)', 18);
+    this.#centerText(ctx, w, h, 'waiting for stream…', 'rgba(255,255,255,0.4)', 18);
   }
 
   #drawCalibrating(ctx, w, h, now) {
@@ -494,8 +494,11 @@ export default class IBreath {
     }
 
     // Instruction
-    this.#centreText(ctx, w, cy - 80,
-      'Breathe normally…', 'rgba(255,255,255,0.85)', 20);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '300 20px Nunito, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Breathe normally…', cx, cy - 80);
 
     // Track ring
     ctx.beginPath();
@@ -513,12 +516,12 @@ export default class IBreath {
     ctx.stroke();
 
     // Countdown
-    this.#centreText(ctx, cx, cy, String(remaining),
+    this.#centerText(ctx, cx, cy, String(remaining),
       'rgba(255,255,255,0.7)', 52, '200');
   }
 
   #drawReady(ctx, w, h) {
-    this.#centreText(ctx, w / 2, h / 2,
+    this.#centerText(ctx, w / 2, h / 2,
       'Press Space or "Next trial" to begin',
       'rgba(255,255,255,0.35)', 18);
   }
@@ -580,19 +583,19 @@ export default class IBreath {
     const remaining = Math.max(0,
       this.#itiDuration - (now - this.#itiStartTime));
     const secs = (remaining / 1000).toFixed(1);
-    this.#centreText(ctx, w / 2, h / 2,
+    this.#centerText(ctx, w / 2, h / 2,
       `Next trial in ${secs}s`,
       'rgba(255,255,255,0.2)', 16);
   }
 
   #drawDone(ctx, w, h) {
     const cx = w / 2, cy = h / 2;
-    this.#centreText(ctx, cx, cy - 40,
+    this.#centerText(ctx, cx, cy - 40,
       'Experiment complete', 'rgba(255,255,255,0.6)', 24);
-    this.#centreText(ctx, cx, cy + 10,
+    this.#centerText(ctx, cx, cy + 10,
       `${this.#trialData.length} trials recorded`,
       'rgba(255,255,255,0.35)', 16);
-    this.#centreText(ctx, cx, cy + 50,
+    this.#centerText(ctx, cx, cy + 50,
       `Subject: ${this.#subjectCode}`,
       'rgba(255,255,255,0.25)', 14);
   }
@@ -636,7 +639,7 @@ export default class IBreath {
   /**
    * Draws centred text. y may be a y-coordinate or h/2 implicitly.
    */
-  #centreText(ctx, x, y, text, color, size, weight = '300') {
+  #centerText(ctx, x, y, text, color, size, weight = '300') {
     ctx.fillStyle    = color;
     ctx.font         = `${weight} ${size}px Nunito, sans-serif`;
     ctx.textAlign    = 'center';
