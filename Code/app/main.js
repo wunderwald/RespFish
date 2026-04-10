@@ -128,26 +128,31 @@ function createWindow() {
     },
   });
 
-  // Grant camera (and microphone) access so WebGazer can use the webcam.
-  // On macOS, Electron does not forward getUserMedia permission requests to
-  // the OS unless this handler explicitly allows them.
-  mainWindow.webContents.session.setPermissionRequestHandler(
-    (_webContents, permission, callback) => {
-      if (permission === "media") {
-        callback(true);
-      } else {
-        callback(false);
-      }
-    }
-  );
-
   mainWindow.loadFile("index.html");
   mainWindow.on("closed", () => (mainWindow = null));
+}
+
+// ── Camera permission ─────────────────────────────────────────────────────────
+// Must be set on the default session before any window loads so that
+// WebGazer's getUserMedia() call is not silently denied on macOS.
+
+function setupPermissions() {
+  const { session } = require("electron");
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      callback(permission === "media");
+    }
+  );
+  // Also set the check handler so synchronous permission checks pass
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission) => permission === "media"
+  );
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
+  setupPermissions();
   startBridge();
   // Brief delay so the bridge socket is ready before the renderer connects
   setTimeout(createWindow, 600);
