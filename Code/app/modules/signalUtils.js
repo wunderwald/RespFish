@@ -349,9 +349,9 @@ export class AutocorrEstimator extends FrequencyEstimator {
  *   const level = gen.sample(tSeconds);          // call each frame
  */
 export class AsyncSignalGenerator {
-  // Noise configuration — matches MATLAB constants
+  // Noise configuration 
   static NOISE_LENGTH   = 150;
-  static NOISE_BLEND    = 0.2;   // 20% noise, 80% sine (ADD_NOISE_ASYNC)
+  static NOISE_BLEND    = 0.02;   // 2% noise, 98% sine (ADD_NOISE_ASYNC)
 
   #estimator;
   #freq        = (2 * Math.PI) / 4;  // default: 4 s period
