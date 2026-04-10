@@ -128,6 +128,19 @@ function createWindow() {
     },
   });
 
+  // Grant camera (and microphone) access so WebGazer can use the webcam.
+  // On macOS, Electron does not forward getUserMedia permission requests to
+  // the OS unless this handler explicitly allows them.
+  mainWindow.webContents.session.setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      if (permission === "media") {
+        callback(true);
+      } else {
+        callback(false);
+      }
+    }
+  );
+
   mainWindow.loadFile("index.html");
   mainWindow.on("closed", () => (mainWindow = null));
 }
