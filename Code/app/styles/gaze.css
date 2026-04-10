@@ -1,0 +1,166 @@
+/* gaze.css — calibration overlay + validation + gaze dot */
+
+/* ── Fullscreen overlay ──────────────────────────────────────────────────── */
+
+#gaze-calib-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #0d1f2a;
+}
+
+/* Canvas fills the overlay for drawing calibration points */
+#gaze-calib-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* clicks pass through to overlay itself */
+  cursor: crosshair;
+}
+
+/* Make canvas clickable during calibration phase */
+#gaze-calib-overlay.clickable #gaze-calib-canvas {
+  pointer-events: all;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+#gaze-calib-header {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  padding: 32px 24px 0;
+  color: rgba(174, 212, 237, 0.9);
+  pointer-events: none;
+  user-select: none;
+  z-index: 2;
+}
+
+#gaze-calib-header h2 {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 1.25rem;
+  margin-bottom: 8px;
+  letter-spacing: 0.06em;
+}
+
+#gaze-calib-header p {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 200;
+  font-size: 0.82rem;
+  opacity: 0.7;
+  line-height: 1.6;
+}
+
+#gaze-calib-header strong {
+  font-weight: 400;
+  color: #aed4ed;
+}
+
+/* ── Progress indicator ──────────────────────────────────────────────────── */
+
+#gaze-calib-progress {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% + 80px));
+  font-family: 'Nunito', sans-serif;
+  font-weight: 200;
+  font-size: 0.78rem;
+  color: rgba(174, 212, 237, 0.35);
+  letter-spacing: 0.1em;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── Validation accuracy badge ───────────────────────────────────────────── */
+
+#gaze-val-badge {
+  position: absolute;
+  bottom: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  color: rgba(174, 212, 237, 0.7);
+  pointer-events: none;
+  z-index: 2;
+}
+
+#gaze-val-badge strong {
+  font-weight: 400;
+}
+
+/* ── Footer buttons ──────────────────────────────────────────────────────── */
+
+#gaze-calib-footer {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  z-index: 2;
+}
+
+#gaze-calib-footer button {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  border-radius: 99px;
+  padding: 8px 28px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+  outline: none;
+}
+
+#gaze-calib-accept {
+  background: rgba(91, 201, 138, 0.15);
+  border: 1px solid rgba(91, 201, 138, 0.5);
+  color: rgba(91, 201, 138, 0.9);
+}
+
+#gaze-calib-accept:hover {
+  background: rgba(91, 201, 138, 0.28);
+  border-color: rgba(91, 201, 138, 0.8);
+}
+
+#gaze-calib-skip {
+  background: transparent;
+  border: 1px solid rgba(174, 212, 237, 0.2);
+  color: rgba(174, 212, 237, 0.45);
+}
+
+#gaze-calib-skip:hover {
+  background: rgba(174, 212, 237, 0.06);
+  border-color: rgba(174, 212, 237, 0.4);
+  color: rgba(174, 212, 237, 0.7);
+}
+
+/* ── Hide WebGazer's own DOM elements ────────────────────────────────────── */
+
+#webgazerVideoContainer,
+#webgazerVideoFeed,
+#webgazerVideoCanvas,
+#webgazerFaceOverlay,
+#webgazerFaceFeedbackBox,
+#webgazerGazeDot {
+  display: none !important;
+}
+
+/* ── Gaze debug dot canvas ───────────────────────────────────────────────── */
+
+#gaze-dot-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  pointer-events: none;
+  display: none;
+}

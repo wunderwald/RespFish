@@ -1,4 +1,9 @@
 .venv
+
+app/subjectData
+
+!app/lib/webgazer.js
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
