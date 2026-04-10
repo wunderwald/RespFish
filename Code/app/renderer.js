@@ -25,7 +25,7 @@ import { GazeManager   } from "./modules/gazeCalibration.js";
 // Change this value to switch frontends.
 // 'visualizer' | 'game' | 'ibreath'
 
-const FRONTEND = 'game';
+const FRONTEND = 'visualizer';
 
 // ── Gaze tracking ─────────────────────────────────────────────────────────────
 //
@@ -36,7 +36,7 @@ const FRONTEND = 'game';
 //
 // The G key toggles gaze on/off at any point regardless of this setting.
 
-const GAZE_ENABLED = true;
+const GAZE_ENABLED = false;
 
 // ── Mount points (defined in index.html) ─────────────────────────────────────
 

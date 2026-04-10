@@ -621,3 +621,4 @@ export class Game {
     ctx.globalAlpha = 1;
   }
 }
+export default Game;

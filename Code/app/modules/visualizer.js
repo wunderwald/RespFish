@@ -152,3 +152,4 @@ export class Visualizer {
     requestAnimationFrame(() => this.#draw());
   }
 }
+export default Visualizer;
