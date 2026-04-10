@@ -35,7 +35,7 @@ Command-line options: `--bpm` (default 12), `--rate` (default 100 Hz), `--name` 
 
 Both scripts publish to LSL with the same interface, so they are drop-in replacements for each other.
 
-> **Creating for new sources:** Any script that opens an `pylsl.StreamOutlet` and pushes float samples will work. The bridge discovers streams by name — no configuration needed on the app side.
+> **Creating new data sources:** Any script that opens an `pylsl.StreamOutlet` and pushes float samples will work. The bridge discovers streams by name, no configuration needed on the app side. **Data streams must be normalized float values in range [0.0, 1.0].**
 
 ---
 
@@ -124,6 +124,11 @@ IBreath saves experiment data to `app/subjectData/<SUBJECT_CODE>/`:
 File I/O is routed through `preload.js` via Electron IPC. The renderer process has no direct filesystem access.
 
 > **Key design decision:** Frontends are isolated from each other and from the Electron main process. Adding or modifying a frontend cannot break the bridge, the stream connection, or other frontends.
+
+#### iBreath - changes from MATLAB version
+
+- **Async signal generation based on auto-correlaion**: In the old verson of iBreath, we used peak detection and  period averaging to determine the average frequency of recorded respiration to then generate asynchronous respiration. This method is now replaced by a new approach that is more stable, especially in settings with a lot of noise: the auto-correlation function of the smoothed respiration recording is calculated and the first prominent peak in it is used as the most period for the async signal.
+- **Open source eye tracking**: Instead of the EYELINK eye tracking device, this module includes a `webgazer.js` eye tracker. This tracker has the disadvantage that it is less stable and provides less real-time control to the experimenter. Yet, it is easier to use in applications and can be ran on any computer with a webcam. **Switching to EYELINK: there is no native support for EYELINK in js apps. Therefore we will need to implement a python 'overlay' that provides eyetracker state and data, e.g. via web sockets**.
 
 ---
 
