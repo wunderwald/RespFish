@@ -543,8 +543,6 @@ export default class IBreath {
     // Record frame data for CSV
     this.#frameRows.push({
       t:      new Date().toISOString(),
-      gaze_x: window.gazeState?.x ?? 0,
-      gaze_y: window.gazeState?.y ?? 0,
       raw:    this.#lastRawSample,
       scaled: this.#lastScaledSample,
       stim:   stimLevel,
@@ -669,8 +667,7 @@ export default class IBreath {
 
   // Column headers — must match MATLAB csvColumns exactly
   static #FRAME_HEADER =
-    'trialIndex,timestamp,gaze_x,gaze_y,' +
-    'breathLevel_input,breathLevel_scaled,stimulusLevel\n';
+    'trialIndex,timestamp,breathLevel_input,breathLevel_scaled,stimulusLevel\n';
 
   static #TRIAL_HEADER =
     'trialIndex,subject,synchronous,img,lr,slowfast,' +
@@ -717,7 +714,6 @@ export default class IBreath {
 
     const rows = this.#frameRows.map(r =>
       `${trial.trialIndex},${r.t},` +
-      `${r.gaze_x.toFixed(1)},${r.gaze_y.toFixed(1)},` +
       `${r.raw.toFixed(6)},${r.scaled.toFixed(6)},${r.stim.toFixed(6)}`
     ).join('\n') + '\n';
 
