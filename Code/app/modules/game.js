@@ -128,33 +128,13 @@ class Cloud {
   }
 }
 
-// Feedback popup 
-
-class Feedback {
-  constructor(text, color, x, y) {
-    this.text = text;
-    this.color = color;
-    this.x = x;
-    this.y = y;
-    this.alpha = 1;
-  }
-
-  tick() {
-    this.alpha -= 0.018;
-    this.y -= 0.5;
-  }
-
-  get alive() { return this.alpha > 0; }
-}
-
-// Game 
+// Game
 
 export class Game {
   // state
   #state = STATE.IDLE;
   #score = 0;
   #clouds = [];
-  #feedbacks = [];
 
   // calibration
   #calStartTime = null;
@@ -248,7 +228,6 @@ export class Game {
     this.#state = STATE.PLAYING;
     this.#score = 0;
     this.#clouds = [];
-    this.#feedbacks = [];
     this.#lastBreathMs = -Infinity;
     this.#gameStartTime = performance.now();
     // First cloud spawns immediately and arrives one beat later
@@ -263,7 +242,6 @@ export class Game {
   #endGame() {
     this.#state = STATE.GAME_OVER;
     this.#clouds = [];
-    this.#feedbacks = [];
     this.#stateEl.textContent = 'game over';
     this.#startBtn.textContent = 'Play again';
     this.#startBtn.disabled = false;
@@ -290,47 +268,28 @@ export class Game {
   }
 
   #onBreath(now) {
-    const cx = this.#canvas.width / 2;
-    const cy = this.#canvas.height / 2;
-
-    // Pick the flying cloud whose arrival time is closest to now
     const target = this.#clouds
       .filter(c => c.state === 'flying')
       .sort((a, b) => Math.abs(now - a.arrivalTime) - Math.abs(now - b.arrivalTime))[0];
 
-    if (!target) {
-      this.#pushFeedback('TOO EARLY', '#f0c060', cx, cy);
-      return;
-    }
+    if (!target) return;
 
-    const delta = now - target.arrivalTime; // negative = early, positive = late
-    const absDelta = Math.abs(delta);
+    const absDelta = Math.abs(now - target.arrivalTime);
 
     if (absDelta <= CONFIG.TIMING.PERFECT) {
-      this.#award(target, now, 'PERFECT!', '#5bc98a', CONFIG.SCORE.PERFECT);
+      this.#award(target, now, CONFIG.SCORE.PERFECT);
     } else if (absDelta <= CONFIG.TIMING.GOOD) {
-      this.#award(target, now, 'GOOD', '#aed4ed', CONFIG.SCORE.GOOD);
+      this.#award(target, now, CONFIG.SCORE.GOOD);
     } else if (absDelta <= CONFIG.TIMING.OK) {
-      this.#award(target, now, delta < 0 ? 'EARLY' : 'LATE', '#f0c060', CONFIG.SCORE.OK);
-    } else {
-      // Outside all timing windows — don't consume the cloud
-      this.#pushFeedback(delta < 0 ? 'TOO EARLY' : 'TOO LATE', '#e07878', cx, cy);
+      this.#award(target, now, CONFIG.SCORE.OK);
     }
   }
 
-  #award(cloud, now, label, color, points) {
+  #award(cloud, now, points) {
     cloud.state = 'hit';
     cloud.frozenT = Math.min(cloud.tAt(now), 1);
     this.#score += points;
     this.#scoreEl.textContent = this.#score;
-    this.#pushFeedback(
-      `${label}  +${points}`, color,
-      this.#canvas.width / 2, this.#canvas.height / 2,
-    );
-  }
-
-  #pushFeedback(text, color, cx, cy) {
-    this.#feedbacks.push(new Feedback(text, color, cx, cy - 80));
   }
 
   // Game loop 
@@ -494,9 +453,6 @@ export class Game {
     const cx = w / 2;
     const cy = h / 2;
 
-    // Breathing guide (drawn first, behind everything)
-    this.#drawBreathGuide(ctx, cx, cy, now);
-
     // Clouds — furthest from center (lowest t) rendered first (behind)
     const now2 = now; // capture for sort closure
     [...this.#clouds]
@@ -507,89 +463,9 @@ export class Game {
         this.#drawCloud(ctx, pos.x, pos.y, cloud.size, cloud.alpha);
       });
 
-    // Center ring (on top of clouds)
-    this.#drawRing(ctx, cx, cy, now);
-
-    // Feedback popups
-    for (const f of this.#feedbacks) {
-      ctx.globalAlpha = f.alpha;
-      ctx.fillStyle = f.color;
-      ctx.font = 'bold 26px Nunito, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(f.text, f.x, f.y);
-    }
-    ctx.globalAlpha = 1;
   }
 
   // Scene elements
-
-  /**
-   * A soft pulsing circle that guides the user's breathing rhythm.
-   * Phase 0 = exhale onset (cloud arrives, ring flashes).
-   * Phase 0 → 0.5 = EXHALE  — guide circle expands.
-   * Phase 0.5 → 1 = INHALE  — guide circle contracts.
-   * breathNorm = sin(phase·π): smoothly arcs 0 → 1 → 0 over one beat.
-   */
-  #drawBreathGuide(ctx, cx, cy, now) {
-    const beatPhase = ((now - this.#gameStartTime) % this.#beatMs) / this.#beatMs;
-    const breathNorm = Math.sin(beatPhase * Math.PI); // 0 at onset, peaks mid-exhale, 0 at inhale end
-    const label = beatPhase < 0.5 ? 'EXHALE' : 'INHALE';
-
-    // Soft expanding/contracting circle
-    const guideR = CONFIG.RING_RADIUS * (0.45 + breathNorm * 0.35);
-    ctx.beginPath();
-    ctx.arc(cx, cy, guideR, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${0.03 + breathNorm * 0.07})`;
-    ctx.fill();
-
-    // Text label below the ring
-    ctx.fillStyle = `rgba(255,255,255,${0.2 + breathNorm * 0.25})`;
-    ctx.font = '200 12px Nunito, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, cx, cy + CONFIG.RING_RADIUS + 22);
-  }
-
-  /**
-   * The target ring in the center.  Flashes at phase 0 (exhale onset /
-   * cloud arrival) and quickly decays — reinforcing the blow-now moment.
-   */
-  #drawRing(ctx, cx, cy, now) {
-    const beatPhase = ((now - this.#gameStartTime) % this.#beatMs) / this.#beatMs;
-    // Sharp flash at beat boundary (phase ≈ 0)
-    const flash = Math.exp(-beatPhase * 5);
-    const r = CONFIG.RING_RADIUS + flash * CONFIG.RING_RADIUS * CONFIG.RING_PULSE_AMP;
-
-    // Soft radial glow
-    const grd = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r * 1.7);
-    grd.addColorStop(0, `rgba(255,255,255,${0.08 + flash * 0.12})`);
-    grd.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.7, 0, Math.PI * 2);
-    ctx.fillStyle = grd;
-    ctx.fill();
-
-    // Ring stroke
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255,255,255,${0.3 + flash * 0.45})`;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    // Four cardinal tick marks
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.arc(
-        cx + Math.cos(angle) * r,
-        cy + Math.sin(angle) * r,
-        3.5, 0, Math.PI * 2,
-      );
-      ctx.fillStyle = `rgba(255,255,255,${0.45 + flash * 0.3})`;
-      ctx.fill();
-    }
-  }
 
   /**
    * Procedural cloud shape: five overlapping circles with a white-to-light-blue
