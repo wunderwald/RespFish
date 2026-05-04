@@ -28,7 +28,7 @@ export const CONFIG = {
 
   SUN_RADIUS:      110,
   CLOUD_SIZE:      95,
-  CLOUD_SLIDE_MS:  700,    // ms for cloud to animate in / out
+  CLOUD_SLIDE_MS:  2200,   // ms for cloud to animate in / out
   FAIL_ORBIT_R:    185,    // distance from sun center where failed clouds rest
   FAIL_FADE_MS:    60000,  // ms for a failed cloud to fully fade (1 minute)
 };
@@ -225,6 +225,7 @@ export class Game {
     this.#stateEl.textContent  = 'playing';
     this.#startBtn.textContent = 'Restart';
     this.#startBtn.disabled    = false;
+    this.#spawnCloud();
   }
 
   #endGame() {
@@ -262,11 +263,13 @@ export class Game {
   }
 
   #onExhaleOnset(now) {
-    this.#phase          = 'exhale';
-    this.#phaseStartTime = now;
+    this.#phase           = 'exhale';
+    this.#phaseStartTime  = now;
     this.#exhaleTimeAbove = 0;
-    this.#lastBreathMs   = now;
+    this.#lastBreathMs    = now;
+  }
 
+  #spawnCloud() {
     const cx = this.#canvas.width  / 2;
     const cy = this.#canvas.height / 2;
     const w  = this.#canvas.width;
@@ -275,9 +278,9 @@ export class Game {
 
     const edge = Math.floor(Math.random() * 4);
     const [sx, sy] = [
-      [Math.random() * w,  -margin       ],
+      [Math.random() * w,  -margin          ],
       [w + margin,          Math.random() * h],
-      [Math.random() * w,   h + margin   ],
+      [Math.random() * w,   h + margin      ],
       [-margin,             Math.random() * h],
     ][edge];
 
@@ -311,6 +314,7 @@ export class Game {
 
     this.#phase          = 'inhale';
     this.#phaseStartTime = now;
+    this.#spawnCloud();
   }
 
   // ── Game loop ────────────────────────────────────────────────────────────────
