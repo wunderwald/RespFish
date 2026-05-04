@@ -34,6 +34,8 @@ export class IBreathRenderer {
         return this.#drawReady(ctx, w, h);
       case STATE.TRIAL:
         return this.#drawTrial(ctx, w, h, data.trial, data.stimLevel);
+      case STATE.RESPONSE:
+        return this.#drawResponse(ctx, w, h);
       case STATE.ITI:
         return this.#drawITI(ctx, w, h, now, data.itiStartTime, data.itiDuration);
       case STATE.DONE:
@@ -104,6 +106,16 @@ export class IBreathRenderer {
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     ctx.lineWidth = 1;
     ctx.stroke();
+  }
+
+  #drawResponse(ctx, w, h) {
+    const cx = w / 2, cy = h / 2;
+    this.#centerText(ctx, cx, cy - 20,
+      'Was the animation in sync with your breathing?',
+      'rgba(255,255,255,0.85)', 22);
+    this.#centerText(ctx, cx, cy + 30,
+      '← yes          no →',
+      'rgba(255,255,255,0.4)', 16);
   }
 
   #drawITI(ctx, w, h, now, itiStartTime, itiDuration) {
