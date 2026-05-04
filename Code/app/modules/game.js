@@ -45,10 +45,6 @@ export const CONFIG = {
   CLOUD_SIZE: 70,     // base radius (px) — randomised ±20 % per cloud
   WIGGLE_AMP: 80,     // max perpendicular wiggle (px)
   WIGGLE_FREQ: 2.5,    // wiggle oscillations per trip
-
-  // Center ring
-  RING_RADIUS: 80,   // base radius (px)
-  RING_PULSE_AMP: 0.15, // pulse amplitude as a fraction of RING_RADIUS
 };
 
 // Game states
@@ -320,7 +316,7 @@ export class Game {
       return;
     }
 
-    // Spawn clouds 
+    // Spawn clouds
     while (now >= this.#nextSpawnTime) {
       const arrivalTime = this.#nextSpawnTime + this.#beatMs * CONFIG.TRAVEL_BEATS;
       this.#spawnCloud(cx, cy, arrivalTime);
@@ -334,7 +330,6 @@ export class Game {
       if (cloud.state === 'flying' && now > cloud.arrivalTime + missDeadline) {
         cloud.state = 'missed';
         cloud.frozenT = cloud.tAt(now);
-        this.#pushFeedback('MISS', '#e07878', cx, cy);
       }
       if (cloud.state === 'hit' || cloud.state === 'missed') {
         cloud.alpha = Math.max(0, cloud.alpha - 0.025);
@@ -342,10 +337,6 @@ export class Game {
       }
     }
     this.#clouds = this.#clouds.filter(c => c.state !== 'gone');
-
-    // Feedbacks
-    for (const f of this.#feedbacks) f.tick();
-    this.#feedbacks = this.#feedbacks.filter(f => f.alive);
   }
 
   #spawnCloud(cx, cy, arrivalTime) {
