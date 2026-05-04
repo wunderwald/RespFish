@@ -1,158 +1,70 @@
 # RespFish
 
-A desktop application for real-time respiration signal visualization and experimentation. Built as an Electron app with a Python backend, it is designed for research contexts where breath data needs to be captured, relayed, and displayed interactively.
-
----
-
-## System Overview
+Electron app for real-time respiration biofeedback experiments.
 
 ```
-Signal source (resp/)
-    → LSL network protocol
-        → Bridge (lsl_bridge/)
-            → WebSocket
-                → App (app/)
-                    → Frontend (visualizer, game, ibreath, ...)
+resp/ → LSL → lsl_bridge/ → WebSocket → app/
 ```
 
-Each layer is independent and replaceable. Any device that publishes an LSL stream works as a signal source — no changes to the rest of the stack required.
+## Running
+
+```bash
+# Start a signal source (pick one)
+cd resp && python simulate_lsl.py --bpm 14   # no hardware
+cd resp && python mic_breath.py              # microphone
+
+# Start the app (spawns the bridge automatically)
+cd app && npm start
+```
+
+The bridge can be started manually for debugging: `cd lsl_bridge && python main.py`
 
 ---
 
 ## Modules
 
-### `resp/` — Signal Sources
+**`resp/`** — Signal sources. Publish float samples in `[0.0, 1.0]` via LSL.
+- `simulate_lsl.py` — synthetic breath signal (`--bpm`, `--rate`, `--name`)
+- `mic_breath.py` — live microphone input
 
-Provides respiration data as an LSL stream. Currently, the following implementations are included:
+**`lsl_bridge/`** — Discovers LSL streams and relays samples to the app over WebSocket (`ws://localhost:8765`).
 
-**`mic_breath.py`** — captures breath from the microphone in real time.
-
-Records audio, bandpass-filters, extracts an RMS envelope, normalizes to [0, 1], and publishes via LSL.
-
-**`simulate_lsl.py`** — generates a synthetic breath signal for testing without hardware.
-
-Command-line options: `--bpm` (default 12), `--rate` (default 100 Hz), `--name` (default `resp_belt_sim`).
-
-Both scripts publish to LSL with the same interface, so they are drop-in replacements for each other.
-
-> **Creating new data sources:** Any script that opens an `pylsl.StreamOutlet` and pushes float samples will work. The bridge discovers streams by name, no configuration needed on the app side. **Data streams must be normalized float values in range [0.0, 1.0].**
+**`app/`** — Electron frontend. `renderer.js` loads the active frontend and wires it to the stream.
 
 ---
 
-### `lsl_bridge/` — LSL-to-WebSocket Bridge
+## Switching frontends
 
-**`main.py`** — a Python asyncio server that discovers LSL streams on the network and relays samples to WebSocket clients.
+Change `FRONTEND` at the top of `app/renderer.js`:
 
-**What it does:**
-
-1. Polls LSL every 2–3 seconds and broadcasts the list of available streams to all connected clients.
-2. When a client selects a stream by name, opens a pull inlet and forwards samples as JSON messages.
-3. Reconnects automatically if a stream disappears.
-
-**Message protocol (JSON over WebSocket):**
-
-| Direction | Message |
-|-----------|---------|
-| Server → Client | `{ type: "streams", streams: [...] }` — available streams |
-| Server → Client | `{ type: "sample", value: float, timestamp: float }` |
-| Server → Client | `{ type: "connected", stream: {...} }` |
-| Server → Client | `{ type: "disconnected", reason: string }` |
-| Client → Server | `{ type: "select_stream", name: string }` |
-
-Listens on `ws://localhost:8765` by default.
-
-> **Adding new features:** The bridge is intentionally thin — it relays raw samples and nothing else. Signal processing (smoothing, normalization, feature extraction) lives in the app layer. To add a new message type (e.g., stream metadata, event markers), extend `ws_handler()` and `read_one_stream()` in `main.py`.
-
-> **Key design decision:** LSL calls block the thread. The bridge runs them in `asyncio.get_event_loop().run_in_executor()` so the event loop stays non-blocking. Keep this pattern when adding new LSL interactions.
-
----
-
-### `app/` — Electron Frontend
-
-A multi-frontend desktop application. The active frontend is swappable at startup; all frontends receive the same breath stream via a shared event interface.
-
-#### Startup sequence
-
-1. **`main.js`** (Electron main process) spawns the Python LSL to WS bridge as a subprocess, creates the browser window, and requests camera permissions (needed for eye tracking).
-2. **`renderer.js`** (orchestrator) injects the frontend's stylesheet, optionally runs gaze calibration, dynamically imports the frontend module, instantiates `StreamManager`, and connects its events to the frontend.
-
-To switch frontends, change the `FRONTEND` constant at the top of `renderer.js`:
-
-```javascript
+```js
 const FRONTEND = 'ibreath'; // 'visualizer' | 'game' | 'ibreath' | 'gazetest'
 ```
 
-#### StreamManager (`modules/stream.js`)
+---
 
-Owns the WebSocket connection to the bridge and emits three events:
+## Adding a frontend
 
-| Event | Payload | Meaning |
-|-------|---------|---------|
-| `sample` | `number` | A new breath value arrived |
-| `status` | `{ type, text }` | Connection state changed |
-| `streams` | `string[]` | Available LSL streams changed |
+1. Create `app/modules/<name>/<name>.js` and `app/styles/<name>.css`.
+2. Export a default class with two methods:
 
-A stream selector dropdown is injected into the UI automatically.
-
-#### Frontend interface
-
-Every frontend module must export a class with two methods:
-
-```javascript
-pushSample(value)        // called on every breath sample
+```js
+pushSample(value)         // called on every breath sample [0, 1]
 setStatus({ type, text }) // called on connection state changes
 ```
 
-To add a new frontend: create `modules/myfrontend.js` and `styles/myfrontend.css`, implement the two methods, and add the name to the `FRONTEND` options.
-
-#### Built-in frontends
-
-| Module | Description |
-|--------|-------------|
-| `visualizer.js` | Scrolling waveform + animated fish avatar |
-| `game.js` | Guitar-Hero-style cloud game controlled by breath |
-| `ibreath.js` | Interoception experiment with gaze tracking |
-| `gazetest.js` | Eye-tracking calibration validation utility |
-
-#### Data output (iBreath)
-
-IBreath saves experiment data to `app/subjectData/<SUBJECT_CODE>/`:
-
-- `frameData_*.csv` — per-frame measurements (gaze position, breath level, stimulus value).
-- `trialData.csv` — aggregated per-trial metrics.
-
-File I/O is routed through `preload.js` via Electron IPC. The renderer process has no direct filesystem access.
-
-> **Key design decision:** Frontends are isolated from each other and from the Electron main process. Adding or modifying a frontend cannot break the bridge, the stream connection, or other frontends.
-
-#### iBreath - changes from MATLAB version
-
-- **Async signal generation based on auto-correlaion**: In the old verson of iBreath, we used peak detection and  period averaging to determine the average frequency of recorded respiration to then generate asynchronous respiration. This method is now replaced by a new approach that is more stable, especially in settings with a lot of noise: the auto-correlation function of the smoothed respiration recording is calculated and the first prominent peak in it is used as the most period for the async signal.
-- **Open source eye tracking**: Instead of the EYELINK eye tracking device, this module includes a `webgazer.js` eye tracker. This tracker has the disadvantage that it is less stable and provides less real-time control to the experimenter. Yet, it is easier to use in applications and can be ran on any computer with a webcam. **Switching to EYELINK: there is no native support for EYELINK in js apps. Therefore we will need to implement a python 'overlay' that provides eyetracker state and data, e.g. via web sockets**.
+3. Add the name to `FRONTEND_PATHS` in `renderer.js`.
 
 ---
 
-## Running the System
+## Adding a signal source
 
-```bash
-# Option A: use the simulator (no hardware needed)
-cd resp
-python simulate_lsl.py --bpm 14
+Any script that opens a `pylsl.StreamOutlet` and pushes normalized float samples (`[0.0, 1.0]`) will work. The bridge discovers streams by name automatically.
 
-# Option B: use the microphone
-cd resp
-python mic_breath.py
+---
 
-# Start the app (bridge is spawned automatically)
-cd app
-npm start
-```
+## Data output (iBreath)
 
-The bridge can also be started manually for debugging:
-
-```bash
-cd lsl_bridge
-python main.py
-```
-
-The app connects to `ws://localhost:8765`. Any LSL stream visible on the local network will appear in the stream selector dropdown once discovered.
+Saved to `app/subjectData/<SUBJECT_CODE>/`:
+- `trialData.csv` — one row per trial
+- `frameData_N.csv` — per-frame breath and stimulus values for trial N
