@@ -21,7 +21,7 @@ function easeOut(t)     { return 1 - (1 - t) * (1 - t); }
 export const CONFIG = {
   TARGET_BPM:             12,     // target breaths per minute
   GAME_DURATION_SECS:     60,
-  EXHALE_ONSET_THRESHOLD: 0.20,   // normalised signal level that triggers exhale onset
+  EXHALE_ONSET_THRESHOLD: 0.40,   // normalised signal level that triggers exhale onset
   BREATH_DEBOUNCE_MS:     1500,   // minimum ms between two exhale onsets
   EXHALE_SUCCESS_RATIO:   0.90,   // fraction of exhale phase above threshold needed to clear a cloud
 

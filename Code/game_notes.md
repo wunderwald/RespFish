@@ -11,7 +11,7 @@ This design means the game adapts to the child's natural inhale pace while still
 
 ## Exhale detection
 
-An exhale onset is detected by a **rising edge**: the normalised signal crosses `EXHALE_ONSET_THRESHOLD` (0.20) from below. The signal is normalised to [0, 1] using the min/max range recorded during calibration.
+An exhale onset is detected by a **rising edge**: the normalised signal crosses `EXHALE_ONSET_THRESHOLD` (0.40) from below. The signal is normalised to [0, 1] using the min/max range recorded during calibration.
 
 A **debounce** of 1500 ms prevents a single noisy breath from triggering multiple rounds.
 
