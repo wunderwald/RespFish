@@ -35,7 +35,7 @@ export const CONFIG = {
   DATA_DIR: "subjectData",
 
   // Variations
-  SYNC_DETECTION: false,    // show post-trial "was it in sync?" response screen
+  SYNC_DETECTION: true,    // show post-trial "was it in sync?" response screen
 };
 
 export const STATE = {
