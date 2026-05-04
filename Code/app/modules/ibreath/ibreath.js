@@ -7,7 +7,7 @@
  *   pushSample(value: number) → void
  *   setStatus({ type, text })  → void
  *
- * State machine:  IDLE → CALIBRATING → READY → TRIAL → ITI → DONE
+ * State machine:  IDLE → CALIBRATING → READY → TRIAL → [RESPONSE →] ITI → DONE
  *
  * Sub-modules:
  *   config.js      — CONFIG and STATE constants
@@ -62,7 +62,10 @@ export default class IBreath {
 
   // ── ITI ────────────────────────────────────────────────────────────────
   #itiStartTime = null;
-  #itiDuration = 0;
+  #itiDuration  = 0;
+
+  // ── response (SYNC_DETECTION) ──────────────────────────────────────────
+  #pendingTrial = null;   // trial awaiting subject response before CSV write
 
   // ── sub-modules ────────────────────────────────────────────────────────
   #hud = null;   // DOM refs from buildHUD()
@@ -116,6 +119,12 @@ export default class IBreath {
           break;
         case 'Escape':
           if (this.#state === STATE.TRIAL) this.#abortTrial();
+          break;
+        case 'ArrowLeft':
+          if (this.#state === STATE.RESPONSE) this.#onResponse(true);
+          break;
+        case 'ArrowRight':
+          if (this.#state === STATE.RESPONSE) this.#onResponse(false);
           break;
       }
     });
@@ -235,20 +244,39 @@ export default class IBreath {
     }
 
     this.#csv.flushFrameCSV(trial, this.#frameRows);
-    this.#csv.appendTrialData(trial);
-
-    this.#trialData.push({ ...trial });
+    this.#hud.abortBtn.style.display = 'none';
     this.#trialIndex++;
 
+    if (CONFIG.SYNC_DETECTION && !aborted) {
+      // Defer CSV write and memory push until subject responds
+      this.#pendingTrial = trial;
+      this.#state = STATE.RESPONSE;
+      this.#hud.stateEl.textContent = 'respond…';
+    } else {
+      this.#csv.appendTrialData(trial);
+      this.#trialData.push({ ...trial });
+      this.#startITIorEnd(trial);
+    }
+  }
+
+  #onResponse(sync) {
+    const trial     = this.#pendingTrial;
+    this.#pendingTrial = null;
+    trial.response  = sync;
+
+    this.#csv.appendTrialData(trial);
+    this.#trialData.push({ ...trial });
+    this.#startITIorEnd(trial);
+  }
+
+  #startITIorEnd(trial) {
     if (this.#trialIndex >= this.#trials.length) {
       this.#endExperiment();
       return;
     }
-
-    this.#itiStartTime = performance.now();
-    this.#itiDuration = trial.ITI;
-    this.#state = STATE.ITI;
-    this.#hud.abortBtn.style.display = 'none';
+    this.#itiStartTime            = performance.now();
+    this.#itiDuration             = trial.ITI;
+    this.#state                   = STATE.ITI;
     this.#hud.stateEl.textContent = 'inter-trial interval…';
   }
 
