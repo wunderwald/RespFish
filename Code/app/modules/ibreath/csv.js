@@ -30,7 +30,7 @@ export class IBreathCSV {
 
   constructor(subjectCode, onWarn) {
     this.#subjectCode = subjectCode;
-    this.#onWarn      = onWarn;
+    this.#onWarn = onWarn;
   }
 
   async init() {
@@ -47,7 +47,7 @@ export class IBreathCSV {
     }
 
     const trialFile = `${dir}/trialData.csv`;
-    const result    = await window.api.writeCSV(trialFile, IBreathCSV.#TRIAL_HEADER);
+    const result = await window.api.writeCSV(trialFile, IBreathCSV.#TRIAL_HEADER);
     if (!result.ok) {
       this.#warn(`Could not init trialData.csv: ${result.error}`);
     } else {
@@ -94,7 +94,7 @@ export class IBreathCSV {
       `${trial.slowfast ?? ''},` +
       `${trial.ITI},` +
       `${trial.startTime ?? ''},` +
-      `${trial.endTime   ?? ''},` +
+      `${trial.endTime ?? ''},` +
       `${trial.aborted}\n`;
 
     const result = await window.api.appendCSV(

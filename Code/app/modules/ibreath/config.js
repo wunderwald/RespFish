@@ -3,7 +3,7 @@ export const CONFIG = {
   SUBJECT_CODE: "TEST",
 
   // Signal scaling (matching MATLAB LOG_SCALING_SYNC path)
-  LOG_SCALE_DEPTH:       500,
+  LOG_SCALE_DEPTH: 500,
   BREATH_SCALE_BASE_LOG: 1.2,
 
   // Smoothing
@@ -15,16 +15,16 @@ export const CONFIG = {
   // Trial timing
   MAX_NUM_TRIALS: 80,
   MAX_TRIAL_TIME: 30,       // seconds
-  MIN_TRIAL_TIME:  5,       // seconds
-  ITI_MIN:      2000,       // ms
-  ITI_MAX:      3000,       // ms
+  MIN_TRIAL_TIME: 5,       // seconds
+  ITI_MIN: 2000,       // ms
+  ITI_MAX: 3000,       // ms
 
   // Async signal
   SPEED_FACTOR_SLOW: 1.1,
   SPEED_FACTOR_FAST: 0.9,
 
   // Noise
-  ADD_NOISE_ASYNC:              true,
+  ADD_NOISE_ASYNC: true,
   MAP_ASYNC_RANGE_TO_SYNC_RANGE: true,
 
   // Cloud stimulus size (fraction of the shorter half-scene dimension)
@@ -36,10 +36,10 @@ export const CONFIG = {
 };
 
 export const STATE = {
-  IDLE:        'idle',
+  IDLE: 'idle',
   CALIBRATING: 'calibrating',
-  READY:       'ready',     // between trials — waiting for experimenter
-  TRIAL:       'trial',
-  ITI:         'iti',
-  DONE:        'done',
+  READY: 'ready',     // between trials — waiting for experimenter
+  TRIAL: 'trial',
+  ITI: 'iti',
+  DONE: 'done',
 };

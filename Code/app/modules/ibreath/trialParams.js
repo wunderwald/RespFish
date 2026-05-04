@@ -19,28 +19,28 @@ export function makeTrialParams(numTrials) {
     return out.slice(0, length);
   }
 
-  const lrSeq    = balancedSeq(numTrials, 4);    // left/right
-  const saSeq    = balancedSeq(numTrials, 2);    // sync/async alternating
+  const lrSeq = balancedSeq(numTrials, 4);    // left/right
+  const saSeq = balancedSeq(numTrials, 2);    // sync/async alternating
   const numAsync = Math.floor(numTrials / 2);
-  const sfSeq    = balancedSeq(numAsync, 4);     // slow/fast (async only)
+  const sfSeq = balancedSeq(numAsync, 4);     // slow/fast (async only)
 
   const trials = [];
   let asyncIdx = 0;
 
   for (let i = 0; i < numTrials; i++) {
     const sync = saSeq[i];
-    const iti  = CONFIG.ITI_MIN +
-                 Math.round(Math.random() * (CONFIG.ITI_MAX - CONFIG.ITI_MIN));
+    const iti = CONFIG.ITI_MIN +
+      Math.round(Math.random() * (CONFIG.ITI_MAX - CONFIG.ITI_MIN));
 
     const trial = {
-      trialIndex:  i + 1,
+      trialIndex: i + 1,
       synchronous: sync,
-      img:         'cloud',   // CSV field — no image file used
-      lr:          lrSeq[i],  // true = left, false = right
-      ITI:         iti,       // ms
-      slowfast:    null,      // only set for async trials
-      startTime:   null,
-      endTime:     null,
+      img: 'cloud',   // CSV field — no image file used
+      lr: lrSeq[i],  // true = left, false = right
+      ITI: iti,       // ms
+      slowfast: null,      // only set for async trials
+      startTime: null,
+      endTime: null,
     };
 
     if (!sync) {

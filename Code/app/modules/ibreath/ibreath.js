@@ -22,57 +22,57 @@ import {
   AutocorrEstimator,
   AsyncSignalGenerator,
 } from '../signal/signalUtils.js';
-import { CONFIG, STATE }   from './config.js';
+import { CONFIG, STATE } from './config.js';
 import { makeTrialParams } from './trialParams.js';
-import { buildHUD }        from './hud.js';
+import { buildHUD } from './hud.js';
 import { IBreathRenderer } from './renderer.js';
-import { IBreathCSV }      from './csv.js';
+import { IBreathCSV } from './csv.js';
 
 export { CONFIG };
 
 export default class IBreath {
   // ── state ──────────────────────────────────────────────────────────────
-  #state       = STATE.IDLE;
+  #state = STATE.IDLE;
   #streamReady = false;
 
   // ── experiment data ────────────────────────────────────────────────────
   #subjectCode = CONFIG.SUBJECT_CODE;
-  #trials      = [];
-  #trialIndex  = 0;
-  #trialData   = [];
+  #trials = [];
+  #trialIndex = 0;
+  #trialData = [];
 
   // ── calibration ────────────────────────────────────────────────────────
-  #calStartTime      = null;
-  #calSamples        = [];
+  #calStartTime = null;
+  #calSamples = [];
   #calStimulusLevels = [];
 
   // ── signal pipeline ────────────────────────────────────────────────────
-  #smoother          = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
-  #asyncGen          = new AsyncSignalGenerator({ estimator: new AutocorrEstimator() });
+  #smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
+  #asyncGen = new AsyncSignalGenerator({ estimator: new AutocorrEstimator() });
   #syncStimulusRange = [0.3, 0.4];
 
   // ── per-trial state ────────────────────────────────────────────────────
-  #trialStartTime     = null;
-  #stimulusLevel      = 0;
-  #lastRawSample      = 0;
-  #lastScaledSample   = 0;
-  #syncSignal         = [];
+  #trialStartTime = null;
+  #stimulusLevel = 0;
+  #lastRawSample = 0;
+  #lastScaledSample = 0;
+  #syncSignal = [];
   #syncStimulusSignal = [];
-  #frameRows          = [];
+  #frameRows = [];
 
   // ── ITI ────────────────────────────────────────────────────────────────
   #itiStartTime = null;
-  #itiDuration  = 0;
+  #itiDuration = 0;
 
   // ── sub-modules ────────────────────────────────────────────────────────
-  #hud      = null;   // DOM refs from buildHUD()
+  #hud = null;   // DOM refs from buildHUD()
   #renderer = null;   // IBreathRenderer
-  #csv      = null;   // IBreathCSV — created at calibration start
+  #csv = null;   // IBreathCSV — created at calibration start
 
   constructor({ statsContainer, sceneContainer }) {
     this.#hud = buildHUD(statsContainer, CONFIG.SUBJECT_CODE, {
       onStart: () => this.#beginCalibration(),
-      onNext:  () => this.#advanceTrial(),
+      onNext: () => this.#advanceTrial(),
       onAbort: () => this.#abortTrial(),
     });
     this.#renderer = new IBreathRenderer(sceneContainer);
@@ -83,7 +83,7 @@ export default class IBreath {
   // ── Public interface ───────────────────────────────────────────────────
 
   pushSample(rawValue) {
-    this.#lastRawSample    = rawValue;
+    this.#lastRawSample = rawValue;
     this.#lastScaledSample = rawValue;
     this.#smoother.push(rawValue);
 
@@ -124,19 +124,19 @@ export default class IBreath {
   // ── State machine ──────────────────────────────────────────────────────
 
   #beginCalibration() {
-    this.#subjectCode       = this.#hud.subjectInput.value.trim() || 'TEST';
-    this.#trials            = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
-    this.#trialIndex        = 0;
-    this.#trialData         = [];
-    this.#calSamples        = [];
+    this.#subjectCode = this.#hud.subjectInput.value.trim() || 'TEST';
+    this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
+    this.#trialIndex = 0;
+    this.#trialData = [];
+    this.#calSamples = [];
     this.#calStimulusLevels = [];
-    this.#calStartTime      = performance.now();
+    this.#calStartTime = performance.now();
     this.#smoother.reset();
 
-    this.#state                      = STATE.CALIBRATING;
-    this.#hud.startBtn.disabled      = true;
-    this.#hud.subjectInput.disabled  = true;
-    this.#hud.stateEl.textContent    = 'calibrating…';
+    this.#state = STATE.CALIBRATING;
+    this.#hud.startBtn.disabled = true;
+    this.#hud.subjectInput.disabled = true;
+    this.#hud.stateEl.textContent = 'calibrating…';
 
     this.#csv = new IBreathCSV(this.#subjectCode, (msg) => this.#csvWarn(msg));
     this.#csv.init();
@@ -149,10 +149,10 @@ export default class IBreath {
     const lvls = this.#calStimulusLevels;
     this.#syncStimulusRange = [Math.min(...lvls) * 0.8, Math.max(...lvls) * 0.8];
 
-    this.#state                     = STATE.READY;
-    this.#hud.stateEl.textContent   = 'ready — press Space or Next trial to begin';
+    this.#state = STATE.READY;
+    this.#hud.stateEl.textContent = 'ready — press Space or Next trial to begin';
     this.#hud.nextBtn.style.display = '';
-    this.#hud.trialEl.textContent   = `0 / ${this.#trials.length}`;
+    this.#hud.trialEl.textContent = `0 / ${this.#trials.length}`;
   }
 
   #advanceTrial() {
@@ -178,10 +178,10 @@ export default class IBreath {
       }
     }
 
-    this.#syncSignal         = [];
+    this.#syncSignal = [];
     this.#syncStimulusSignal = [];
-    this.#frameRows          = [];
-    this.#stimulusLevel      = 0;
+    this.#frameRows = [];
+    this.#stimulusLevel = 0;
     this.#smoother.reset();
 
     // Pre-fill smoother with 64 samples (matching MATLAB pre-buffer)
@@ -195,16 +195,16 @@ export default class IBreath {
     }
 
     this.#trialStartTime = performance.now();
-    trial.startTime      = new Date().toISOString();
+    trial.startTime = new Date().toISOString();
 
     // Write header now — a mid-trial crash still leaves a valid (partial) file
     this.#csv.initFrameCSV(trial.trialIndex);
 
-    this.#state                       = STATE.TRIAL;
-    this.#hud.nextBtn.style.display   = 'none';
-    this.#hud.abortBtn.style.display  = '';
-    this.#hud.stateEl.textContent     = trial.synchronous ? 'sync trial' : 'async trial';
-    this.#hud.trialEl.textContent     = `${this.#trialIndex + 1} / ${this.#trials.length}`;
+    this.#state = STATE.TRIAL;
+    this.#hud.nextBtn.style.display = 'none';
+    this.#hud.abortBtn.style.display = '';
+    this.#hud.stateEl.textContent = trial.synchronous ? 'sync trial' : 'async trial';
+    this.#hud.trialEl.textContent = `${this.#trialIndex + 1} / ${this.#trials.length}`;
   }
 
   #onTrialSample(scaled) {
@@ -217,7 +217,7 @@ export default class IBreath {
   }
 
   #endTrial(aborted = false) {
-    const trial   = this.#trials[this.#trialIndex];
+    const trial = this.#trials[this.#trialIndex];
     trial.endTime = new Date().toISOString();
     trial.aborted = aborted;
 
@@ -245,11 +245,11 @@ export default class IBreath {
       return;
     }
 
-    this.#itiStartTime               = performance.now();
-    this.#itiDuration                = trial.ITI;
-    this.#state                      = STATE.ITI;
+    this.#itiStartTime = performance.now();
+    this.#itiDuration = trial.ITI;
+    this.#state = STATE.ITI;
     this.#hud.abortBtn.style.display = 'none';
-    this.#hud.stateEl.textContent    = 'inter-trial interval…';
+    this.#hud.stateEl.textContent = 'inter-trial interval…';
   }
 
   #abortTrial() {
@@ -257,11 +257,11 @@ export default class IBreath {
   }
 
   #endExperiment() {
-    this.#state                      = STATE.DONE;
-    this.#hud.nextBtn.style.display  = 'none';
+    this.#state = STATE.DONE;
+    this.#hud.nextBtn.style.display = 'none';
     this.#hud.abortBtn.style.display = 'none';
-    this.#hud.stateEl.textContent    = 'experiment complete';
-    this.#hud.trialEl.textContent    = `${this.#trials.length} / ${this.#trials.length}`;
+    this.#hud.stateEl.textContent = 'experiment complete';
+    this.#hud.trialEl.textContent = `${this.#trials.length} / ${this.#trials.length}`;
   }
 
   // ── Main loop ──────────────────────────────────────────────────────────
@@ -279,9 +279,9 @@ export default class IBreath {
 
     if (this.#state === STATE.ITI) {
       if (now - this.#itiStartTime >= this.#itiDuration) {
-        this.#state                     = STATE.READY;
+        this.#state = STATE.READY;
         this.#hud.nextBtn.style.display = '';
-        this.#hud.stateEl.textContent   = 'ready — press Space or Next trial';
+        this.#hud.stateEl.textContent = 'ready — press Space or Next trial';
       }
     }
 
@@ -297,10 +297,10 @@ export default class IBreath {
       const stimLevel = Math.max(0, Math.min(1, this.#stimulusLevel));
 
       this.#frameRows.push({
-        t:      new Date().toISOString(),
-        raw:    this.#lastRawSample,
+        t: new Date().toISOString(),
+        raw: this.#lastRawSample,
         scaled: this.#lastScaledSample,
-        stim:   stimLevel,
+        stim: stimLevel,
       });
 
       if (tSecs >= CONFIG.MAX_TRIAL_TIME) {
@@ -315,9 +315,9 @@ export default class IBreath {
     this.#renderer.draw(this.#state, now, {
       calStartTime: this.#calStartTime,
       itiStartTime: this.#itiStartTime,
-      itiDuration:  this.#itiDuration,
-      trialCount:   this.#trialData.length,
-      subjectCode:  this.#subjectCode,
+      itiDuration: this.#itiDuration,
+      trialCount: this.#trialData.length,
+      subjectCode: this.#subjectCode,
       ...(trialDrawData ?? {}),
     });
 

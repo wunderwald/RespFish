@@ -23,15 +23,15 @@ export function buildHUD(container, subjectCode, { onStart, onNext, onAbort }) {
     </span>
   `;
 
-  const stateEl      = container.querySelector('#ib-state-text');
-  const trialEl      = container.querySelector('#ib-trial');
+  const stateEl = container.querySelector('#ib-state-text');
+  const trialEl = container.querySelector('#ib-trial');
   const subjectInput = container.querySelector('#ib-subject');
-  const startBtn     = container.querySelector('#ib-start-btn');
-  const nextBtn      = container.querySelector('#ib-next-btn');
-  const abortBtn     = container.querySelector('#ib-abort-btn');
+  const startBtn = container.querySelector('#ib-start-btn');
+  const nextBtn = container.querySelector('#ib-next-btn');
+  const abortBtn = container.querySelector('#ib-abort-btn');
 
   startBtn.addEventListener('click', onStart);
-  nextBtn.addEventListener('click',  onNext);
+  nextBtn.addEventListener('click', onNext);
   abortBtn.addEventListener('click', onAbort);
 
   return { stateEl, trialEl, subjectInput, startBtn, nextBtn, abortBtn };

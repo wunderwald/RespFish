@@ -5,24 +5,24 @@ import { STATE, CONFIG } from './config.js';
 
 export class IBreathRenderer {
   #canvas = null;
-  #ctx    = null;
+  #ctx = null;
 
   constructor(container) {
     container.innerHTML = '<canvas id="ib-canvas"></canvas>';
     this.#canvas = container.querySelector('#ib-canvas');
-    this.#ctx    = this.#canvas.getContext('2d');
+    this.#ctx = this.#canvas.getContext('2d');
   }
 
   // ── Public draw entry point ────────────────────────────────────────────
 
   draw(state, now, data = {}) {
     const canvas = this.#canvas;
-    canvas.width  = canvas.offsetWidth;
+    canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
 
     const ctx = this.#ctx;
-    const w   = canvas.width;
-    const h   = canvas.height;
+    const w = canvas.width;
+    const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
 
     switch (state) {
@@ -48,15 +48,15 @@ export class IBreathRenderer {
   }
 
   #drawCalibrating(ctx, w, h, now, calStartTime) {
-    const elapsed   = now - calStartTime;
-    const progress  = Math.min(elapsed / (CONFIG.CALIBRATION_SECS * 1000), 1);
+    const elapsed = now - calStartTime;
+    const progress = Math.min(elapsed / (CONFIG.CALIBRATION_SECS * 1000), 1);
     const remaining = Math.max(0, Math.ceil(CONFIG.CALIBRATION_SECS - elapsed / 1000));
     const cx = w / 2, cy = h / 2;
-    const r  = 60;
+    const r = 60;
 
-    ctx.fillStyle    = 'rgba(255,255,255,0.85)';
-    ctx.font         = '300 20px Nunito, sans-serif';
-    ctx.textAlign    = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '300 20px Nunito, sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('Breathe normally…', cx, cy - 80);
 
@@ -64,15 +64,15 @@ export class IBreathRenderer {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth   = 5;
+    ctx.lineWidth = 5;
     ctx.stroke();
 
     // Progress arc
     ctx.beginPath();
     ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
     ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth   = 5;
-    ctx.lineCap     = 'round';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
     ctx.stroke();
 
     this.#centerText(ctx, cx, cy, String(remaining), 'rgba(255,255,255,0.7)', 52, '200');
@@ -85,7 +85,7 @@ export class IBreathRenderer {
   }
 
   #drawTrial(ctx, w, h, trial, stimLevel) {
-    const halfW   = w / 2;
+    const halfW = w / 2;
     const centreX = trial.lr
       ? halfW / 2            // centre of left half
       : halfW + halfW / 2;   // centre of right half
@@ -93,7 +93,7 @@ export class IBreathRenderer {
 
     const minSize = Math.min(halfW, h) * CONFIG.CLOUD_SIZE_MIN;
     const maxSize = Math.min(halfW, h) * CONFIG.CLOUD_SIZE_MAX;
-    const size    = minSize + stimLevel * (maxSize - minSize);
+    const size = minSize + stimLevel * (maxSize - minSize);
 
     this.#drawCloud(ctx, centreX, centreY, size, 1);
 
@@ -102,22 +102,22 @@ export class IBreathRenderer {
     ctx.moveTo(halfW, 0);
     ctx.lineTo(halfW, h);
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-    ctx.lineWidth   = 1;
+    ctx.lineWidth = 1;
     ctx.stroke();
   }
 
   #drawITI(ctx, w, h, now, itiStartTime, itiDuration) {
     const remaining = Math.max(0, itiDuration - (now - itiStartTime));
-    const secs      = (remaining / 1000).toFixed(1);
+    const secs = (remaining / 1000).toFixed(1);
     this.#centerText(ctx, w / 2, h / 2,
       `Next trial in ${secs}s`, 'rgba(255,255,255,0.2)', 16);
   }
 
   #drawDone(ctx, w, h, trialCount, subjectCode) {
     const cx = w / 2, cy = h / 2;
-    this.#centerText(ctx, cx, cy - 40, 'Experiment complete',         'rgba(255,255,255,0.6)',  24);
+    this.#centerText(ctx, cx, cy - 40, 'Experiment complete', 'rgba(255,255,255,0.6)', 24);
     this.#centerText(ctx, cx, cy + 10, `${trialCount} trials recorded`, 'rgba(255,255,255,0.35)', 16);
-    this.#centerText(ctx, cx, cy + 50, `Subject: ${subjectCode}`,     'rgba(255,255,255,0.25)', 14);
+    this.#centerText(ctx, cx, cy + 50, `Subject: ${subjectCode}`, 'rgba(255,255,255,0.25)', 14);
   }
 
   // ── Canvas helpers ─────────────────────────────────────────────────────
@@ -128,11 +128,11 @@ export class IBreathRenderer {
     ctx.globalAlpha = alpha;
 
     const blobs = [
-      { dx: 0,            dy: 0,            r: size * 0.55 },
-      { dx: -size * 0.42, dy:  size * 0.12, r: size * 0.42 },
-      { dx:  size * 0.42, dy:  size * 0.12, r: size * 0.40 },
+      { dx: 0, dy: 0, r: size * 0.55 },
+      { dx: -size * 0.42, dy: size * 0.12, r: size * 0.42 },
+      { dx: size * 0.42, dy: size * 0.12, r: size * 0.40 },
       { dx: -size * 0.20, dy: -size * 0.28, r: size * 0.34 },
-      { dx:  size * 0.22, dy: -size * 0.24, r: size * 0.32 },
+      { dx: size * 0.22, dy: -size * 0.24, r: size * 0.32 },
     ];
 
     const grd = ctx.createRadialGradient(
@@ -154,9 +154,9 @@ export class IBreathRenderer {
   }
 
   #centerText(ctx, x, y, text, color, size, weight = '300') {
-    ctx.fillStyle    = color;
-    ctx.font         = `${weight} ${size}px Nunito, sans-serif`;
-    ctx.textAlign    = 'center';
+    ctx.fillStyle = color;
+    ctx.font = `${weight} ${size}px Nunito, sans-serif`;
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, x, y);
   }
