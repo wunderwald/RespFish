@@ -44,19 +44,20 @@ const STATE = {
 // ── Cloud ─────────────────────────────────────────────────────────────────────
 
 class Cloud {
-  constructor({ startX, startY, sunX, sunY }) {
+  constructor({ startX, startY, sunX, sunY, slideInMs }) {
     this.x = startX;
     this.y = startY;
-    this._fromX = startX;
-    this._fromY = startY;
-    this._toX   = sunX;
-    this._toY   = sunY;
-    this.sunX   = sunX;
-    this.sunY   = sunY;
-    this.size   = CONFIG.CLOUD_SIZE;
-    this.alpha  = 1;
-    this._state = 'sliding_in'; // sliding_in | covering | success_fade | sliding_out | resting
-    this._t     = 0;
+    this._fromX    = startX;
+    this._fromY    = startY;
+    this._toX      = sunX;
+    this._toY      = sunY;
+    this.sunX      = sunX;
+    this.sunY      = sunY;
+    this.size      = CONFIG.CLOUD_SIZE;
+    this.alpha     = 1;
+    this._state    = 'sliding_in'; // sliding_in | covering | success_fade | sliding_out | resting
+    this._t        = 0;
+    this._slideInMs = slideInMs;
   }
 
   get alive() { return this._state !== 'gone'; }
@@ -75,10 +76,8 @@ class Cloud {
   }
 
   tick(dt) {
-    const speed = dt / CONFIG.CLOUD_SLIDE_MS;
-
     if (this._state === 'sliding_in') {
-      this._t = Math.min(this._t + speed, 1);
+      this._t = Math.min(this._t + dt / this._slideInMs, 1);
       this.x  = lerp(this._fromX, this._toX, easeOut(this._t));
       this.y  = lerp(this._fromY, this._toY, easeOut(this._t));
       if (this._t >= 1) this._state = 'covering';
@@ -89,7 +88,7 @@ class Cloud {
       if (this.alpha <= 0) this._state = 'gone';
 
     } else if (this._state === 'sliding_out') {
-      this._t = Math.min(this._t + speed, 1);
+      this._t = Math.min(this._t + dt / CONFIG.CLOUD_SLIDE_MS, 1);
       this.x  = lerp(this._fromX, this._toX, easeOut(this._t));
       this.y  = lerp(this._fromY, this._toY, easeOut(this._t));
       if (this._t >= 1) this._state = 'resting';
@@ -304,7 +303,7 @@ export class Game {
       [-margin,             Math.random() * h],
     ][edge];
 
-    this.#activeCloud = new Cloud({ startX: sx, startY: sy, sunX: cx, sunY: cy });
+    this.#activeCloud = new Cloud({ startX: sx, startY: sy, sunX: cx, sunY: cy, slideInMs: this.#beatMs / 2 });
   }
 
   #onExhaleEnd(now) {
