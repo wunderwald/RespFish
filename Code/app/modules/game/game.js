@@ -14,30 +14,30 @@
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function lerp(a, b, t) { return a + (b - a) * t; }
-function easeOut(t)     { return 1 - (1 - t) * (1 - t); }
+function easeOut(t) { return 1 - (1 - t) * (1 - t); }
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
 export const CONFIG = {
-  TARGET_BPM:             6,     // target breaths per minute
-  GAME_DURATION_SECS:     60,
+  TARGET_BPM: 6,     // target breaths per minute
+  GAME_DURATION_SECS: 60,
   EXHALE_ONSET_THRESHOLD: 0.40,   // normalised signal level that triggers exhale onset
-  BREATH_DEBOUNCE_MS:     1500,   // minimum ms between two exhale onsets
-  EXHALE_SUCCESS_RATIO:   0.90,   // fraction of exhale phase above threshold needed to clear a cloud
+  BREATH_DEBOUNCE_MS: 1500,   // minimum ms between two exhale onsets
+  EXHALE_SUCCESS_RATIO: 0.90,   // fraction of exhale phase above threshold needed to clear a cloud
 
-  SUN_RADIUS:      110,
-  CLOUD_SIZE:      95,
-  CLOUD_SLIDE_MS:  2200,   // ms for cloud to animate in / out
-  FAIL_ORBIT_R:    185,    // distance from sun center where failed clouds rest
-  FAIL_FADE_MS:    60000,  // ms for a failed cloud to fully fade (1 minute)
+  SUN_RADIUS: 110,
+  CLOUD_SIZE: 95,
+  CLOUD_SLIDE_MS: 2200,   // ms for cloud to animate in / out
+  FAIL_ORBIT_R: 185,    // distance from sun center where failed clouds rest
+  FAIL_FADE_MS: 60000,  // ms for a failed cloud to fully fade (1 minute)
 };
 
 // ── Game states ───────────────────────────────────────────────────────────────
 
 const STATE = {
-  IDLE:      'idle',
+  IDLE: 'idle',
   COUNTDOWN: 'countdown',
-  PLAYING:   'playing',
+  PLAYING: 'playing',
   GAME_OVER: 'game_over',
 };
 
@@ -47,16 +47,16 @@ class Cloud {
   constructor({ startX, startY, sunX, sunY, slideInMs }) {
     this.x = startX;
     this.y = startY;
-    this._fromX    = startX;
-    this._fromY    = startY;
-    this._toX      = sunX;
-    this._toY      = sunY;
-    this.sunX      = sunX;
-    this.sunY      = sunY;
-    this.size      = CONFIG.CLOUD_SIZE;
-    this.alpha     = 1;
-    this._state    = 'sliding_in'; // sliding_in | covering | success_fade | sliding_out | resting
-    this._t        = 0;
+    this._fromX = startX;
+    this._fromY = startY;
+    this._toX = sunX;
+    this._toY = sunY;
+    this.sunX = sunX;
+    this.sunY = sunY;
+    this.size = CONFIG.CLOUD_SIZE;
+    this.alpha = 1;
+    this._state = 'sliding_in'; // sliding_in | covering | success_fade | sliding_out | resting
+    this._t = 0;
     this._slideInMs = slideInMs;
   }
 
@@ -68,29 +68,29 @@ class Cloud {
 
   slideTo(targetX, targetY) {
     this._state = 'sliding_out';
-    this._t     = 0;
+    this._t = 0;
     this._fromX = this.x;
     this._fromY = this.y;
-    this._toX   = targetX;
-    this._toY   = targetY;
+    this._toX = targetX;
+    this._toY = targetY;
   }
 
   tick(dt) {
     if (this._state === 'sliding_in') {
       this._t = Math.min(this._t + dt / this._slideInMs, 1);
-      this.x  = lerp(this._fromX, this._toX, easeOut(this._t));
-      this.y  = lerp(this._fromY, this._toY, easeOut(this._t));
+      this.x = lerp(this._fromX, this._toX, easeOut(this._t));
+      this.y = lerp(this._fromY, this._toY, easeOut(this._t));
       if (this._t >= 1) this._state = 'covering';
 
     } else if (this._state === 'success_fade') {
       this.alpha = Math.max(0, this.alpha - dt / 700);
-      this.y    -= dt * 0.06;   // drift upward as it fades
+      this.y -= dt * 0.06;   // drift upward as it fades
       if (this.alpha <= 0) this._state = 'gone';
 
     } else if (this._state === 'sliding_out') {
       this._t = Math.min(this._t + dt / CONFIG.CLOUD_SLIDE_MS, 1);
-      this.x  = lerp(this._fromX, this._toX, easeOut(this._t));
-      this.y  = lerp(this._fromY, this._toY, easeOut(this._t));
+      this.x = lerp(this._fromX, this._toX, easeOut(this._t));
+      this.y = lerp(this._fromY, this._toY, easeOut(this._t));
       if (this._t >= 1) this._state = 'resting';
 
     } else if (this._state === 'resting') {
@@ -106,15 +106,15 @@ const PARTICLE_COLORS = ['#ffffff', '#fff7aa', '#ffe066', '#ffffff', '#ffffff'];
 
 class Particle {
   constructor(x, y) {
-    const angle  = Math.random() * Math.PI * 2;
-    const speed  = 60 + Math.random() * 140;
-    this.x       = x;
-    this.y       = y;
-    this.vx      = Math.cos(angle) * speed;
-    this.vy      = Math.sin(angle) * speed;
-    this.r       = 2.5 + Math.random() * 4;
-    this.color   = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
-    this.life    = 450 + Math.random() * 300;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 60 + Math.random() * 140;
+    this.x = x;
+    this.y = y;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.r = 2.5 + Math.random() * 4;
+    this.color = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+    this.life = 450 + Math.random() * 300;
     this.elapsed = 0;
   }
 
@@ -140,32 +140,32 @@ export class Game {
   #countdownStart = null;
 
   // breath tracking
-  #phase           = 'inhale'; // 'inhale' | 'exhale'
-  #phaseStartTime  = null;
+  #phase = 'inhale'; // 'inhale' | 'exhale'
+  #phaseStartTime = null;
   #exhaleTimeAbove = 0;        // accumulated ms above threshold in current exhale phase
-  #lastBreathMs    = -Infinity;
-  #inBreath        = false;
-  #lastSampleTime  = null;
-  #lastNorm        = 0;
+  #lastBreathMs = -Infinity;
+  #inBreath = false;
+  #lastSampleTime = null;
+  #lastNorm = 0;
 
   // timing
-  #beatMs        = (60 / CONFIG.TARGET_BPM) * 1000; // 5000 ms at 12 BPM
+  #beatMs = (60 / CONFIG.TARGET_BPM) * 1000; // 5000 ms at 12 BPM
   #gameStartTime = null;
 
   // clouds
-  #activeCloud    = null;
-  #failedClouds   = [];
+  #activeCloud = null;
+  #failedClouds = [];
   #failAngleIndex = 0;   // cycles through orbit positions for failed clouds
-  #particles      = [];
+  #particles = [];
 
   // animation
   #lastFrameTime = null;
 
   // DOM
-  #canvas   = null;
-  #ctx      = null;
-  #scoreEl  = null;
-  #stateEl  = null;
+  #canvas = null;
+  #ctx = null;
+  #scoreEl = null;
+  #stateEl = null;
   #startBtn = null;
 
   constructor({ statsContainer, sceneContainer }) {
@@ -178,7 +178,7 @@ export class Game {
 
   pushSample(value) {
     const now = performance.now();
-    const dt  = this.#lastSampleTime != null ? now - this.#lastSampleTime : 0;
+    const dt = this.#lastSampleTime != null ? now - this.#lastSampleTime : 0;
     this.#lastSampleTime = now;
 
     if (this.#state === STATE.PLAYING) {
@@ -190,7 +190,7 @@ export class Game {
     const streamReady = type === 'connected';
     if (this.#state === STATE.IDLE) {
       this.#stateEl.textContent = streamReady ? 'ready — press Start' : text;
-      this.#startBtn.disabled   = !streamReady;
+      this.#startBtn.disabled = !streamReady;
     }
   }
 
@@ -202,8 +202,8 @@ export class Game {
       <span><span class="label">score</span><span id="game-score">—</span></span>
       <button id="game-start-btn" disabled>Start</button>
     `;
-    this.#stateEl  = container.querySelector('#game-state-text');
-    this.#scoreEl  = container.querySelector('#game-score');
+    this.#stateEl = container.querySelector('#game-state-text');
+    this.#scoreEl = container.querySelector('#game-score');
     this.#startBtn = container.querySelector('#game-start-btn');
     this.#startBtn.addEventListener('click', () => this.#beginCountdown());
   }
@@ -211,51 +211,51 @@ export class Game {
   #buildCanvas(container) {
     container.innerHTML = '<canvas id="game-canvas"></canvas>';
     this.#canvas = container.querySelector('#game-canvas');
-    this.#ctx    = this.#canvas.getContext('2d');
+    this.#ctx = this.#canvas.getContext('2d');
   }
 
   // ── State machine ────────────────────────────────────────────────────────────
 
   #beginCountdown() {
-    this.#state          = STATE.COUNTDOWN;
+    this.#state = STATE.COUNTDOWN;
     this.#countdownStart = performance.now();
-    this.#startBtn.disabled   = true;
+    this.#startBtn.disabled = true;
     this.#stateEl.textContent = 'get ready…';
   }
 
   #beginPlaying() {
-    this.#state          = STATE.PLAYING;
-    this.#score          = 0;
-    this.#activeCloud    = null;
-    this.#failedClouds   = [];
+    this.#state = STATE.PLAYING;
+    this.#score = 0;
+    this.#activeCloud = null;
+    this.#failedClouds = [];
     this.#failAngleIndex = 0;
-    this.#particles      = [];
-    this.#phase          = 'inhale';
+    this.#particles = [];
+    this.#phase = 'inhale';
     this.#phaseStartTime = performance.now();
-    this.#lastBreathMs   = -Infinity;
-    this.#gameStartTime  = performance.now();
+    this.#lastBreathMs = -Infinity;
+    this.#gameStartTime = performance.now();
 
-    this.#scoreEl.textContent  = '0';
-    this.#stateEl.textContent  = 'playing';
+    this.#scoreEl.textContent = '0';
+    this.#stateEl.textContent = 'playing';
     this.#startBtn.textContent = 'Restart';
-    this.#startBtn.disabled    = false;
+    this.#startBtn.disabled = false;
     this.#spawnCloud();
   }
 
   #endGame() {
-    this.#state        = STATE.GAME_OVER;
-    this.#activeCloud  = null;
+    this.#state = STATE.GAME_OVER;
+    this.#activeCloud = null;
     this.#failedClouds = [];
-    this.#particles    = [];
-    this.#stateEl.textContent  = 'game over';
+    this.#particles = [];
+    this.#stateEl.textContent = 'game over';
     this.#startBtn.textContent = 'Play again';
-    this.#startBtn.disabled    = false;
+    this.#startBtn.disabled = false;
   }
 
   // ── Breath tracking ──────────────────────────────────────────────────────────
 
   #tickBreath(value, now, dt) {
-    const norm  = value;
+    const norm = value;
     const above = norm >= CONFIG.EXHALE_ONSET_THRESHOLD;
     this.#lastNorm = norm;
 
@@ -278,10 +278,10 @@ export class Game {
   }
 
   #onExhaleOnset(now) {
-    this.#phase           = 'exhale';
-    this.#phaseStartTime  = now;
+    this.#phase = 'exhale';
+    this.#phaseStartTime = now;
     this.#exhaleTimeAbove = 0;
-    this.#lastBreathMs    = now;
+    this.#lastBreathMs = now;
   }
 
   #burstParticles(x, y) {
@@ -289,18 +289,18 @@ export class Game {
   }
 
   #spawnCloud() {
-    const cx = this.#canvas.width  / 2;
+    const cx = this.#canvas.width / 2;
     const cy = this.#canvas.height / 2;
-    const w  = this.#canvas.width;
-    const h  = this.#canvas.height;
+    const w = this.#canvas.width;
+    const h = this.#canvas.height;
     const margin = 120;
 
     const edge = Math.floor(Math.random() * 4);
     const [sx, sy] = [
-      [Math.random() * w,  -margin          ],
-      [w + margin,          Math.random() * h],
-      [Math.random() * w,   h + margin      ],
-      [-margin,             Math.random() * h],
+      [Math.random() * w, -margin],
+      [w + margin, Math.random() * h],
+      [Math.random() * w, h + margin],
+      [-margin, Math.random() * h],
     ][edge];
 
     this.#activeCloud = new Cloud({ startX: sx, startY: sy, sunX: cx, sunY: cy, slideInMs: this.#beatMs / 2 });
@@ -308,8 +308,8 @@ export class Game {
 
   #onExhaleEnd(now) {
     const exhalePhaseMs = this.#beatMs / 2;
-    const ratio         = this.#exhaleTimeAbove / exhalePhaseMs;
-    const success       = ratio >= CONFIG.EXHALE_SUCCESS_RATIO;
+    const ratio = this.#exhaleTimeAbove / exhalePhaseMs;
+    const success = ratio >= CONFIG.EXHALE_SUCCESS_RATIO;
 
     if (this.#activeCloud) {
       if (success) {
@@ -319,8 +319,8 @@ export class Game {
         this.#burstParticles(this.#activeCloud.x, this.#activeCloud.y);
         // gone cloud cleaned up in #update
       } else {
-        const cx    = this.#canvas.width  / 2;
-        const cy    = this.#canvas.height / 2;
+        const cx = this.#canvas.width / 2;
+        const cy = this.#canvas.height / 2;
         // Spread failed clouds evenly around the sun in up to 12 positions
         const angle = (this.#failAngleIndex * Math.PI * 2) / 12;
         const failX = cx + Math.cos(angle) * CONFIG.FAIL_ORBIT_R;
@@ -332,7 +332,7 @@ export class Game {
       this.#activeCloud = null;
     }
 
-    this.#phase          = 'inhale';
+    this.#phase = 'inhale';
     this.#phaseStartTime = now;
     this.#spawnCloud();
   }
@@ -352,7 +352,7 @@ export class Game {
   #syncCanvasSize() {
     const c = this.#canvas;
     if (c.width !== c.offsetWidth || c.height !== c.offsetHeight) {
-      c.width  = c.offsetWidth;
+      c.width = c.offsetWidth;
       c.height = c.offsetHeight;
     }
   }
@@ -381,41 +381,41 @@ export class Game {
 
   #draw() {
     const ctx = this.#ctx;
-    const w   = this.#canvas.width;
-    const h   = this.#canvas.height;
+    const w = this.#canvas.width;
+    const h = this.#canvas.height;
     ctx.clearRect(0, 0, w, h);
 
     switch (this.#state) {
-      case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
+      case STATE.IDLE: return this.#drawIdle(ctx, w, h);
       case STATE.COUNTDOWN: return this.#drawCountdown(ctx, w, h);
-      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h);
-      case STATE.GAME_OVER:   return this.#drawGameOver(ctx, w, h);
+      case STATE.PLAYING: return this.#drawPlaying(ctx, w, h);
+      case STATE.GAME_OVER: return this.#drawGameOver(ctx, w, h);
     }
   }
 
   #drawIdle(ctx, w, h) {
-    ctx.fillStyle    = 'rgba(255,255,255,0.25)';
-    ctx.font         = '300 20px Nunito, sans-serif';
-    ctx.textAlign    = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.font = '300 20px Nunito, sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('Select a stream and press Start', w / 2, h / 2);
   }
 
   #drawGameOver(ctx, w, h) {
     const cx = w / 2, cy = h / 2;
-    ctx.textAlign    = 'center';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font      = '200 16px Nunito, sans-serif';
+    ctx.font = '200 16px Nunito, sans-serif';
     ctx.fillText('SUCCESSFUL EXHALES', cx, cy - 52);
 
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font      = '300 72px Nunito, sans-serif';
+    ctx.font = '300 72px Nunito, sans-serif';
     ctx.fillText(this.#score, cx, cy);
 
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font      = '200 14px Nunito, sans-serif';
+    ctx.font = '200 14px Nunito, sans-serif';
     ctx.fillText('Press Play again to retry', cx, cy + 52);
   }
 
@@ -442,9 +442,9 @@ export class Game {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(scale, scale);
-    ctx.fillStyle    = label === 'GO!' ? 'rgba(255,220,80,0.95)' : 'rgba(255,255,255,0.9)';
-    ctx.font         = '300 80px Nunito, sans-serif';
-    ctx.textAlign    = 'center';
+    ctx.fillStyle = label === 'GO!' ? 'rgba(255,220,80,0.95)' : 'rgba(255,255,255,0.9)';
+    ctx.font = '300 80px Nunito, sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, 0, 0);
     ctx.restore();
@@ -466,7 +466,7 @@ export class Game {
     // Active cloud — shake while the player is actively exhaling
     if (this.#activeCloud?.alive) {
       const shaking = this.#phase === 'exhale' && this.#inBreath;
-      const t  = performance.now();
+      const t = performance.now();
       const sx = shaking ? Math.sin(t / 38) * 6 : 0;
       const sy = shaking ? Math.cos(t / 31) * 5 : 0;
       this.#drawCloud(ctx, this.#activeCloud.x + sx, this.#activeCloud.y + sy, this.#activeCloud.size, this.#activeCloud.alpha);
@@ -475,7 +475,7 @@ export class Game {
     // Particles (on top of everything)
     for (const p of this.#particles) {
       ctx.globalAlpha = p.alpha;
-      ctx.fillStyle   = p.color;
+      ctx.fillStyle = p.color;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fill();
@@ -483,12 +483,12 @@ export class Game {
     ctx.globalAlpha = 1;
 
     // Debug breath-phase label
-    const phaseLabel  = this.#phase === 'exhale' ? 'BREATHE OUT' : 'BREATHE IN';
+    const phaseLabel = this.#phase === 'exhale' ? 'BREATHE OUT' : 'BREATHE IN';
     const signalLabel = this.#inBreath ? 'exhaling' : 'inhaling';
     const debug = `${phaseLabel}  |  signal: ${this.#lastNorm.toFixed(2)}  (${signalLabel})`;
-    ctx.fillStyle    = 'rgba(255,255,255,0.55)';
-    ctx.font         = '300 18px Nunito, sans-serif';
-    ctx.textAlign    = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = '300 18px Nunito, sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText(debug, cx, h - 20);
   }
@@ -501,8 +501,8 @@ export class Game {
     // Rays
     const rayCount = 12;
     ctx.strokeStyle = 'rgba(255,210,50,0.85)';
-    ctx.lineWidth   = 5;
-    ctx.lineCap     = 'round';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
     for (let i = 0; i < rayCount; i++) {
       const angle = (i / rayCount) * Math.PI * 2;
       ctx.beginPath();
@@ -523,7 +523,7 @@ export class Game {
     // Eyes
     const eyeOffX = r * 0.28;
     const eyeOffY = r * 0.18;
-    const eyeR    = r * 0.09;
+    const eyeR = r * 0.09;
     for (const ex of [-eyeOffX, eyeOffX]) {
       ctx.beginPath();
       ctx.arc(cx + ex, cy - eyeOffY, eyeR, 0, Math.PI * 2);
@@ -539,8 +539,8 @@ export class Game {
       ctx.arc(cx, cy + r * 0.05, r * 0.38, 0.2 * Math.PI, 0.8 * Math.PI);
     }
     ctx.strokeStyle = '#7a4a00';
-    ctx.lineWidth   = r * 0.08;
-    ctx.lineCap     = 'round';
+    ctx.lineWidth = r * 0.08;
+    ctx.lineCap = 'round';
     ctx.stroke();
   }
 
@@ -548,11 +548,11 @@ export class Game {
     ctx.globalAlpha = alpha;
 
     const blobs = [
-      { dx:  0,            dy:  0,            r: size * 0.55 },
-      { dx: -size * 0.42,  dy:  size * 0.12,  r: size * 0.42 },
-      { dx:  size * 0.42,  dy:  size * 0.12,  r: size * 0.40 },
-      { dx: -size * 0.20,  dy: -size * 0.28,  r: size * 0.34 },
-      { dx:  size * 0.22,  dy: -size * 0.24,  r: size * 0.32 },
+      { dx: 0, dy: 0, r: size * 0.55 },
+      { dx: -size * 0.42, dy: size * 0.12, r: size * 0.42 },
+      { dx: size * 0.42, dy: size * 0.12, r: size * 0.40 },
+      { dx: -size * 0.20, dy: -size * 0.28, r: size * 0.34 },
+      { dx: size * 0.22, dy: -size * 0.24, r: size * 0.32 },
     ];
 
     const grd = ctx.createRadialGradient(x, y - size * 0.15, 0, x, y, size * 0.8);

@@ -26,20 +26,20 @@
 const CALIB_POINTS = [
   [0.5, 0.5],                               // centre first (easiest to find)
   [0.1, 0.1], [0.5, 0.1], [0.9, 0.1],      // top row
-  [0.1, 0.5],             [0.9, 0.5],       // middle sides
+  [0.1, 0.5], [0.9, 0.5],       // middle sides
   [0.1, 0.9], [0.5, 0.9], [0.9, 0.9],      // bottom row
 ];
 
-const VALIDATION_SAMPLES   = 30;   // gaze samples to collect per validation point
+const VALIDATION_SAMPLES = 30;   // gaze samples to collect per validation point
 const VALIDATION_SAMPLE_MS = 50;   // ms between samples (~20 Hz)
-const GOOD_ACCURACY_PX     = 80;   // px mean error considered acceptable (green)
-const OK_ACCURACY_PX       = 140;  // px mean error considered marginal (yellow)
+const GOOD_ACCURACY_PX = 80;   // px mean error considered acceptable (green)
+const OK_ACCURACY_PX = 140;  // px mean error considered marginal (yellow)
 
 // Gaze debug dot appearance
-const DOT_RADIUS     = 10;
-const DOT_COLOR      = 'rgba(255, 80, 80, 0.82)';
+const DOT_RADIUS = 10;
+const DOT_COLOR = 'rgba(255, 80, 80, 0.82)';
 const DOT_RING_COLOR = 'rgba(255, 80, 80, 0.30)';
-const DOT_RING_R     = 22;
+const DOT_RING_R = 22;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,14 +59,14 @@ function sleep(ms) {
 // ── GazeManager ───────────────────────────────────────────────────────────────
 
 export class GazeManager {
-  #active       = false;
+  #active = false;
   #resolveCalib = null;
 
   // Gaze debug dot
-  #dotCanvas  = null;
-  #dotCtx     = null;
+  #dotCanvas = null;
+  #dotCtx = null;
   #dotVisible = false;
-  #dotRafId   = null;
+  #dotRafId = null;
 
   constructor() {
     window.gazeState = { x: 0, y: 0, active: false };
@@ -127,8 +127,8 @@ export class GazeManager {
   #runCalibrationPhase() {
     return new Promise((resolve) => {
       const overlay = this.#makeOverlay();
-      const canvas  = this.#makeCanvas(overlay);
-      const ctx     = canvas.getContext('2d');
+      const canvas = this.#makeCanvas(overlay);
+      const ctx = canvas.getContext('2d');
 
       // Header
       const header = document.createElement('div');
@@ -153,8 +153,8 @@ export class GazeManager {
       document.body.appendChild(overlay);
 
       let pointIdx = 0;
-      let animT    = 0;
-      let rafId    = null;
+      let animT = 0;
+      let rafId = null;
 
       const advance = () => {
         if (pointIdx >= CALIB_POINTS.length) {
@@ -188,7 +188,7 @@ export class GazeManager {
 
       // Animation loop
       const draw = () => {
-        canvas.width  = window.innerWidth;
+        canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -249,8 +249,8 @@ export class GazeManager {
   #runValidationPhase() {
     return new Promise(async (resolve) => {
       const overlay = this.#makeOverlay();
-      const canvas  = this.#makeCanvas(overlay);
-      const ctx     = canvas.getContext('2d');
+      const canvas = this.#makeCanvas(overlay);
+      const ctx = canvas.getContext('2d');
 
       const header = document.createElement('div');
       header.id = 'gaze-calib-header';
@@ -266,24 +266,24 @@ export class GazeManager {
 
       document.body.appendChild(overlay);
 
-      const order   = shuffle([...Array(CALIB_POINTS.length).keys()]);
-      const errors  = new Array(CALIB_POINTS.length).fill(null);
+      const order = shuffle([...Array(CALIB_POINTS.length).keys()]);
+      const errors = new Array(CALIB_POINTS.length).fill(null);
 
       for (let i = 0; i < order.length; i++) {
-        const ptIdx  = order[i];
+        const ptIdx = order[i];
         const [fx, fy] = CALIB_POINTS[ptIdx];
-        const px     = fx * window.innerWidth;
-        const py     = fy * window.innerHeight;
+        const px = fx * window.innerWidth;
+        const py = fy * window.innerHeight;
 
         progress.textContent = `${i + 1} / ${order.length}`;
 
         // Animate the point while collecting samples
-        let animT  = 0;
-        let done   = false;
-        let rafId  = null;
+        let animT = 0;
+        let done = false;
+        let rafId = null;
 
         const draw = () => {
-          canvas.width  = window.innerWidth;
+          canvas.width = window.innerWidth;
           canvas.height = window.innerHeight;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -345,7 +345,7 @@ export class GazeManager {
 
     // Overall mean
     const valid = errors.filter(e => e !== null);
-    const mean  = valid.length
+    const mean = valid.length
       ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length)
       : null;
 
@@ -363,8 +363,8 @@ export class GazeManager {
     badge.id = 'gaze-val-badge';
     const color = mean === null ? '#aed4ed'
       : mean < GOOD_ACCURACY_PX ? '#5bc98a'
-      : mean < OK_ACCURACY_PX   ? '#f0c060'
-      :                           '#e07878';
+        : mean < OK_ACCURACY_PX ? '#f0c060'
+          : '#e07878';
     badge.innerHTML = mean !== null
       ? `<span style="color:${color}">Mean error: <strong>${mean} px</strong></span>`
       : `<span style="color:#e07878">No data collected</span>`;
@@ -372,7 +372,7 @@ export class GazeManager {
 
     // Draw points with error colours on canvas
     const draw = () => {
-      canvas.width  = window.innerWidth;
+      canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -382,10 +382,10 @@ export class GazeManager {
         const py = fy * canvas.height;
         const err = errors[i];
 
-        const col = err === null  ? 'rgba(174,212,237,0.3)'
+        const col = err === null ? 'rgba(174,212,237,0.3)'
           : err < GOOD_ACCURACY_PX ? 'rgba(91,201,138,0.9)'
-          : err < OK_ACCURACY_PX   ? 'rgba(240,192,96,0.9)'
-          :                          'rgba(224,120,120,0.9)';
+            : err < OK_ACCURACY_PX ? 'rgba(240,192,96,0.9)'
+              : 'rgba(224,120,120,0.9)';
 
         ctx.beginPath();
         ctx.arc(px, py, 14, 0, Math.PI * 2);
@@ -478,7 +478,7 @@ export class GazeManager {
       c.id = 'gaze-dot-canvas';
       document.body.appendChild(c);
       this.#dotCanvas = c;
-      this.#dotCtx    = c.getContext('2d');
+      this.#dotCtx = c.getContext('2d');
     }
     this.#dotCanvas.style.display = 'block';
     this.#dotVisible = true;
@@ -498,8 +498,8 @@ export class GazeManager {
   #drawDotLoop() {
     if (!this.#dotVisible) return;
     const canvas = this.#dotCanvas;
-    const ctx    = this.#dotCtx;
-    if (canvas.width  !== window.innerWidth)  canvas.width  = window.innerWidth;
+    const ctx = this.#dotCtx;
+    if (canvas.width !== window.innerWidth) canvas.width = window.innerWidth;
     if (canvas.height !== window.innerHeight) canvas.height = window.innerHeight;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const { x, y, active } = window.gazeState;

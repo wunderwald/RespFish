@@ -55,9 +55,9 @@ export function perlin1d(len) {
     for (let i = 0; i < len; i++) {
       const pos = (i / len) * (numPoints - 1);
       const idx = Math.floor(pos);
-      const t   = pos - idx;
-      const t2  = t * t;
-      const t3  = t2 * t;
+      const t = pos - idx;
+      const t2 = t * t;
+      const t3 = t2 * t;
 
       const p0 = ctrl[Math.max(idx - 1, 0)];
       const p1 = ctrl[idx];
@@ -115,7 +115,7 @@ export class GaussianSmoother {
   constructor(windowSize = 64) {
     this.#windowSize = windowSize;
     this.#kernel = GaussianSmoother.#makeKernel(windowSize);
-    this.#ring   = new Float32Array(windowSize);
+    this.#ring = new Float32Array(windowSize);
   }
 
   /** Push a new raw sample into the smoother. */
@@ -159,14 +159,14 @@ export class GaussianSmoother {
   /** Discard all buffered samples (e.g. between trials). */
   reset() {
     this.#ring.fill(0);
-    this.#head  = 0;
+    this.#head = 0;
     this.#count = 0;
   }
 
   // Build a normalised Gaussian kernel (σ = windowSize / 6)
   static #makeKernel(size) {
     const kernel = new Float32Array(size);
-    const sigma  = size / 6;
+    const sigma = size / 6;
     const center = (size - 1) / 2;
     let sum = 0;
     for (let i = 0; i < size; i++) {
@@ -251,7 +251,7 @@ export class AutocorrEstimator extends FrequencyEstimator {
     // ── 2. Normalised autocorrelation ─────────────────────────────────────
     // r[lag] = Σ centered[i] · centered[i + lag]  /  r[0]
     const maxLag = Math.min(n - 1, Math.floor(this.maxBreathPeriod * sampleRate));
-    const minLag = Math.max(1,     Math.floor(this.minBreathPeriod * sampleRate));
+    const minLag = Math.max(1, Math.floor(this.minBreathPeriod * sampleRate));
 
     const acorr = new Float32Array(maxLag + 1);
     for (let lag = 0; lag <= maxLag; lag++) {
@@ -265,8 +265,8 @@ export class AutocorrEstimator extends FrequencyEstimator {
     for (let lag = 0; lag <= maxLag; lag++) acorr[lag] /= r0;
 
     // ── 3. Find first prominent peak in acorr after minLag ────────────────
-    let bestLag  = -1;
-    let bestVal  = -Infinity;
+    let bestLag = -1;
+    let bestVal = -Infinity;
 
     for (let lag = minLag; lag < maxLag - 1; lag++) {
       const isPeak = acorr[lag] > acorr[lag - 1] && acorr[lag] > acorr[lag + 1];
@@ -324,21 +324,21 @@ export class AutocorrEstimator extends FrequencyEstimator {
  */
 export class AsyncSignalGenerator {
   // Noise configuration 
-  static NOISE_LENGTH   = 150;
-  static NOISE_BLEND    = 0.02;   // 2% noise, 98% sine (ADD_NOISE_ASYNC)
+  static NOISE_LENGTH = 150;
+  static NOISE_BLEND = 0.02;   // 2% noise, 98% sine (ADD_NOISE_ASYNC)
 
   #estimator;
-  #freq        = (2 * Math.PI) / 4;  // default: 4 s period
-  #amp         = 0.5;
-  #phase       = 0;
+  #freq = (2 * Math.PI) / 4;  // default: 4 s period
+  #amp = 0.5;
+  #phase = 0;
   #speedFactor = 1.0;
-  #noise       = null;   // Float32Array, ping-pong loop
-  #noiseIndex  = 0;
-  #noisePeak   = 1;
-  #calibrated  = false;
+  #noise = null;   // Float32Array, ping-pong loop
+  #noiseIndex = 0;
+  #noisePeak = 1;
+  #calibrated = false;
 
   // Range of the sync stimulus, used for MAP_ASYNC_RANGE_TO_SYNC_RANGE
-  #syncRange   = null;   // [min, max] | null
+  #syncRange = null;   // [min, max] | null
 
   /**
    * @param {object} opts
@@ -360,9 +360,9 @@ export class AsyncSignalGenerator {
     const arr = signal instanceof Float32Array ? signal : new Float32Array(signal);
     const { freq, amp, phase } = this.#estimator.estimate(arr, sampleRate);
 
-    this.#freq      = isFinite(freq)  && freq  > 0 ? freq  : (2 * Math.PI) / 4;
-    this.#amp       = isFinite(amp)   && amp   > 0 ? amp   : 0.5;
-    this.#phase     = isFinite(phase)             ? phase : 0;
+    this.#freq = isFinite(freq) && freq > 0 ? freq : (2 * Math.PI) / 4;
+    this.#amp = isFinite(amp) && amp > 0 ? amp : 0.5;
+    this.#phase = isFinite(phase) ? phase : 0;
     this.#syncRange = syncRange;
     this.#calibrated = true;
     this.#buildNoise();
@@ -402,7 +402,7 @@ export class AsyncSignalGenerator {
     const noiseNorm = noiseSample / this.#noisePeak;
 
     const blended = (1 - AsyncSignalGenerator.NOISE_BLEND) * sine +
-                    AsyncSignalGenerator.NOISE_BLEND * noiseNorm;
+      AsyncSignalGenerator.NOISE_BLEND * noiseNorm;
 
     // Map to sync range if provided
     if (this.#syncRange) {
@@ -420,12 +420,12 @@ export class AsyncSignalGenerator {
   // Build ping-pong Perlin noise array
   #buildNoise() {
     const len = AsyncSignalGenerator.NOISE_LENGTH;
-    const forward  = perlin1d(len);
+    const forward = perlin1d(len);
     const backward = new Float32Array(len);
     for (let i = 0; i < len; i++) backward[i] = forward[len - 1 - i];
 
     this.#noise = new Float32Array(len * 2);
-    this.#noise.set(forward,  0);
+    this.#noise.set(forward, 0);
     this.#noise.set(backward, len);
 
     this.#noisePeak = 0;
