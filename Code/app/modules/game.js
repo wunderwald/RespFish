@@ -21,7 +21,6 @@ function easeOut(t)     { return 1 - (1 - t) * (1 - t); }
 export const CONFIG = {
   TARGET_BPM:             12,     // target breaths per minute
   GAME_DURATION_SECS:     60,
-  CALIBRATION_SECS:       10,
   EXHALE_ONSET_THRESHOLD: 0.20,   // normalised signal level that triggers exhale onset
   BREATH_DEBOUNCE_MS:     1500,   // minimum ms between two exhale onsets
   EXHALE_SUCCESS_RATIO:   0.90,   // fraction of exhale phase above threshold needed to clear a cloud
@@ -36,10 +35,10 @@ export const CONFIG = {
 // ── Game states ───────────────────────────────────────────────────────────────
 
 const STATE = {
-  IDLE:       'idle',
-  CALIBRATING:'calibrating',
-  PLAYING:    'playing',
-  GAME_OVER:  'game_over',
+  IDLE:      'idle',
+  COUNTDOWN: 'countdown',
+  PLAYING:   'playing',
+  GAME_OVER: 'game_over',
 };
 
 // ── Cloud ─────────────────────────────────────────────────────────────────────
@@ -108,10 +107,8 @@ export class Game {
   #state = STATE.IDLE;
   #score = 0;
 
-  // calibration
-  #calStartTime = null;
-  #calSamples   = [];
-  #calRange     = null;
+  // countdown
+  #countdownStart = null;
 
   // breath tracking
   #phase           = 'inhale'; // 'inhale' | 'exhale'
@@ -154,10 +151,7 @@ export class Game {
     const dt  = this.#lastSampleTime != null ? now - this.#lastSampleTime : 0;
     this.#lastSampleTime = now;
 
-    if (this.#state === STATE.CALIBRATING) {
-      this.#calSamples.push(value);
-      this.#tickCalibration();
-    } else if (this.#state === STATE.PLAYING && this.#calRange) {
+    if (this.#state === STATE.PLAYING) {
       this.#tickBreath(value, now, dt);
     }
   }
@@ -181,7 +175,7 @@ export class Game {
     this.#stateEl  = container.querySelector('#game-state-text');
     this.#scoreEl  = container.querySelector('#game-score');
     this.#startBtn = container.querySelector('#game-start-btn');
-    this.#startBtn.addEventListener('click', () => this.#beginCalibration());
+    this.#startBtn.addEventListener('click', () => this.#beginCountdown());
   }
 
   #buildCanvas(container) {
@@ -192,23 +186,11 @@ export class Game {
 
   // ── State machine ────────────────────────────────────────────────────────────
 
-  #beginCalibration() {
-    this.#state        = STATE.CALIBRATING;
-    this.#calSamples   = [];
-    this.#calRange     = null;
-    this.#calStartTime = performance.now();
+  #beginCountdown() {
+    this.#state          = STATE.COUNTDOWN;
+    this.#countdownStart = performance.now();
     this.#startBtn.disabled   = true;
-    this.#stateEl.textContent = 'calibrating…';
-  }
-
-  #tickCalibration() {
-    const elapsed = performance.now() - this.#calStartTime;
-    if (elapsed < CONFIG.CALIBRATION_SECS * 1000) return;
-    this.#calRange = {
-      min: Math.min(...this.#calSamples),
-      max: Math.max(...this.#calSamples),
-    };
-    this.#beginPlaying();
+    this.#stateEl.textContent = 'get ready…';
   }
 
   #beginPlaying() {
@@ -241,8 +223,7 @@ export class Game {
   // ── Breath tracking ──────────────────────────────────────────────────────────
 
   #tickBreath(value, now, dt) {
-    const { min, max } = this.#calRange;
-    const norm  = (value - min) / ((max - min) || 1);
+    const norm  = value;
     const above = norm >= CONFIG.EXHALE_ONSET_THRESHOLD;
     this.#lastNorm = norm;
 
@@ -326,7 +307,7 @@ export class Game {
     this.#lastFrameTime = timestamp;
 
     this.#syncCanvasSize();
-    if (this.#state === STATE.PLAYING) this.#update(dt);
+    if (this.#state === STATE.PLAYING || this.#state === STATE.COUNTDOWN) this.#update(dt);
     this.#draw();
     requestAnimationFrame((t) => this.#loop(t));
   }
@@ -341,6 +322,11 @@ export class Game {
 
   #update(dt) {
     const now = performance.now();
+
+    if (this.#state === STATE.COUNTDOWN) {
+      if (now - this.#countdownStart >= 3500) this.#beginPlaying();
+      return;
+    }
 
     if (now - this.#gameStartTime >= CONFIG.GAME_DURATION_SECS * 1000) {
       this.#endGame();
@@ -361,9 +347,9 @@ export class Game {
     ctx.clearRect(0, 0, w, h);
 
     switch (this.#state) {
-      case STATE.IDLE:        return this.#drawIdle(ctx, w, h);
-      case STATE.CALIBRATING: return this.#drawCalibrating(ctx, w, h);
-      case STATE.PLAYING:     return this.#drawPlaying(ctx, w, h);
+      case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
+      case STATE.COUNTDOWN: return this.#drawCountdown(ctx, w, h);
+      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h);
       case STATE.GAME_OVER:   return this.#drawGameOver(ctx, w, h);
     }
   }
@@ -394,36 +380,35 @@ export class Game {
     ctx.fillText('Press Play again to retry', cx, cy + 52);
   }
 
-  #drawCalibrating(ctx, w, h) {
-    const elapsed   = performance.now() - this.#calStartTime;
-    const progress  = Math.min(elapsed / (CONFIG.CALIBRATION_SECS * 1000), 1);
-    const remaining = Math.max(0, Math.ceil(CONFIG.CALIBRATION_SECS - elapsed / 1000));
+  #drawCountdown(ctx, w, h) {
+    const elapsed = performance.now() - this.#countdownStart;
     const cx = w / 2, cy = h / 2;
 
-    ctx.fillStyle    = 'rgba(255,255,255,0.85)';
-    ctx.font         = '300 20px Nunito, sans-serif';
+    // Each digit occupies 1000 ms; "GO!" fills the last 500 ms
+    let label;
+    let phase; // 0–1 within the current step (for scale pulse)
+    if (elapsed < 1000) {
+      label = '3'; phase = elapsed / 1000;
+    } else if (elapsed < 2000) {
+      label = '2'; phase = (elapsed - 1000) / 1000;
+    } else if (elapsed < 3000) {
+      label = '1'; phase = (elapsed - 2000) / 1000;
+    } else {
+      label = 'GO!'; phase = (elapsed - 3000) / 500;
+    }
+
+    // Scale pulses large at step onset, settles to 1
+    const scale = 1 + (1 - easeOut(phase)) * 0.5;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.fillStyle    = label === 'GO!' ? 'rgba(255,220,80,0.95)' : 'rgba(255,255,255,0.9)';
+    ctx.font         = '300 80px Nunito, sans-serif';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Breathe normally…', cx, cy - 80);
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, 60, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth   = 5;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, 60, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth   = 5;
-    ctx.lineCap     = 'round';
-    ctx.stroke();
-
-    ctx.fillStyle    = 'rgba(255,255,255,0.7)';
-    ctx.font         = '200 52px Nunito, sans-serif';
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(remaining, cx, cy);
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
   }
 
   #drawPlaying(ctx, w, h) {
