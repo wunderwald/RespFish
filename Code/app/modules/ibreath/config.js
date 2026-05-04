@@ -33,13 +33,17 @@ export const CONFIG = {
 
   // Data output base directory (relative to Electron app dir)
   DATA_DIR: "subjectData",
+
+  // Variations
+  SYNC_DETECTION: false,    // show post-trial "was it in sync?" response screen
 };
 
 export const STATE = {
-  IDLE: 'idle',
+  IDLE:        'idle',
   CALIBRATING: 'calibrating',
-  READY: 'ready',     // between trials — waiting for experimenter
-  TRIAL: 'trial',
-  ITI: 'iti',
-  DONE: 'done',
+  READY:       'ready',      // between trials — waiting for experimenter
+  TRIAL:       'trial',
+  RESPONSE:    'response',   // post-trial sync detection question (SYNC_DETECTION only)
+  ITI:         'iti',
+  DONE:        'done',
 };
