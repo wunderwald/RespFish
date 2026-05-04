@@ -17,7 +17,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { StreamManager } from "./modules/stream/index.js";
+import { StreamManager } from "./modules/stream/stream.js";
 import { GazeManager   } from "./modules/webgazer/gazeCalibration.js";
 
 // ── Active frontend ───────────────────────────────────────────────────────────
@@ -62,9 +62,9 @@ async function init() {
 
   // 3. Dynamically import the frontend module.
   const FRONTEND_PATHS = {
-    visualizer: './modules/visualizer/index.js',
-    game:       './modules/game/index.js',
-    ibreath:    './modules/ibreath/index.js',
+    visualizer: './modules/visualizer/visualizer.js',
+    game:       './modules/game/game.js',
+    ibreath:    './modules/ibreath/ibreath.js',
     gazetest:   './modules/webgazer/gazetest.js',
   };
   const { default: FrontendClass } = await import(FRONTEND_PATHS[FRONTEND]);
