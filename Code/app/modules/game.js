@@ -84,7 +84,8 @@ class Cloud {
       if (this._t >= 1) this._state = 'covering';
 
     } else if (this._state === 'success_fade') {
-      this.alpha = Math.max(0, this.alpha - dt / 400);
+      this.alpha = Math.max(0, this.alpha - dt / 700);
+      this.y    -= dt * 0.06;   // drift upward as it fades
       if (this.alpha <= 0) this._state = 'gone';
 
     } else if (this._state === 'sliding_out') {
@@ -415,17 +416,22 @@ export class Game {
     const cx = w / 2;
     const cy = h / 2;
 
-    // Sun (behind everything)
-    this.#drawSun(ctx, cx, cy);
+    // Sun (behind everything) — goes sad while covered
+    const isCovered = this.#activeCloud?._state === 'covering';
+    this.#drawSun(ctx, cx, cy, isCovered);
 
     // Failed clouds orbiting the sun
     for (const cloud of this.#failedClouds) {
       if (cloud.alive) this.#drawCloud(ctx, cloud.x, cloud.y, cloud.size, cloud.alpha);
     }
 
-    // Active cloud sliding in / covering / sliding out
+    // Active cloud — shake while the player is actively exhaling
     if (this.#activeCloud?.alive) {
-      this.#drawCloud(ctx, this.#activeCloud.x, this.#activeCloud.y, this.#activeCloud.size, this.#activeCloud.alpha);
+      const shaking = this.#phase === 'exhale' && this.#inBreath;
+      const t  = performance.now();
+      const sx = shaking ? Math.sin(t / 38) * 6 : 0;
+      const sy = shaking ? Math.cos(t / 31) * 5 : 0;
+      this.#drawCloud(ctx, this.#activeCloud.x + sx, this.#activeCloud.y + sy, this.#activeCloud.size, this.#activeCloud.alpha);
     }
 
     // Debug breath-phase label
@@ -441,7 +447,7 @@ export class Game {
 
   // ── Scene elements ────────────────────────────────────────────────────────────
 
-  #drawSun(ctx, cx, cy) {
+  #drawSun(ctx, cx, cy, sad = false) {
     const r = CONFIG.SUN_RADIUS;
 
     // Rays
@@ -477,9 +483,13 @@ export class Game {
       ctx.fill();
     }
 
-    // Smile
+    // Smile or frown
     ctx.beginPath();
-    ctx.arc(cx, cy + r * 0.05, r * 0.38, 0.2 * Math.PI, 0.8 * Math.PI);
+    if (sad) {
+      ctx.arc(cx, cy + r * 0.52, r * 0.32, 1.2 * Math.PI, 1.8 * Math.PI);
+    } else {
+      ctx.arc(cx, cy + r * 0.05, r * 0.38, 0.2 * Math.PI, 0.8 * Math.PI);
+    }
     ctx.strokeStyle = '#7a4a00';
     ctx.lineWidth   = r * 0.08;
     ctx.lineCap     = 'round';
