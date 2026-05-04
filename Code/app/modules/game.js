@@ -101,6 +101,35 @@ class Cloud {
   }
 }
 
+// ── Particle ──────────────────────────────────────────────────────────────────
+
+const PARTICLE_COLORS = ['#ffffff', '#fff7aa', '#ffe066', '#ffffff', '#ffffff'];
+
+class Particle {
+  constructor(x, y) {
+    const angle  = Math.random() * Math.PI * 2;
+    const speed  = 60 + Math.random() * 140;
+    this.x       = x;
+    this.y       = y;
+    this.vx      = Math.cos(angle) * speed;
+    this.vy      = Math.sin(angle) * speed;
+    this.r       = 2.5 + Math.random() * 4;
+    this.color   = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+    this.life    = 450 + Math.random() * 300;
+    this.elapsed = 0;
+  }
+
+  get alive() { return this.elapsed < this.life; }
+
+  tick(dt) {
+    this.elapsed += dt;
+    this.x += this.vx * dt / 1000;
+    this.y += this.vy * dt / 1000;
+  }
+
+  get alpha() { return Math.max(0, 1 - this.elapsed / this.life); }
+}
+
 // ── Game ──────────────────────────────────────────────────────────────────────
 
 export class Game {
@@ -128,6 +157,7 @@ export class Game {
   #activeCloud    = null;
   #failedClouds   = [];
   #failAngleIndex = 0;   // cycles through orbit positions for failed clouds
+  #particles      = [];
 
   // animation
   #lastFrameTime = null;
@@ -200,6 +230,7 @@ export class Game {
     this.#activeCloud    = null;
     this.#failedClouds   = [];
     this.#failAngleIndex = 0;
+    this.#particles      = [];
     this.#phase          = 'inhale';
     this.#phaseStartTime = performance.now();
     this.#lastBreathMs   = -Infinity;
@@ -216,6 +247,7 @@ export class Game {
     this.#state        = STATE.GAME_OVER;
     this.#activeCloud  = null;
     this.#failedClouds = [];
+    this.#particles    = [];
     this.#stateEl.textContent  = 'game over';
     this.#startBtn.textContent = 'Play again';
     this.#startBtn.disabled    = false;
@@ -253,6 +285,10 @@ export class Game {
     this.#lastBreathMs    = now;
   }
 
+  #burstParticles(x, y) {
+    for (let i = 0; i < 22; i++) this.#particles.push(new Particle(x, y));
+  }
+
   #spawnCloud() {
     const cx = this.#canvas.width  / 2;
     const cy = this.#canvas.height / 2;
@@ -281,6 +317,7 @@ export class Game {
         this.#score++;
         this.#scoreEl.textContent = this.#score;
         this.#activeCloud.succeed();
+        this.#burstParticles(this.#activeCloud.x, this.#activeCloud.y);
         // gone cloud cleaned up in #update
       } else {
         const cx    = this.#canvas.width  / 2;
@@ -337,6 +374,8 @@ export class Game {
     if (this.#activeCloud) this.#activeCloud.tick(dt);
     for (const c of this.#failedClouds) c.tick(dt);
     this.#failedClouds = this.#failedClouds.filter(c => c.alive);
+    for (const p of this.#particles) p.tick(dt);
+    this.#particles = this.#particles.filter(p => p.alive);
   }
 
   // ── Drawing ──────────────────────────────────────────────────────────────────
@@ -433,6 +472,16 @@ export class Game {
       const sy = shaking ? Math.cos(t / 31) * 5 : 0;
       this.#drawCloud(ctx, this.#activeCloud.x + sx, this.#activeCloud.y + sy, this.#activeCloud.size, this.#activeCloud.alpha);
     }
+
+    // Particles (on top of everything)
+    for (const p of this.#particles) {
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle   = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
 
     // Debug breath-phase label
     const phaseLabel  = this.#phase === 'exhale' ? 'BREATHE OUT' : 'BREATHE IN';
