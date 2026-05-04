@@ -26,7 +26,8 @@ export class IBreathCSV {
 
   static #TRIAL_HEADER =
     'trialIndex,subject,synchronous,img,lr,slowfast,' +
-    'ITI,startTime,endTime,aborted\n';
+    'ITI,startTime,endTime,aborted' +
+    (CONFIG.SYNC_DETECTION ? ',response' : '') + '\n';
 
   constructor(subjectCode, onWarn) {
     this.#subjectCode = subjectCode;
@@ -95,7 +96,8 @@ export class IBreathCSV {
       `${trial.ITI},` +
       `${trial.startTime ?? ''},` +
       `${trial.endTime ?? ''},` +
-      `${trial.aborted}\n`;
+      `${trial.aborted}` +
+      (CONFIG.SYNC_DETECTION ? `,${trial.response ?? ''}` : '') + '\n';
 
     const result = await window.api.appendCSV(
       `${CONFIG.DATA_DIR}/${this.#subjectCode}/trialData.csv`,
