@@ -1,0 +1,117 @@
+// CSV output for the iBreath experiment.
+//
+// Two files per subject, written to CONFIG.DATA_DIR/<subjectCode>/:
+//   trialData.csv   — one row per trial (appended after each trial ends)
+//   frameData_N.csv — one row per animation frame for trial N
+//
+// Columns match the MATLAB ibreath_main_v2.m output exactly.
+//
+// Strategy:
+//   • Subject directory + trialData.csv header are created at calibration
+//     start (init()), before any trial runs.
+//   • frameData_N.csv header is written when a trial starts (initFrameCSV()),
+//     so even a crash mid-trial leaves a valid (partial) file.
+//   • Frame rows are buffered during the trial, then flushed as a single
+//     write at trial end (flushFrameCSV()). This avoids hundreds of IPC
+//     calls per trial while keeping memory bounded.
+
+import { CONFIG } from './config.js';
+
+export class IBreathCSV {
+  #subjectCode;
+  #onWarn;
+
+  static #FRAME_HEADER =
+    'trialIndex,timestamp,breathLevel_input,breathLevel_scaled,stimulusLevel\n';
+
+  static #TRIAL_HEADER =
+    'trialIndex,subject,synchronous,img,lr,slowfast,' +
+    'ITI,startTime,endTime,aborted\n';
+
+  constructor(subjectCode, onWarn) {
+    this.#subjectCode = subjectCode;
+    this.#onWarn      = onWarn;
+  }
+
+  async init() {
+    if (!window.api) {
+      console.warn('[CSV] window.api not available — file I/O disabled');
+      return;
+    }
+    const dir = `${CONFIG.DATA_DIR}/${this.#subjectCode}`;
+
+    const dirResult = await window.api.ensureDir(dir);
+    if (!dirResult.ok) {
+      this.#warn(`Could not create data dir: ${dirResult.error}`);
+      return;
+    }
+
+    const trialFile = `${dir}/trialData.csv`;
+    const result    = await window.api.writeCSV(trialFile, IBreathCSV.#TRIAL_HEADER);
+    if (!result.ok) {
+      this.#warn(`Could not init trialData.csv: ${result.error}`);
+    } else {
+      console.log(`[CSV] initialised ${trialFile}`);
+    }
+  }
+
+  async initFrameCSV(trialIndex) {
+    if (!window.api) return;
+    const result = await window.api.writeCSV(
+      this.#framePath(trialIndex),
+      IBreathCSV.#FRAME_HEADER
+    );
+    if (!result.ok) {
+      this.#warn(`Could not init frameData_${trialIndex}.csv: ${result.error}`);
+    }
+  }
+
+  async flushFrameCSV(trial, frameRows) {
+    if (!window.api || frameRows.length === 0) return;
+
+    const rows = frameRows.map(r =>
+      `${trial.trialIndex},${r.t},` +
+      `${r.raw.toFixed(6)},${r.scaled.toFixed(6)},${r.stim.toFixed(6)}`
+    ).join('\n') + '\n';
+
+    const result = await window.api.appendCSV(this.#framePath(trial.trialIndex), rows);
+    if (!result.ok) {
+      this.#warn(`Could not write frameData_${trial.trialIndex}.csv: ${result.error}`);
+    } else {
+      console.log(`[CSV] wrote ${frameRows.length} frame rows for trial ${trial.trialIndex}`);
+    }
+  }
+
+  async appendTrialData(trial) {
+    if (!window.api) return;
+
+    const row =
+      `${trial.trialIndex},` +
+      `${this.#subjectCode},` +
+      `${trial.synchronous},` +
+      `${trial.img},` +
+      `${trial.lr},` +
+      `${trial.slowfast ?? ''},` +
+      `${trial.ITI},` +
+      `${trial.startTime ?? ''},` +
+      `${trial.endTime   ?? ''},` +
+      `${trial.aborted}\n`;
+
+    const result = await window.api.appendCSV(
+      `${CONFIG.DATA_DIR}/${this.#subjectCode}/trialData.csv`,
+      row
+    );
+    if (!result.ok) {
+      this.#warn(`Could not append to trialData.csv: ${result.error}`);
+    }
+  }
+
+  #framePath(trialIndex) {
+    return `${CONFIG.DATA_DIR}/${this.#subjectCode}/frameData_${trialIndex}.csv`;
+  }
+
+  #warn(msg) {
+    console.error('[CSV]', msg);
+    this.#onWarn(msg);
+  }
+}
