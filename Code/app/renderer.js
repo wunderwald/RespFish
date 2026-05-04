@@ -17,8 +17,8 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { StreamManager } from "./modules/stream.js";
-import { GazeManager   } from "./modules/gazeCalibration.js";
+import { StreamManager } from "./modules/stream/index.js";
+import { GazeManager   } from "./modules/webgazer/gazeCalibration.js";
 
 // ── Active frontend ───────────────────────────────────────────────────────────
 //
@@ -61,7 +61,13 @@ async function init() {
   }
 
   // 3. Dynamically import the frontend module.
-  const { default: FrontendClass } = await import(`./modules/${FRONTEND}.js`);
+  const FRONTEND_PATHS = {
+    visualizer: './modules/visualizer/index.js',
+    game:       './modules/game/index.js',
+    ibreath:    './modules/ibreath/index.js',
+    gazetest:   './modules/webgazer/gazetest.js',
+  };
+  const { default: FrontendClass } = await import(FRONTEND_PATHS[FRONTEND]);
 
   // 4. Instantiate — every frontend receives the same two containers.
   const frontend = new FrontendClass({ statsContainer, sceneContainer });

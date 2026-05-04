@@ -20,7 +20,7 @@ import {
   GaussianSmoother,
   AutocorrEstimator,
   AsyncSignalGenerator,
-} from "./signalUtils.js";
+} from "../signal/signalUtils.js";
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 // Mirrors the constants in ibreath_main_v2.m
