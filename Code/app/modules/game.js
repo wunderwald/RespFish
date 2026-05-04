@@ -120,6 +120,7 @@ export class Game {
   #lastBreathMs    = -Infinity;
   #inBreath        = false;
   #lastSampleTime  = null;
+  #lastNorm        = 0;
 
   // timing
   #beatMs        = (60 / CONFIG.TARGET_BPM) * 1000; // 5000 ms at 12 BPM
@@ -243,6 +244,7 @@ export class Game {
     const { min, max } = this.#calRange;
     const norm  = (value - min) / ((max - min) || 1);
     const above = norm >= CONFIG.EXHALE_ONSET_THRESHOLD;
+    this.#lastNorm = norm;
 
     if (this.#phase === 'inhale') {
       // Rising edge during inhale → exhale onset
@@ -442,12 +444,14 @@ export class Game {
     }
 
     // Debug breath-phase label
-    const label = this.#phase === 'exhale' ? 'BREATHE OUT' : 'BREATHE IN';
+    const phaseLabel  = this.#phase === 'exhale' ? 'BREATHE OUT' : 'BREATHE IN';
+    const signalLabel = this.#inBreath ? 'exhaling' : 'inhaling';
+    const debug = `${phaseLabel}  |  signal: ${this.#lastNorm.toFixed(2)}  (${signalLabel})`;
     ctx.fillStyle    = 'rgba(255,255,255,0.55)';
     ctx.font         = '300 18px Nunito, sans-serif';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(label, cx, h - 20);
+    ctx.fillText(debug, cx, h - 20);
   }
 
   // ── Scene elements ────────────────────────────────────────────────────────────
