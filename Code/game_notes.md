@@ -36,9 +36,13 @@ A first cloud is also spawned immediately when the game starts.
 
 If a round fails, the cloud slides to an orbit position around the sun and fades out slowly over 60 s (`FAIL_FADE_MS`). Up to 12 orbit positions are used (evenly distributed), cycling if more clouds accumulate.
 
-## Calibration
+## Signal normalisation
 
-Before playing, 10 s of resting signal is recorded to establish the min/max range used for normalisation. This makes the threshold robust to different sensor offsets and gains across sessions.
+The incoming signal is assumed to already be normalised to [0, 1] by the stream layer. No in-game calibration is performed.
+
+## Countdown
+
+When the player presses Start, a 3-second countdown (3 → 2 → 1 → GO!) plays before the game begins. Each digit pulses in with a brief scale animation. The game starts immediately after "GO!" (3.5 s total).
 
 ## Debug overlay
 
