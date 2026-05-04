@@ -1,172 +1,163 @@
 /**
- * game.js — Breath-controlled cloud game
- * =======================================
- * Guitar-Hero-style: clouds spawn at the screen edge and fly toward a center
- * ring along a squiggly path.  The player "blows them away" at exhale onset —
- * the moment the signal starts rising from its resting baseline.
- * Score depends on timing accuracy.
+ * game.js — Breath-controlled sun & cloud game
+ * ==============================================
+ * A sun sits in the center. On each exhale onset a cloud slides in to cover it.
+ * The child must blow into the microphone for ≥ EXHALE_SUCCESS_RATIO of the
+ * exhale phase (half the breath cycle). Success → cloud fades out quickly.
+ * Failure → cloud drifts to an orbit position around the sun and fades slowly.
  *
  * Implements the standard frontend interface:
  *   pushSample(value: number) → void
  *   setStatus({ type, text })  → void
  */
 
-// Configuration
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function easeOut(t)     { return 1 - (1 - t) * (1 - t); }
+
+// ── Configuration ─────────────────────────────────────────────────────────────
 
 export const CONFIG = {
-  // Breathing rhythm
-  TARGET_BPM: 12,      // target breaths per minute
+  TARGET_BPM:             12,     // target breaths per minute
+  GAME_DURATION_SECS:     60,
+  CALIBRATION_SECS:       10,
+  EXHALE_ONSET_THRESHOLD: 0.20,   // normalised signal level that triggers exhale onset
+  BREATH_DEBOUNCE_MS:     1500,   // minimum ms between two exhale onsets
+  EXHALE_SUCCESS_RATIO:   0.90,   // fraction of exhale phase above threshold needed to clear a cloud
 
-  // Game duration
-  GAME_DURATION_SECS: 60,     // seconds the playing phase lasts
-
-  // Calibration
-  CALIBRATION_SECS: 10,     // seconds of signal to record before playing
-  EXHALE_ONSET_THRESHOLD: 0.20, // rising edge across this level triggers exhale onset
-  BREATH_DEBOUNCE_MS: 1500,   // minimum ms between two breath triggers
-
-  // Timing windows (ms from the perfect moment)
-  TIMING: {
-    PERFECT: 300,
-    GOOD: 700,
-    OK: 1200,
-    MISS_GRACE: 600,   // auto-miss this many ms after the OK window closes
-  },
-
-  // Scoring
-  SCORE: {
-    PERFECT: 100,
-    GOOD: 50,
-    OK: 20,
-  },
-
-  // Cloud path
-  TRAVEL_BEATS: 1,      // beats a cloud takes to reach the center ring
-  CLOUD_SIZE: 70,     // base radius (px) — randomised ±20 % per cloud
-  WIGGLE_AMP: 80,     // max perpendicular wiggle (px)
-  WIGGLE_FREQ: 2.5,    // wiggle oscillations per trip
+  SUN_RADIUS:      110,
+  CLOUD_SIZE:      95,
+  CLOUD_SLIDE_MS:  700,    // ms for cloud to animate in / out
+  FAIL_ORBIT_R:    185,    // distance from sun center where failed clouds rest
+  FAIL_FADE_MS:    60000,  // ms for a failed cloud to fully fade (1 minute)
 };
 
-// Game states
+// ── Game states ───────────────────────────────────────────────────────────────
 
 const STATE = {
-  IDLE: 'idle',
-  CALIBRATING: 'calibrating',
-  PLAYING: 'playing',
-  GAME_OVER: 'game_over',
+  IDLE:       'idle',
+  CALIBRATING:'calibrating',
+  PLAYING:    'playing',
+  GAME_OVER:  'game_over',
 };
 
-// Cloud
+// ── Cloud ─────────────────────────────────────────────────────────────────────
 
 class Cloud {
-  /**
-   * @param {object} p
-   * @param {number} p.startX      spawn x
-   * @param {number} p.startY      spawn y
-   * @param {number} p.cx          center x (target)
-   * @param {number} p.cy          center y (target)
-   * @param {number} p.arrivalTime ms timestamp when cloud should reach center
-   * @param {number} p.travelMs    total travel time in ms
-   */
-  constructor({ startX, startY, cx, cy, arrivalTime, travelMs }) {
-    this.startX = startX;
-    this.startY = startY;
-    this.cx = cx;
-    this.cy = cy;
-    this.arrivalTime = arrivalTime;
-    this.spawnTime = arrivalTime - travelMs;
-
-    // Randomise path character per cloud
-    this.wiggleAmp = CONFIG.WIGGLE_AMP * (0.6 + Math.random() * 0.8);
-    this.wiggleFreq = CONFIG.WIGGLE_FREQ * (0.7 + Math.random() * 0.6);
-    this.wigglePhase = Math.random() * Math.PI * 2;
-    this.size = CONFIG.CLOUD_SIZE * (0.8 + Math.random() * 0.4);
-
-    this.state = 'flying'; // flying | hit | missed | gone
-    this.alpha = 1;
-    this.frozenT = null;     // set when the cloud is consumed to freeze position
+  constructor({ startX, startY, sunX, sunY }) {
+    this.x = startX;
+    this.y = startY;
+    this._fromX = startX;
+    this._fromY = startY;
+    this._toX   = sunX;
+    this._toY   = sunY;
+    this.sunX   = sunX;
+    this.sunY   = sunY;
+    this.size   = CONFIG.CLOUD_SIZE;
+    this.alpha  = 1;
+    this._state = 'sliding_in'; // sliding_in | covering | success_fade | sliding_out | resting
+    this._t     = 0;
   }
 
-  /** Normalised progress t ∈ [0, 1+] at timestamp `now`. */
-  tAt(now) {
-    return (now - this.spawnTime) / (this.arrivalTime - this.spawnTime);
+  get alive() { return this._state !== 'gone'; }
+
+  succeed() {
+    this._state = 'success_fade';
   }
 
-  /**
-   * World-space position for progress value `t`.
-   * The path is a straight line with a perpendicular sinusoidal wiggle that
-   * fades to zero as the cloud approaches the ring (smooth entry).
-   */
-  posAt(t) {
-    const dx = this.cx - this.startX;
-    const dy = this.cy - this.startY;
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-
-    // Perpendicular unit vector
-    const px = -dy / len;
-    const py = dx / len;
-
-    // Wiggle envelope: quadratic fade-out near center
-    const envelope = Math.pow(Math.max(0, 1 - t), 2);
-    const wiggle = Math.sin(t * this.wiggleFreq * Math.PI * 2 + this.wigglePhase)
-      * this.wiggleAmp * envelope;
-
-    return {
-      x: this.startX + dx * t + px * wiggle,
-      y: this.startY + dy * t + py * wiggle,
-    };
+  slideTo(targetX, targetY) {
+    this._state = 'sliding_out';
+    this._t     = 0;
+    this._fromX = this.x;
+    this._fromY = this.y;
+    this._toX   = targetX;
+    this._toY   = targetY;
   }
 
-  /** Position to use for drawing (respects frozen state). */
-  drawPos(now) {
-    const t = this.frozenT ?? Math.max(0, this.tAt(now));
-    return this.posAt(t);
+  tick(dt) {
+    const speed = dt / CONFIG.CLOUD_SLIDE_MS;
+
+    if (this._state === 'sliding_in') {
+      this._t = Math.min(this._t + speed, 1);
+      this.x  = lerp(this._fromX, this._toX, easeOut(this._t));
+      this.y  = lerp(this._fromY, this._toY, easeOut(this._t));
+      if (this._t >= 1) this._state = 'covering';
+
+    } else if (this._state === 'success_fade') {
+      this.alpha = Math.max(0, this.alpha - dt / 400);
+      if (this.alpha <= 0) this._state = 'gone';
+
+    } else if (this._state === 'sliding_out') {
+      this._t = Math.min(this._t + speed, 1);
+      this.x  = lerp(this._fromX, this._toX, easeOut(this._t));
+      this.y  = lerp(this._fromY, this._toY, easeOut(this._t));
+      if (this._t >= 1) this._state = 'resting';
+
+    } else if (this._state === 'resting') {
+      this.alpha = Math.max(0, this.alpha - dt / CONFIG.FAIL_FADE_MS);
+      if (this.alpha <= 0) this._state = 'gone';
+    }
   }
 }
 
-// Game
+// ── Game ──────────────────────────────────────────────────────────────────────
 
 export class Game {
-  // state
+  // game state
   #state = STATE.IDLE;
   #score = 0;
-  #clouds = [];
 
   // calibration
   #calStartTime = null;
-  #calSamples = [];
-  #calRange = null;  // { min, max }
+  #calSamples   = [];
+  #calRange     = null;
 
-  // breath detection
-  #lastBreathMs = -Infinity;
-  #inBreath = false;
+  // breath tracking
+  #phase           = 'inhale'; // 'inhale' | 'exhale'
+  #phaseStartTime  = null;
+  #exhaleTimeAbove = 0;        // accumulated ms above threshold in current exhale phase
+  #lastBreathMs    = -Infinity;
+  #inBreath        = false;
+  #lastSampleTime  = null;
 
-  // scheduling
-  #beatMs = (60 / CONFIG.TARGET_BPM) * 1000;
-  #nextSpawnTime = null;
+  // timing
+  #beatMs        = (60 / CONFIG.TARGET_BPM) * 1000; // 5000 ms at 12 BPM
   #gameStartTime = null;
 
+  // clouds
+  #activeCloud    = null;
+  #failedClouds   = [];
+  #failAngleIndex = 0;   // cycles through orbit positions for failed clouds
+
+  // animation
+  #lastFrameTime = null;
+
   // DOM
-  #canvas = null;
-  #ctx = null;
-  #scoreEl = null;
-  #stateEl = null;
+  #canvas   = null;
+  #ctx      = null;
+  #scoreEl  = null;
+  #stateEl  = null;
   #startBtn = null;
 
   constructor({ statsContainer, sceneContainer }) {
     this.#buildHUD(statsContainer);
     this.#buildCanvas(sceneContainer);
-    requestAnimationFrame(() => this.#loop());
+    requestAnimationFrame((t) => this.#loop(t));
   }
 
-  // Frontend interface
+  // ── Frontend interface ───────────────────────────────────────────────────────
 
   pushSample(value) {
+    const now = performance.now();
+    const dt  = this.#lastSampleTime != null ? now - this.#lastSampleTime : 0;
+    this.#lastSampleTime = now;
+
     if (this.#state === STATE.CALIBRATING) {
       this.#calSamples.push(value);
       this.#tickCalibration();
     } else if (this.#state === STATE.PLAYING && this.#calRange) {
-      this.#tickBreath(value);
+      this.#tickBreath(value, now, dt);
     }
   }
 
@@ -174,11 +165,11 @@ export class Game {
     const streamReady = type === 'connected';
     if (this.#state === STATE.IDLE) {
       this.#stateEl.textContent = streamReady ? 'ready — press Start' : text;
-      this.#startBtn.disabled = !streamReady;
+      this.#startBtn.disabled   = !streamReady;
     }
   }
 
-  // DOM construction
+  // ── DOM construction ─────────────────────────────────────────────────────────
 
   #buildHUD(container) {
     container.innerHTML = `
@@ -186,8 +177,8 @@ export class Game {
       <span><span class="label">score</span><span id="game-score">—</span></span>
       <button id="game-start-btn" disabled>Start</button>
     `;
-    this.#stateEl = container.querySelector('#game-state-text');
-    this.#scoreEl = container.querySelector('#game-score');
+    this.#stateEl  = container.querySelector('#game-state-text');
+    this.#scoreEl  = container.querySelector('#game-score');
     this.#startBtn = container.querySelector('#game-start-btn');
     this.#startBtn.addEventListener('click', () => this.#beginCalibration());
   }
@@ -195,24 +186,23 @@ export class Game {
   #buildCanvas(container) {
     container.innerHTML = '<canvas id="game-canvas"></canvas>';
     this.#canvas = container.querySelector('#game-canvas');
-    this.#ctx = this.#canvas.getContext('2d');
+    this.#ctx    = this.#canvas.getContext('2d');
   }
 
-  // State machine 
+  // ── State machine ────────────────────────────────────────────────────────────
 
   #beginCalibration() {
-    this.#state = STATE.CALIBRATING;
-    this.#calSamples = [];
-    this.#calRange = null;
+    this.#state        = STATE.CALIBRATING;
+    this.#calSamples   = [];
+    this.#calRange     = null;
     this.#calStartTime = performance.now();
-    this.#startBtn.disabled = true;
+    this.#startBtn.disabled   = true;
     this.#stateEl.textContent = 'calibrating…';
   }
 
   #tickCalibration() {
     const elapsed = performance.now() - this.#calStartTime;
     if (elapsed < CONFIG.CALIBRATION_SECS * 1000) return;
-
     this.#calRange = {
       min: Math.min(...this.#calSamples),
       max: Math.max(...this.#calSamples),
@@ -221,256 +211,297 @@ export class Game {
   }
 
   #beginPlaying() {
-    this.#state = STATE.PLAYING;
-    this.#score = 0;
-    this.#clouds = [];
-    this.#lastBreathMs = -Infinity;
-    this.#gameStartTime = performance.now();
-    // First cloud spawns immediately and arrives one beat later
-    this.#nextSpawnTime = this.#gameStartTime;
+    this.#state          = STATE.PLAYING;
+    this.#score          = 0;
+    this.#activeCloud    = null;
+    this.#failedClouds   = [];
+    this.#failAngleIndex = 0;
+    this.#phase          = 'inhale';
+    this.#phaseStartTime = performance.now();
+    this.#lastBreathMs   = -Infinity;
+    this.#gameStartTime  = performance.now();
 
-    this.#scoreEl.textContent = '0';
-    this.#stateEl.textContent = 'playing';
+    this.#scoreEl.textContent  = '0';
+    this.#stateEl.textContent  = 'playing';
     this.#startBtn.textContent = 'Restart';
-    this.#startBtn.disabled = false;
+    this.#startBtn.disabled    = false;
   }
 
   #endGame() {
-    this.#state = STATE.GAME_OVER;
-    this.#clouds = [];
-    this.#stateEl.textContent = 'game over';
+    this.#state        = STATE.GAME_OVER;
+    this.#activeCloud  = null;
+    this.#failedClouds = [];
+    this.#stateEl.textContent  = 'game over';
     this.#startBtn.textContent = 'Play again';
-    this.#startBtn.disabled = false;
+    this.#startBtn.disabled    = false;
   }
 
-  // Breath detection
+  // ── Breath tracking ──────────────────────────────────────────────────────────
 
-  #tickBreath(value) {
+  #tickBreath(value, now, dt) {
     const { min, max } = this.#calRange;
-    const norm = (value - min) / ((max - min) || 1);
+    const norm  = (value - min) / ((max - min) || 1);
+    const above = norm >= CONFIG.EXHALE_ONSET_THRESHOLD;
 
-    // Exhale onset: rising edge crossing EXHALE_ONSET_THRESHOLD.
-    // Triggers at the start of the exhale rise, not after it peaks.
-    const rising = norm >= CONFIG.EXHALE_ONSET_THRESHOLD;
+    if (this.#phase === 'inhale') {
+      // Rising edge during inhale → exhale onset
+      if (above && !this.#inBreath && now - this.#lastBreathMs > CONFIG.BREATH_DEBOUNCE_MS) {
+        this.#onExhaleOnset(now);
+      }
+    } else {
+      // Exhale phase: accumulate time above threshold
+      if (above) this.#exhaleTimeAbove += dt;
 
-    if (rising && !this.#inBreath) {
-      const now = performance.now();
-      if (now - this.#lastBreathMs > CONFIG.BREATH_DEBOUNCE_MS) {
-        this.#lastBreathMs = now;
-        this.#onBreath(now);
+      // Exhale phase ends after half a beat
+      if (now - this.#phaseStartTime >= this.#beatMs / 2) {
+        this.#onExhaleEnd(now);
       }
     }
-    this.#inBreath = rising;
+
+    this.#inBreath = above;
   }
 
-  #onBreath(now) {
-    const target = this.#clouds
-      .filter(c => c.state === 'flying')
-      .sort((a, b) => Math.abs(now - a.arrivalTime) - Math.abs(now - b.arrivalTime))[0];
+  #onExhaleOnset(now) {
+    this.#phase          = 'exhale';
+    this.#phaseStartTime = now;
+    this.#exhaleTimeAbove = 0;
+    this.#lastBreathMs   = now;
 
-    if (!target) return;
+    const cx = this.#canvas.width  / 2;
+    const cy = this.#canvas.height / 2;
+    const w  = this.#canvas.width;
+    const h  = this.#canvas.height;
+    const margin = 120;
 
-    const absDelta = Math.abs(now - target.arrivalTime);
+    const edge = Math.floor(Math.random() * 4);
+    const [sx, sy] = [
+      [Math.random() * w,  -margin       ],
+      [w + margin,          Math.random() * h],
+      [Math.random() * w,   h + margin   ],
+      [-margin,             Math.random() * h],
+    ][edge];
 
-    if (absDelta <= CONFIG.TIMING.PERFECT) {
-      this.#award(target, now, CONFIG.SCORE.PERFECT);
-    } else if (absDelta <= CONFIG.TIMING.GOOD) {
-      this.#award(target, now, CONFIG.SCORE.GOOD);
-    } else if (absDelta <= CONFIG.TIMING.OK) {
-      this.#award(target, now, CONFIG.SCORE.OK);
+    this.#activeCloud = new Cloud({ startX: sx, startY: sy, sunX: cx, sunY: cy });
+  }
+
+  #onExhaleEnd(now) {
+    const exhalePhaseMs = this.#beatMs / 2;
+    const ratio         = this.#exhaleTimeAbove / exhalePhaseMs;
+    const success       = ratio >= CONFIG.EXHALE_SUCCESS_RATIO;
+
+    if (this.#activeCloud) {
+      if (success) {
+        this.#score++;
+        this.#scoreEl.textContent = this.#score;
+        this.#activeCloud.succeed();
+        // gone cloud cleaned up in #update
+      } else {
+        const cx    = this.#canvas.width  / 2;
+        const cy    = this.#canvas.height / 2;
+        // Spread failed clouds evenly around the sun in up to 12 positions
+        const angle = (this.#failAngleIndex * Math.PI * 2) / 12;
+        const failX = cx + Math.cos(angle) * CONFIG.FAIL_ORBIT_R;
+        const failY = cy + Math.sin(angle) * CONFIG.FAIL_ORBIT_R;
+        this.#activeCloud.slideTo(failX, failY);
+        this.#failedClouds.push(this.#activeCloud);
+        this.#failAngleIndex = (this.#failAngleIndex + 1) % 12;
+      }
+      this.#activeCloud = null;
     }
+
+    this.#phase          = 'inhale';
+    this.#phaseStartTime = now;
   }
 
-  #award(cloud, now, points) {
-    cloud.state = 'hit';
-    cloud.frozenT = Math.min(cloud.tAt(now), 1);
-    this.#score += points;
-    this.#scoreEl.textContent = this.#score;
-  }
+  // ── Game loop ────────────────────────────────────────────────────────────────
 
-  // Game loop 
+  #loop(timestamp) {
+    const dt = this.#lastFrameTime != null ? timestamp - this.#lastFrameTime : 16;
+    this.#lastFrameTime = timestamp;
 
-  #loop() {
     this.#syncCanvasSize();
-    if (this.#state === STATE.PLAYING) this.#update();
+    if (this.#state === STATE.PLAYING) this.#update(dt);
     this.#draw();
-    requestAnimationFrame(() => this.#loop());
+    requestAnimationFrame((t) => this.#loop(t));
   }
 
   #syncCanvasSize() {
     const c = this.#canvas;
     if (c.width !== c.offsetWidth || c.height !== c.offsetHeight) {
-      c.width = c.offsetWidth;
+      c.width  = c.offsetWidth;
       c.height = c.offsetHeight;
     }
   }
 
-  #update() {
+  #update(dt) {
     const now = performance.now();
-    const cx = this.#canvas.width / 2;
-    const cy = this.#canvas.height / 2;
 
-    // Check game duration
     if (now - this.#gameStartTime >= CONFIG.GAME_DURATION_SECS * 1000) {
       this.#endGame();
       return;
     }
 
-    // Spawn clouds
-    while (now >= this.#nextSpawnTime) {
-      const arrivalTime = this.#nextSpawnTime + this.#beatMs * CONFIG.TRAVEL_BEATS;
-      this.#spawnCloud(cx, cy, arrivalTime);
-      this.#nextSpawnTime += this.#beatMs;
-    }
-
-    // Cloud lifecycle
-    const missDeadline = CONFIG.TIMING.OK + CONFIG.TIMING.MISS_GRACE;
-
-    for (const cloud of this.#clouds) {
-      if (cloud.state === 'flying' && now > cloud.arrivalTime + missDeadline) {
-        cloud.state = 'missed';
-        cloud.frozenT = cloud.tAt(now);
-      }
-      if (cloud.state === 'hit' || cloud.state === 'missed') {
-        cloud.alpha = Math.max(0, cloud.alpha - 0.025);
-        if (cloud.alpha === 0) cloud.state = 'gone';
-      }
-    }
-    this.#clouds = this.#clouds.filter(c => c.state !== 'gone');
+    if (this.#activeCloud) this.#activeCloud.tick(dt);
+    for (const c of this.#failedClouds) c.tick(dt);
+    this.#failedClouds = this.#failedClouds.filter(c => c.alive);
   }
 
-  #spawnCloud(cx, cy, arrivalTime) {
-    const w = this.#canvas.width;
-    const h = this.#canvas.height;
-    const margin = 100;
-
-    // Random point on one of the four edges (outside the canvas)
-    const edge = Math.floor(Math.random() * 4);
-    const [startX, startY] = [
-      [Math.random() * w, -margin],   // top
-      [w + margin, Math.random() * h],   // right
-      [Math.random() * w, h + margin],   // bottom
-      [-margin, Math.random() * h],   // left
-    ][edge];
-
-    this.#clouds.push(new Cloud({
-      startX, startY, cx, cy,
-      arrivalTime,
-      travelMs: this.#beatMs * CONFIG.TRAVEL_BEATS,
-    }));
-  }
-
-  // Drawing 
+  // ── Drawing ──────────────────────────────────────────────────────────────────
 
   #draw() {
     const ctx = this.#ctx;
-    const w = this.#canvas.width;
-    const h = this.#canvas.height;
+    const w   = this.#canvas.width;
+    const h   = this.#canvas.height;
     ctx.clearRect(0, 0, w, h);
 
     switch (this.#state) {
-      case STATE.IDLE: return this.#drawIdle(ctx, w, h);
+      case STATE.IDLE:        return this.#drawIdle(ctx, w, h);
       case STATE.CALIBRATING: return this.#drawCalibrating(ctx, w, h);
-      case STATE.PLAYING: return this.#drawPlaying(ctx, w, h);
-      case STATE.GAME_OVER: return this.#drawGameOver(ctx, w, h);
+      case STATE.PLAYING:     return this.#drawPlaying(ctx, w, h);
+      case STATE.GAME_OVER:   return this.#drawGameOver(ctx, w, h);
     }
   }
 
   #drawIdle(ctx, w, h) {
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.font = '300 20px Nunito, sans-serif';
-    ctx.textAlign = 'center';
+    ctx.fillStyle    = 'rgba(255,255,255,0.25)';
+    ctx.font         = '300 20px Nunito, sans-serif';
+    ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('Select a stream and press Start', w / 2, h / 2);
   }
 
   #drawGameOver(ctx, w, h) {
     const cx = w / 2, cy = h / 2;
-
-    ctx.textAlign = 'center';
+    ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
 
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = '200 16px Nunito, sans-serif';
-    ctx.fillText('FINAL SCORE', cx, cy - 52);
+    ctx.font      = '200 16px Nunito, sans-serif';
+    ctx.fillText('SUCCESSFUL EXHALES', cx, cy - 52);
 
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font = '300 72px Nunito, sans-serif';
+    ctx.font      = '300 72px Nunito, sans-serif';
     ctx.fillText(this.#score, cx, cy);
 
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = '200 14px Nunito, sans-serif';
+    ctx.font      = '200 14px Nunito, sans-serif';
     ctx.fillText('Press Play again to retry', cx, cy + 52);
   }
 
   #drawCalibrating(ctx, w, h) {
-    const elapsed = performance.now() - this.#calStartTime;
-    const progress = Math.min(elapsed / (CONFIG.CALIBRATION_SECS * 1000), 1);
+    const elapsed   = performance.now() - this.#calStartTime;
+    const progress  = Math.min(elapsed / (CONFIG.CALIBRATION_SECS * 1000), 1);
     const remaining = Math.max(0, Math.ceil(CONFIG.CALIBRATION_SECS - elapsed / 1000));
     const cx = w / 2, cy = h / 2;
 
-    // Instruction
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = '300 20px Nunito, sans-serif';
-    ctx.textAlign = 'center';
+    ctx.fillStyle    = 'rgba(255,255,255,0.85)';
+    ctx.font         = '300 20px Nunito, sans-serif';
+    ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('Breathe normally…', cx, cy - 80);
 
-    // Track ring (dim)
     ctx.beginPath();
     ctx.arc(cx, cy, 60, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth = 5;
+    ctx.lineWidth   = 5;
     ctx.stroke();
 
-    // Progress arc
     ctx.beginPath();
     ctx.arc(cx, cy, 60, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
     ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth = 5;
-    ctx.lineCap = 'round';
+    ctx.lineWidth   = 5;
+    ctx.lineCap     = 'round';
     ctx.stroke();
 
-    // Countdown number
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.font = '200 52px Nunito, sans-serif';
-    ctx.textAlign = 'center';
+    ctx.fillStyle    = 'rgba(255,255,255,0.7)';
+    ctx.font         = '200 52px Nunito, sans-serif';
+    ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(remaining, cx, cy);
   }
 
   #drawPlaying(ctx, w, h) {
-    const now = performance.now();
     const cx = w / 2;
     const cy = h / 2;
 
-    // Clouds — furthest from center (lowest t) rendered first (behind)
-    const now2 = now; // capture for sort closure
-    [...this.#clouds]
-      .sort((a, b) => a.tAt(now2) - b.tAt(now2))
-      .forEach(cloud => {
-        if (cloud.state === 'gone') return;
-        const pos = cloud.drawPos(now);
-        this.#drawCloud(ctx, pos.x, pos.y, cloud.size, cloud.alpha);
-      });
+    // Sun (behind everything)
+    this.#drawSun(ctx, cx, cy);
 
+    // Failed clouds orbiting the sun
+    for (const cloud of this.#failedClouds) {
+      if (cloud.alive) this.#drawCloud(ctx, cloud.x, cloud.y, cloud.size, cloud.alpha);
+    }
+
+    // Active cloud sliding in / covering / sliding out
+    if (this.#activeCloud?.alive) {
+      this.#drawCloud(ctx, this.#activeCloud.x, this.#activeCloud.y, this.#activeCloud.size, this.#activeCloud.alpha);
+    }
+
+    // Debug breath-phase label
+    const label = this.#phase === 'exhale' ? 'BREATHE OUT' : 'BREATHE IN';
+    ctx.fillStyle    = 'rgba(255,255,255,0.55)';
+    ctx.font         = '300 18px Nunito, sans-serif';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(label, cx, h - 20);
   }
 
-  // Scene elements
+  // ── Scene elements ────────────────────────────────────────────────────────────
 
-  /**
-   * Procedural cloud shape: five overlapping circles with a white-to-light-blue
-   * radial gradient.  Replace with an image asset by swapping this method.
-   */
+  #drawSun(ctx, cx, cy) {
+    const r = CONFIG.SUN_RADIUS;
+
+    // Rays
+    const rayCount = 12;
+    ctx.strokeStyle = 'rgba(255,210,50,0.85)';
+    ctx.lineWidth   = 5;
+    ctx.lineCap     = 'round';
+    for (let i = 0; i < rayCount; i++) {
+      const angle = (i / rayCount) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * r * 1.15, cy + Math.sin(angle) * r * 1.15);
+      ctx.lineTo(cx + Math.cos(angle) * r * 1.50, cy + Math.sin(angle) * r * 1.50);
+      ctx.stroke();
+    }
+
+    // Body
+    const grd = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, r * 0.1, cx, cy, r);
+    grd.addColorStop(0, '#fff7aa');
+    grd.addColorStop(1, '#f5c000');
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    // Eyes
+    const eyeOffX = r * 0.28;
+    const eyeOffY = r * 0.18;
+    const eyeR    = r * 0.09;
+    for (const ex of [-eyeOffX, eyeOffX]) {
+      ctx.beginPath();
+      ctx.arc(cx + ex, cy - eyeOffY, eyeR, 0, Math.PI * 2);
+      ctx.fillStyle = '#7a4a00';
+      ctx.fill();
+    }
+
+    // Smile
+    ctx.beginPath();
+    ctx.arc(cx, cy + r * 0.05, r * 0.38, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.strokeStyle = '#7a4a00';
+    ctx.lineWidth   = r * 0.08;
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+  }
+
   #drawCloud(ctx, x, y, size, alpha) {
     ctx.globalAlpha = alpha;
 
     const blobs = [
-      { dx: 0, dy: 0, r: size * 0.55 },
-      { dx: -size * 0.42, dy: size * 0.12, r: size * 0.42 },
-      { dx: size * 0.42, dy: size * 0.12, r: size * 0.40 },
-      { dx: -size * 0.20, dy: -size * 0.28, r: size * 0.34 },
-      { dx: size * 0.22, dy: -size * 0.24, r: size * 0.32 },
+      { dx:  0,            dy:  0,            r: size * 0.55 },
+      { dx: -size * 0.42,  dy:  size * 0.12,  r: size * 0.42 },
+      { dx:  size * 0.42,  dy:  size * 0.12,  r: size * 0.40 },
+      { dx: -size * 0.20,  dy: -size * 0.28,  r: size * 0.34 },
+      { dx:  size * 0.22,  dy: -size * 0.24,  r: size * 0.32 },
     ];
 
     const grd = ctx.createRadialGradient(x, y - size * 0.15, 0, x, y, size * 0.8);
@@ -488,4 +519,5 @@ export class Game {
     ctx.globalAlpha = 1;
   }
 }
+
 export default Game;
