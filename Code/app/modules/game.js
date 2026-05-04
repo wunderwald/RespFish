@@ -19,7 +19,7 @@ function easeOut(t)     { return 1 - (1 - t) * (1 - t); }
 // ── Configuration ─────────────────────────────────────────────────────────────
 
 export const CONFIG = {
-  TARGET_BPM:             12,     // target breaths per minute
+  TARGET_BPM:             6,     // target breaths per minute
   GAME_DURATION_SECS:     60,
   EXHALE_ONSET_THRESHOLD: 0.40,   // normalised signal level that triggers exhale onset
   BREATH_DEBOUNCE_MS:     1500,   // minimum ms between two exhale onsets
