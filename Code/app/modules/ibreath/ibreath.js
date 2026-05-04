@@ -158,10 +158,15 @@ export default class IBreath {
     const lvls = this.#calStimulusLevels;
     this.#syncStimulusRange = [Math.min(...lvls) * 0.8, Math.max(...lvls) * 0.8];
 
-    this.#state = STATE.READY;
-    this.#hud.stateEl.textContent = 'ready — press Space or Next trial to begin';
-    this.#hud.nextBtn.style.display = '';
     this.#hud.trialEl.textContent = `0 / ${this.#trials.length}`;
+
+    if (CONFIG.AUTO_ADVANCE) {
+      this.#advanceTrial();
+    } else {
+      this.#state = STATE.READY;
+      this.#hud.stateEl.textContent = 'ready — press Space or Next trial to begin';
+      this.#hud.nextBtn.style.display = '';
+    }
   }
 
   #advanceTrial() {
@@ -307,9 +312,13 @@ export default class IBreath {
 
     if (this.#state === STATE.ITI) {
       if (now - this.#itiStartTime >= this.#itiDuration) {
-        this.#state = STATE.READY;
-        this.#hud.nextBtn.style.display = '';
-        this.#hud.stateEl.textContent = 'ready — press Space or Next trial';
+        if (CONFIG.AUTO_ADVANCE) {
+          this.#advanceTrial();
+        } else {
+          this.#state = STATE.READY;
+          this.#hud.nextBtn.style.display = '';
+          this.#hud.stateEl.textContent = 'ready — press Space or Next trial';
+        }
       }
     }
 

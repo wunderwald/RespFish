@@ -36,6 +36,7 @@ export const CONFIG = {
 
   // Variations
   SYNC_DETECTION: true,    // show post-trial "was it in sync?" response screen
+  AUTO_ADVANCE:   false,   // skip the READY state — advance to next trial automatically
 };
 
 export const STATE = {
