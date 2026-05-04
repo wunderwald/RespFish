@@ -25,7 +25,7 @@ import {
 import { CONFIG, STATE } from './config.js';
 import { makeTrialParams } from './trialParams.js';
 import { buildHUD } from './hud.js';
-import { IBreathRenderer } from './renderer.js';
+import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
 
 export { CONFIG };
