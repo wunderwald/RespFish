@@ -128,7 +128,7 @@ function createControlWindow() {
       nodeIntegration: false,
     },
   });
-  controlWindow.loadFile("experimenter.html");
+  controlWindow.loadFile("experimenter.html", { query: { frontend: process.env.FRONTEND || "ibreath" } });
   controlWindow.on("closed", () => {
     controlWindow = null;
     app.quit();
@@ -146,8 +146,16 @@ ipcMain.on("hud:action", (_event, data) => {
 });
 
 ipcMain.on("hud:open-control", () => {
-  if (!controlWindow) createControlWindow();
-  else controlWindow.focus();
+  controlWindow?.focus();
+});
+
+// Relay: scene window → experimenter window (frontend state)
+ipcMain.on("frontend:state", (_event, data) => {
+  controlWindow?.webContents.send("frontend:state", data);
+});
+// Relay: experimenter window → scene window (frontend action)
+ipcMain.on("frontend:action", (_event, data) => {
+  mainWindow?.webContents.send("frontend:action", data);
 });
 
 // Relay: experimenter window → scene window (resp stream data)
@@ -215,6 +223,7 @@ app.whenReady().then(() => {
   startBridge();
   // Brief delay so the bridge socket is ready before the renderer connects
   setTimeout(createWindow, 600);
+  setTimeout(createControlWindow, 600);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

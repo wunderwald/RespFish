@@ -29,18 +29,14 @@ export class Visualizer {
 
   // stats
   #sampleCount = 0;
+  #lastPush = 0;
 
   // DOM refs
   #canvas = null;
   #ctx = null;
   #fish = null;
-  #statusDot = null;
-  #statusText = null;
-  #valEl = null;
-  #spsEl = null;
 
   constructor({ statsContainer, sceneContainer }) {
-    this.#buildStats(statsContainer);
     this.#buildScene(sceneContainer);
     this.#startSpsCounter();
     requestAnimationFrame(() => this.#draw());
@@ -52,31 +48,21 @@ export class Visualizer {
     this.#history[this.#histIdx] = value;
     this.#histIdx = (this.#histIdx + 1) % HISTORY_LEN;
     this.#sampleCount++;
-    this.#valEl.textContent = value.toFixed(3);
+    if (Date.now() - this.#lastPush > 250) {
+      this.#lastPush = Date.now();
+      window.api.frontend.sendState({ value: value.toFixed(3) });
+    }
   }
 
   setStatus({ type, text }) {
-    this.#statusDot.className = type;
-    this.#statusText.textContent = text;
-    if (type === "disconnected") this.#valEl.textContent = "—";
+    window.api.frontend.sendState({
+      dotClass:   type,
+      statusText: text,
+      value:      type === 'disconnected' ? '—' : undefined,
+    });
   }
 
   // DOM construction
-
-  #buildStats(container) {
-    container.innerHTML = `
-      <span>
-        <span id="status-dot"></span>
-        <span id="status-text">connecting…</span>
-      </span>
-      <span><span class="label">value</span><span id="val">—</span></span>
-      <span><span class="label">samples/s</span><span id="sps">—</span></span>
-    `;
-    this.#statusDot = container.querySelector("#status-dot");
-    this.#statusText = container.querySelector("#status-text");
-    this.#valEl = container.querySelector("#val");
-    this.#spsEl = container.querySelector("#sps");
-  }
 
   #buildScene(container) {
     container.innerHTML = `
@@ -95,7 +81,7 @@ export class Visualizer {
     setInterval(() => {
       const elapsed = performance.now() - lastTick;
       lastTick = performance.now();
-      this.#spsEl.textContent = (this.#sampleCount / elapsed * 1000).toFixed(0);
+      window.api.frontend.sendState({ sps: (this.#sampleCount / elapsed * 1000).toFixed(0) });
       this.#sampleCount = 0;
     }, 1000);
   }

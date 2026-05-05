@@ -161,16 +161,22 @@ export class Game {
   // animation
   #lastFrameTime = null;
 
+  // IPC HUD state
+  #hudStateText = 'waiting for stream…';
+  #hudScore = null;
+  #hudBtnEnabled = false;
+  #hudBtnText = 'Start';
+
   // DOM
   #canvas = null;
   #ctx = null;
-  #scoreEl = null;
-  #stateEl = null;
-  #startBtn = null;
 
   constructor({ statsContainer, sceneContainer }) {
-    this.#buildHUD(statsContainer);
     this.#buildCanvas(sceneContainer);
+    window.api.frontend.onAction(({ type }) => {
+      if (type === 'start') this.#beginCountdown();
+    });
+    this.#pushState();
     requestAnimationFrame((t) => this.#loop(t));
   }
 
@@ -189,24 +195,24 @@ export class Game {
   setStatus({ type, text }) {
     const streamReady = type === 'connected';
     if (this.#state === STATE.IDLE) {
-      this.#stateEl.textContent = streamReady ? 'ready — press Start' : text;
-      this.#startBtn.disabled = !streamReady;
+      this.#hudStateText  = streamReady ? 'ready — press Start' : text;
+      this.#hudBtnEnabled = streamReady;
+      this.#pushState();
     }
   }
 
-  // ── DOM construction ─────────────────────────────────────────────────────────
+  // ── IPC state push ────────────────────────────────────────────────────────────
 
-  #buildHUD(container) {
-    container.innerHTML = `
-      <span id="game-state-text">waiting for stream…</span>
-      <span><span class="label">score</span><span id="game-score">—</span></span>
-      <button id="game-start-btn" disabled>Start</button>
-    `;
-    this.#stateEl = container.querySelector('#game-state-text');
-    this.#scoreEl = container.querySelector('#game-score');
-    this.#startBtn = container.querySelector('#game-start-btn');
-    this.#startBtn.addEventListener('click', () => this.#beginCountdown());
+  #pushState() {
+    window.api.frontend.sendState({
+      stateText:  this.#hudStateText,
+      score:      this.#hudScore,
+      btnEnabled: this.#hudBtnEnabled,
+      btnText:    this.#hudBtnText,
+    });
   }
+
+  // ── DOM construction ─────────────────────────────────────────────────────────
 
   #buildCanvas(container) {
     container.innerHTML = '<canvas id="game-canvas"></canvas>';
@@ -219,8 +225,9 @@ export class Game {
   #beginCountdown() {
     this.#state = STATE.COUNTDOWN;
     this.#countdownStart = performance.now();
-    this.#startBtn.disabled = true;
-    this.#stateEl.textContent = 'get ready…';
+    this.#hudStateText  = 'get ready…';
+    this.#hudBtnEnabled = false;
+    this.#pushState();
   }
 
   #beginPlaying() {
@@ -235,10 +242,11 @@ export class Game {
     this.#lastBreathMs = -Infinity;
     this.#gameStartTime = performance.now();
 
-    this.#scoreEl.textContent = '0';
-    this.#stateEl.textContent = 'playing';
-    this.#startBtn.textContent = 'Restart';
-    this.#startBtn.disabled = false;
+    this.#hudStateText  = 'playing';
+    this.#hudScore      = 0;
+    this.#hudBtnText    = 'Restart';
+    this.#hudBtnEnabled = true;
+    this.#pushState();
     this.#spawnCloud();
   }
 
@@ -247,9 +255,10 @@ export class Game {
     this.#activeCloud = null;
     this.#failedClouds = [];
     this.#particles = [];
-    this.#stateEl.textContent = 'game over';
-    this.#startBtn.textContent = 'Play again';
-    this.#startBtn.disabled = false;
+    this.#hudStateText  = 'game over';
+    this.#hudBtnText    = 'Play again';
+    this.#hudBtnEnabled = true;
+    this.#pushState();
   }
 
   // ── Breath tracking ──────────────────────────────────────────────────────────
@@ -314,7 +323,8 @@ export class Game {
     if (this.#activeCloud) {
       if (success) {
         this.#score++;
-        this.#scoreEl.textContent = this.#score;
+        this.#hudScore = this.#score;
+        this.#pushState();
         this.#activeCloud.succeed();
         this.#burstParticles(this.#activeCloud.x, this.#activeCloud.y);
         // gone cloud cleaned up in #update

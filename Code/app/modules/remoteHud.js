@@ -7,7 +7,7 @@
  *   - receives user actions (start/next/abort/response) from the experimenter
  *     window via hud:action IPC and calls the appropriate callbacks
  */
-import { CONFIG } from './config.js';
+import { CONFIG } from './ibreath/config.js';
 
 export class RemoteHud {
   #snap = {

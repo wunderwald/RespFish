@@ -86,6 +86,14 @@ contextBridge.exposeInMainWorld("api", {
     openControl: ()       => ipcRenderer.send('hud:open-control'),
   },
 
+  // Frontend IPC — scene window pushes state, experimenter window sends actions
+  frontend: {
+    sendState:  (data) => ipcRenderer.send('frontend:state', data),
+    onState:    (cb)   => ipcRenderer.on('frontend:state', (_e, d) => cb(d)),
+    sendAction: (data) => ipcRenderer.send('frontend:action', data),
+    onAction:   (cb)   => ipcRenderer.on('frontend:action', (_e, d) => cb(d)),
+  },
+
   // Stream IPC — experimenter window sends data, scene window receives it
   stream: {
     sendSample:     (data) => ipcRenderer.send('stream:sample', data),

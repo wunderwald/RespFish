@@ -67,13 +67,12 @@ async function init() {
   };
   const { default: FrontendClass } = await import(FRONTEND_PATHS[FRONTEND]);
 
-  // 4. Instantiate — ibreath uses a separate experimenter window for its HUD;
-  //    all other frontends ignore statsContainer.
+  // 4. Instantiate — the experimenter window handles all HUD and stats displays;
+  //    the scene window hides its stats container for all frontends.
+  statsContainer.style.display = 'none';
   let hudFactory;
   if (FRONTEND === 'ibreath') {
-    statsContainer.style.display = 'none';
-    window.api.hud.openControl();
-    const { RemoteHud } = await import('./modules/ibreath/remoteHud.js');
+    const { RemoteHud } = await import('./modules/remoteHud.js');
     hudFactory = (callbacks) => new RemoteHud(callbacks);
   }
   const frontend = new FrontendClass({ statsContainer, sceneContainer, hudFactory });

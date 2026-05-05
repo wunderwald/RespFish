@@ -56,6 +56,7 @@ export default class GazeTest {
   #sampleCount = 0;
   #samplesPerSec = 0;
   #lastSpsTime = performance.now();
+  #lastPush = 0;
 
   // stream status (displayed in stats bar, not used for gaze)
   #streamStatus = 'waiting for stream…';
@@ -64,15 +65,7 @@ export default class GazeTest {
   #canvas = null;
   #ctx = null;
 
-  // stats bar elements
-  #elGazeStatus = null;
-  #elCoords = null;
-  #elSps = null;
-  #elAccuracy = null;
-  #elStream = null;
-
   constructor({ statsContainer, sceneContainer }) {
-    this.#buildStats(statsContainer);
     this.#buildScene(sceneContainer);
 
     // Pre-fill trail with off-screen positions
@@ -90,40 +83,10 @@ export default class GazeTest {
 
   setStatus({ type, text }) {
     this.#streamStatus = text;
-    if (this.#elStream) this.#elStream.textContent = text;
+    window.api.frontend.sendState({ streamStatus: text });
   }
 
   // ── DOM ────────────────────────────────────────────────────────────────────
-
-  #buildStats(container) {
-    container.innerHTML = `
-      <span>
-        <span class="label">gaze</span>
-        <span id="gt-gaze-status">—</span>
-      </span>
-      <span>
-        <span class="label">position</span>
-        <span id="gt-coords">—</span>
-      </span>
-      <span>
-        <span class="label">accuracy</span>
-        <span id="gt-accuracy">—</span>
-      </span>
-      <span>
-        <span class="label">samples/s</span>
-        <span id="gt-sps">—</span>
-      </span>
-      <span>
-        <span class="label">stream</span>
-        <span id="gt-stream">waiting…</span>
-      </span>
-    `;
-    this.#elGazeStatus = container.querySelector('#gt-gaze-status');
-    this.#elCoords = container.querySelector('#gt-coords');
-    this.#elAccuracy = container.querySelector('#gt-accuracy');
-    this.#elSps = container.querySelector('#gt-sps');
-    this.#elStream = container.querySelector('#gt-stream');
-  }
 
   #buildScene(container) {
     container.innerHTML = '<canvas id="gt-canvas"></canvas>';
@@ -352,30 +315,20 @@ export default class GazeTest {
   }
 
   #updateStats(gs) {
-    if (!this.#elGazeStatus) return;
+    if (Date.now() - this.#lastPush < 250) return;
+    this.#lastPush = Date.now();
 
     const active = gs?.active ?? false;
-    this.#elGazeStatus.textContent = active ? 'active' : 'inactive';
-    this.#elGazeStatus.style.color = active
-      ? 'rgba(91,201,138,0.9)'
-      : 'rgba(224,120,120,0.8)';
-
-    if (active && gs.x) {
-      this.#elCoords.textContent =
-        `${Math.round(gs.x)}, ${Math.round(gs.y)}`;
-    } else {
-      this.#elCoords.textContent = '—';
-    }
-
     const avgAcc = this.#accuracyBuf.length > 0
       ? this.#accuracyBuf.reduce((a, b) => a + b, 0) / this.#accuracyBuf.length
       : null;
-    this.#elAccuracy.textContent = avgAcc !== null
-      ? `${Math.round(avgAcc)} px`
-      : '—';
 
-    this.#elSps.textContent = active
-      ? `${this.#samplesPerSec}`
-      : '—';
+    window.api.frontend.sendState({
+      gazeActive:   active,
+      coords:       (active && gs.x) ? `${Math.round(gs.x)}, ${Math.round(gs.y)}` : '—',
+      accuracy:     avgAcc !== null ? `${Math.round(avgAcc)} px` : '—',
+      sps:          active ? this.#samplesPerSec : '—',
+      streamStatus: this.#streamStatus,
+    });
   }
 }

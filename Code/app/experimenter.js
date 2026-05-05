@@ -1,6 +1,10 @@
-// Experimenter control window — HUD + stream selection for iBreath.
+// Experimenter control window — stream selection + frontend-specific controls.
 import { StreamManager } from './modules/stream/stream.js';
 import { CONFIG }        from './modules/ibreath/config.js';
+
+// ── Frontend detection ────────────────────────────────────────────────────────
+
+const frontend = new URLSearchParams(location.search).get('frontend') || 'ibreath';
 
 // ── Stream selectors ──────────────────────────────────────────────────────────
 
@@ -29,110 +33,193 @@ gazeStream.on('status', ({ type }) => {
   if (type === 'disconnected') window.api.stream.sendGazeSample({ channels: null });
 });
 
-// ── HUD bar ───────────────────────────────────────────────────────────────────
+// ── Timer bar visibility ──────────────────────────────────────────────────────
 
-const container = document.getElementById('stats');
-container.innerHTML = `
-  <span>
-    <span class="label">trial</span>
-    <span id="ib-trial">—</span>
-  </span>
-  <span>
-    <span class="label">subject</span>
-    <input id="ib-subject" type="text" value="${CONFIG.SUBJECT_CODE}"
-           placeholder="subject code" autocomplete="off" spellcheck="false" />
-  </span>
-  <span>
-    <span class="label">group</span>
-    <select id="ib-question-type" class="stream-select">
-      <option value="intero">Target (intero)</option>
-      <option value="extero">Control (extero)</option>
-    </select>
-  </span>
-  <span id="ib-controls">
-    <button id="ib-start-btn"  disabled>Start</button>
-    <button id="ib-next-btn"   style="display:none">Next trial</button>
-    <button id="ib-abort-btn"  style="display:none">Abort trial</button>
-  </span>
-`;
-
-const stateEl            = document.getElementById('ib-state-text');   // in #timer-bar
-const elapsedEl          = document.getElementById('ib-elapsed');       // in #timer-bar
-const remainingEl        = document.getElementById('ib-remaining');     // in #timer-bar
-const trialEl            = document.getElementById('ib-trial');
-const subjectInput       = document.getElementById('ib-subject');
-const questionTypeSelect = document.getElementById('ib-question-type');
-const startBtn           = document.getElementById('ib-start-btn');
-const nextBtn            = document.getElementById('ib-next-btn');
-const abortBtn           = document.getElementById('ib-abort-btn');
-
-// ── Clocks ────────────────────────────────────────────────────────────────────
-
-let experimentStartedAt = null;
-let stateTimer          = null;   // { startedAt, duration } or null
-
-function fmtTime(secs) {
-  if (secs == null) return '—';
-  secs = Math.max(0, Math.floor(secs));
-  return `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
+if (frontend !== 'ibreath') {
+  document.getElementById('timer-bar').style.display = 'none';
 }
 
-setInterval(() => {
-  elapsedEl.textContent   = experimentStartedAt
-    ? fmtTime((Date.now() - experimentStartedAt) / 1000)
-    : '—';
-  remainingEl.textContent = (stateTimer && stateTimer.duration != null)
-    ? fmtTime(stateTimer.duration - (Date.now() - stateTimer.startedAt) / 1000)
-    : '—';
-}, 250);
+// ── Frontend-specific stats section ──────────────────────────────────────────
 
-// ── Receive state from scene window ───────────────────────────────────────────
+const statsEl = document.getElementById('stats');
 
-window.api.hud.onState(({ stateText, stateColor, trialText,
-                           startEnabled, nextVisible, abortVisible, inputsLocked,
-                           experimentStartedAt: esa, stateTimer: st }) => {
-  if (esa !== undefined) experimentStartedAt = esa;
-  if (st  !== undefined) stateTimer          = st;
-  if (stateText    !== undefined) stateEl.textContent        = stateText;
-  if (stateColor   !== undefined) stateEl.style.color        = stateColor;
-  if (trialText    !== undefined) trialEl.textContent        = trialText;
-  if (startEnabled !== undefined) startBtn.disabled          = !startEnabled;
-  if (nextVisible  !== undefined) nextBtn.style.display      = nextVisible  ? '' : 'none';
-  if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
-  if (inputsLocked !== undefined) {
-    subjectInput.disabled        = inputsLocked;
-    questionTypeSelect.disabled  = inputsLocked;
-    if (inputsLocked) {
-      respStream.disable();
-      gazeStream.disable();
+if (frontend === 'ibreath') {
+  // ── iBreath HUD ─────────────────────────────────────────────────────────────
+
+  statsEl.innerHTML = `
+    <span>
+      <span class="label">trial</span>
+      <span id="ib-trial">—</span>
+    </span>
+    <span>
+      <span class="label">subject</span>
+      <input id="ib-subject" type="text" value="${CONFIG.SUBJECT_CODE}"
+             placeholder="subject code" autocomplete="off" spellcheck="false" />
+    </span>
+    <span>
+      <span class="label">group</span>
+      <select id="ib-question-type" class="stream-select">
+        <option value="intero">Target (intero)</option>
+        <option value="extero">Control (extero)</option>
+      </select>
+    </span>
+    <span id="ib-controls">
+      <button id="ib-start-btn"  disabled>Start</button>
+      <button id="ib-next-btn"   style="display:none">Next trial</button>
+      <button id="ib-abort-btn"  style="display:none">Abort trial</button>
+    </span>
+  `;
+
+  const stateEl            = document.getElementById('ib-state-text');   // in #timer-bar
+  const elapsedEl          = document.getElementById('ib-elapsed');       // in #timer-bar
+  const remainingEl        = document.getElementById('ib-remaining');     // in #timer-bar
+  const trialEl            = document.getElementById('ib-trial');
+  const subjectInput       = document.getElementById('ib-subject');
+  const questionTypeSelect = document.getElementById('ib-question-type');
+  const startBtn           = document.getElementById('ib-start-btn');
+  const nextBtn            = document.getElementById('ib-next-btn');
+  const abortBtn           = document.getElementById('ib-abort-btn');
+
+  // ── Clocks ──────────────────────────────────────────────────────────────────
+
+  let experimentStartedAt = null;
+  let stateTimer          = null;   // { startedAt, duration } or null
+
+  function fmtTime(secs) {
+    if (secs == null) return '—';
+    secs = Math.max(0, Math.floor(secs));
+    return `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
+  }
+
+  setInterval(() => {
+    elapsedEl.textContent   = experimentStartedAt
+      ? fmtTime((Date.now() - experimentStartedAt) / 1000)
+      : '—';
+    remainingEl.textContent = (stateTimer && stateTimer.duration != null)
+      ? fmtTime(stateTimer.duration - (Date.now() - stateTimer.startedAt) / 1000)
+      : '—';
+  }, 250);
+
+  // ── Receive state from scene window ─────────────────────────────────────────
+
+  window.api.hud.onState(({ stateText, stateColor, trialText,
+                             startEnabled, nextVisible, abortVisible, inputsLocked,
+                             experimentStartedAt: esa, stateTimer: st }) => {
+    if (esa !== undefined) experimentStartedAt = esa;
+    if (st  !== undefined) stateTimer          = st;
+    if (stateText    !== undefined) stateEl.textContent        = stateText;
+    if (stateColor   !== undefined) stateEl.style.color        = stateColor;
+    if (trialText    !== undefined) trialEl.textContent        = trialText;
+    if (startEnabled !== undefined) startBtn.disabled          = !startEnabled;
+    if (nextVisible  !== undefined) nextBtn.style.display      = nextVisible  ? '' : 'none';
+    if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
+    if (inputsLocked !== undefined) {
+      subjectInput.disabled        = inputsLocked;
+      questionTypeSelect.disabled  = inputsLocked;
+      if (inputsLocked) {
+        respStream.disable();
+        gazeStream.disable();
+      }
     }
-  }
-});
-
-// ── Send actions to scene window ──────────────────────────────────────────────
-
-startBtn.addEventListener('click', () => {
-  window.api.hud.sendAction({
-    type:         'start',
-    subjectCode:  subjectInput.value.trim() || 'TEST',
-    questionType: questionTypeSelect.value,
   });
-});
-nextBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'next' }));
-abortBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'abort' }));
 
-// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+  // ── Send actions to scene window ─────────────────────────────────────────────
 
-window.addEventListener('keydown', (e) => {
-  if (document.activeElement === subjectInput) return;
-  switch (e.code) {
-    case 'Space':      e.preventDefault(); window.api.hud.sendAction({ type: 'next' }); break;
-    case 'Escape':     window.api.hud.sendAction({ type: 'abort' }); break;
-    case 'ArrowLeft':  window.api.hud.sendAction({ type: 'response', value: true });  break;
-    case 'ArrowRight': window.api.hud.sendAction({ type: 'response', value: false }); break;
-  }
-});
+  startBtn.addEventListener('click', () => {
+    window.api.hud.sendAction({
+      type:         'start',
+      subjectCode:  subjectInput.value.trim() || 'TEST',
+      questionType: questionTypeSelect.value,
+    });
+  });
+  nextBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'next' }));
+  abortBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'abort' }));
 
-// ── Request current HUD state on load ─────────────────────────────────────────
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 
-window.api.hud.sendAction({ type: 'ready' });
+  window.addEventListener('keydown', (e) => {
+    if (document.activeElement === subjectInput) return;
+    switch (e.code) {
+      case 'Space':      e.preventDefault(); window.api.hud.sendAction({ type: 'next' }); break;
+      case 'Escape':     window.api.hud.sendAction({ type: 'abort' }); break;
+      case 'ArrowLeft':  window.api.hud.sendAction({ type: 'response', value: true });  break;
+      case 'ArrowRight': window.api.hud.sendAction({ type: 'response', value: false }); break;
+    }
+  });
+
+  // ── Request current HUD state on load ────────────────────────────────────────
+
+  window.api.hud.sendAction({ type: 'ready' });
+
+} else if (frontend === 'game') {
+  // ── Game controls ────────────────────────────────────────────────────────────
+
+  statsEl.innerHTML = `
+    <span id="fe-state">waiting for stream…</span>
+    <span><span class="label">score</span><span id="fe-score">—</span></span>
+    <button id="fe-start-btn" disabled>Start</button>
+  `;
+  const feStateEl  = document.getElementById('fe-state');
+  const feScoreEl  = document.getElementById('fe-score');
+  const feStartBtn = document.getElementById('fe-start-btn');
+
+  feStartBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'start' }));
+
+  window.api.frontend.onState(({ stateText, score, btnEnabled, btnText }) => {
+    if (stateText  !== undefined) feStateEl.textContent   = stateText;
+    if (score      !== null && score !== undefined) feScoreEl.textContent = score;
+    if (btnEnabled !== undefined) feStartBtn.disabled     = !btnEnabled;
+    if (btnText    !== undefined) feStartBtn.textContent  = btnText;
+  });
+
+} else if (frontend === 'visualizer') {
+  // ── Visualizer status ────────────────────────────────────────────────────────
+
+  statsEl.innerHTML = `
+    <span><span id="v-status-dot"></span><span id="v-status-text">connecting…</span></span>
+    <span><span class="label">value</span><span id="v-val">—</span></span>
+    <span><span class="label">samples/s</span><span id="v-sps">—</span></span>
+  `;
+  const vDotEl  = document.getElementById('v-status-dot');
+  const vTextEl = document.getElementById('v-status-text');
+  const vValEl  = document.getElementById('v-val');
+  const vSpsEl  = document.getElementById('v-sps');
+
+  window.api.frontend.onState(({ dotClass, statusText, value, sps }) => {
+    if (dotClass   !== undefined) vDotEl.className    = dotClass;
+    if (statusText !== undefined) vTextEl.textContent = statusText;
+    if (value      !== undefined && value !== null) vValEl.textContent = value;
+    if (sps        !== undefined) vSpsEl.textContent  = sps;
+  });
+
+} else if (frontend === 'gazetest') {
+  // ── Gazetest stats ───────────────────────────────────────────────────────────
+
+  statsEl.innerHTML = `
+    <span><span class="label">gaze</span><span id="gt-gaze-status">—</span></span>
+    <span><span class="label">position</span><span id="gt-coords">—</span></span>
+    <span><span class="label">accuracy</span><span id="gt-accuracy">—</span></span>
+    <span><span class="label">samples/s</span><span id="gt-sps">—</span></span>
+    <span><span class="label">stream</span><span id="gt-stream">—</span></span>
+  `;
+  const gtGazeEl   = document.getElementById('gt-gaze-status');
+  const gtCoordsEl = document.getElementById('gt-coords');
+  const gtAccEl    = document.getElementById('gt-accuracy');
+  const gtSpsEl    = document.getElementById('gt-sps');
+  const gtStreamEl = document.getElementById('gt-stream');
+
+  window.api.frontend.onState(({ gazeActive, coords, accuracy, sps, streamStatus }) => {
+    if (gazeActive !== undefined) {
+      gtGazeEl.textContent = gazeActive ? 'active' : 'inactive';
+      gtGazeEl.style.color = gazeActive ? 'rgba(91,201,138,0.9)' : 'rgba(224,120,120,0.8)';
+    }
+    if (coords       !== undefined) gtCoordsEl.textContent = coords;
+    if (accuracy     !== undefined) gtAccEl.textContent    = accuracy;
+    if (sps          !== undefined) gtSpsEl.textContent    = sps;
+    if (streamStatus !== undefined) gtStreamEl.textContent = streamStatus;
+  });
+
+} else {
+  // Unknown frontend — hide stats bar
+  statsEl.style.display = 'none';
+}
