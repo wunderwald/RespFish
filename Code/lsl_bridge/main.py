@@ -1,3 +1,8 @@
+from marker_bridge import marker_ws_handler
+from signal_bridge import BridgeState, stream_discoverer, lsl_reader, ws_handler
+from config import WS_HOST, WS_PORT, MARKER_WS_PORT, MARKER_STREAM_NAME
+from pylsl import StreamInfo, StreamOutlet
+import websockets
 import asyncio
 import logging
 import sys
@@ -6,12 +11,6 @@ from pathlib import Path
 # Allow sibling modules to be imported when run as a script from any cwd
 sys.path.insert(0, str(Path(__file__).parent))
 
-import websockets
-from pylsl import StreamInfo, StreamOutlet
-
-from config import WS_HOST, WS_PORT, MARKER_WS_PORT, MARKER_STREAM_NAME
-from signal_bridge import BridgeState, stream_discoverer, lsl_reader, ws_handler
-from marker_bridge import marker_ws_handler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,7 +26,8 @@ async def main() -> None:
     asyncio.create_task(stream_discoverer(state))
     asyncio.create_task(lsl_reader(state))
 
-    marker_info   = StreamInfo(MARKER_STREAM_NAME, "Markers", 1, 0, "string", "respfish_markers")
+    marker_info = StreamInfo(
+        MARKER_STREAM_NAME, "Markers", 1, 0, "string", "respfish_markers")
     marker_outlet = StreamOutlet(marker_info)
     log.info(f"LSL marker outlet '{MARKER_STREAM_NAME}' ready")
 
