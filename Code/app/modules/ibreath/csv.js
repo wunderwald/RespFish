@@ -19,6 +19,7 @@ import { CONFIG } from './config.js';
 
 export class IBreathCSV {
   #subjectCode;
+  #questionType;
   #onWarn;
 
   static #FRAME_HEADER =
@@ -26,13 +27,14 @@ export class IBreathCSV {
     (CONFIG.FLASHING_IMAGE ? ',flashActive' : '') + '\n';
 
   static #TRIAL_HEADER =
-    'trialIndex,subject,synchronous,img,lr,slowfast,' +
+    'trialIndex,subject,group,synchronous,img,lr,slowfast,' +
     'ITI,startTime,endTime,aborted' +
     (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
     (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
 
-  constructor(subjectCode, onWarn) {
+  constructor(subjectCode, questionType, onWarn) {
     this.#subjectCode = subjectCode;
+    this.#questionType = questionType;
     this.#onWarn = onWarn;
   }
 
@@ -92,6 +94,7 @@ export class IBreathCSV {
     const row =
       `${trial.trialIndex},` +
       `${this.#subjectCode},` +
+      `${this.#questionType},` +
       `${trial.synchronous},` +
       `${trial.img},` +
       `${trial.lr},` +
