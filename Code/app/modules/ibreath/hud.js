@@ -60,6 +60,8 @@ export class LocalHud {
     this.#subjectInput.disabled       = v;
     this.#questionTypeSelect.disabled = v;
   }
+  set experimentStartedAt(_v) {}
+  set stateTimer(_v) {}
   get subjectCode()    { return this.#subjectInput.value.trim() || 'TEST'; }
   get questionType()   { return this.#questionTypeSelect.value; }
 }

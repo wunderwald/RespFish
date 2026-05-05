@@ -45,6 +45,13 @@ container.innerHTML = `
       <option value="extero">Control (extero)</option>
     </select>
   </span>
+  <span id="ib-clock">
+    <span class="label">elapsed</span>
+    <span id="ib-elapsed">—</span>
+    <span class="clock-sep"> / </span>
+    <span class="label">left</span>
+    <span id="ib-remaining">—</span>
+  </span>
   <span id="ib-controls">
     <button id="ib-start-btn"  disabled>Start</button>
     <button id="ib-next-btn"   style="display:none">Next trial</button>
@@ -53,6 +60,8 @@ container.innerHTML = `
 `;
 
 const stateEl            = document.getElementById('ib-state-text');
+const elapsedEl          = document.getElementById('ib-elapsed');
+const remainingEl        = document.getElementById('ib-remaining');
 const trialEl            = document.getElementById('ib-trial');
 const subjectInput       = document.getElementById('ib-subject');
 const questionTypeSelect = document.getElementById('ib-question-type');
@@ -60,10 +69,33 @@ const startBtn           = document.getElementById('ib-start-btn');
 const nextBtn            = document.getElementById('ib-next-btn');
 const abortBtn           = document.getElementById('ib-abort-btn');
 
+// ── Clocks ────────────────────────────────────────────────────────────────────
+
+let experimentStartedAt = null;
+let stateTimer          = null;   // { startedAt, duration } or null
+
+function fmtTime(secs) {
+  if (secs == null) return '—';
+  secs = Math.max(0, Math.floor(secs));
+  return `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
+}
+
+setInterval(() => {
+  elapsedEl.textContent   = experimentStartedAt
+    ? fmtTime((Date.now() - experimentStartedAt) / 1000)
+    : '—';
+  remainingEl.textContent = (stateTimer && stateTimer.duration != null)
+    ? fmtTime(stateTimer.duration - (Date.now() - stateTimer.startedAt) / 1000)
+    : '—';
+}, 250);
+
 // ── Receive state from scene window ───────────────────────────────────────────
 
 window.api.hud.onState(({ stateText, stateColor, trialText,
-                           startEnabled, nextVisible, abortVisible, inputsLocked }) => {
+                           startEnabled, nextVisible, abortVisible, inputsLocked,
+                           experimentStartedAt: esa, stateTimer: st }) => {
+  if (esa !== undefined) experimentStartedAt = esa;
+  if (st  !== undefined) stateTimer          = st;
   if (stateText    !== undefined) stateEl.textContent        = stateText;
   if (stateColor   !== undefined) stateEl.style.color        = stateColor;
   if (trialText    !== undefined) trialEl.textContent        = trialText;

@@ -175,6 +175,8 @@ export default class IBreath {
     this.#smoother.reset();
 
     this.#state = STATE.CALIBRATING;
+    this.#hud.experimentStartedAt = Date.now();
+    this.#hud.stateTimer  = { startedAt: Date.now(), duration: CONFIG.CALIBRATION_SECS };
     this.#hud.startEnabled = false;
     this.#hud.inputsLocked = true;
     this.#hud.stateText = 'calibrating…';
@@ -198,6 +200,7 @@ export default class IBreath {
       this.#advanceTrial();
     } else {
       this.#state = STATE.READY;
+      this.#hud.stateTimer  = { startedAt: Date.now(), duration: null };
       this.#hud.stateText   = 'ready — press Space or Next trial to begin';
       this.#hud.nextVisible = true;
     }
@@ -251,6 +254,7 @@ export default class IBreath {
     if (CONFIG.ANIMATION_DISPLAY) {
       this.#displayStartTime = performance.now();
       this.#state = STATE.DISPLAY;
+      this.#hud.stateTimer = { startedAt: Date.now(), duration: CONFIG.DISPLAY_SECS };
       this.#markers.send(`display_start_t${trial.trialIndex}`);
     } else {
       this.#beginTrial();
@@ -268,6 +272,7 @@ export default class IBreath {
     trial.startTime = new Date().toISOString();
     this.#csv.initFrameCSV(trial.trialIndex);
     this.#state = STATE.TRIAL;
+    this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.MAX_TRIAL_TIME };
     this.#hud.abortVisible = true;
     this.#markers.send(`trial_start_t${trial.trialIndex}`);
   }
@@ -309,6 +314,7 @@ export default class IBreath {
       this.#pendingTrial      = trial;
       this.#responseStartTime = performance.now();
       this.#state             = STATE.RESPONSE;
+      this.#hud.stateTimer    = { startedAt: Date.now(), duration: CONFIG.RESPONSE_TIMEOUT_SECS };
       this.#hud.stateText     = 'respond…';
       this.#markers.send(`response_start_t${trial.trialIndex}`);
     } else {
@@ -339,6 +345,7 @@ export default class IBreath {
     this.#itiStartTime = performance.now();
     this.#itiDuration = trial.ITI;
     this.#state = STATE.ITI;
+    this.#hud.stateTimer = { startedAt: Date.now(), duration: trial.ITI / 1000 };
     this.#markers.send(`iti_start_t${trial.trialIndex}`);
     this.#hud.stateText = 'inter-trial interval…';
   }
@@ -350,6 +357,7 @@ export default class IBreath {
   #endExperiment() {
     this.#markers.send('experiment_done');
     this.#state = STATE.DONE;
+    this.#hud.stateTimer   = { startedAt: Date.now(), duration: null };
     this.#hud.nextVisible  = false;
     this.#hud.abortVisible = false;
     this.#hud.stateText    = 'experiment complete';
@@ -385,6 +393,7 @@ export default class IBreath {
           this.#advanceTrial();
         } else {
           this.#state = STATE.READY;
+          this.#hud.stateTimer  = { startedAt: Date.now(), duration: null };
           this.#hud.nextVisible = true;
           this.#hud.stateText   = 'ready — press Space or Next trial';
         }

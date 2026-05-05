@@ -11,13 +11,15 @@ import { CONFIG } from './config.js';
 
 export class RemoteHud {
   #snap = {
-    stateText:    'waiting for stream…',
-    stateColor:   '',
-    trialText:    '—',
-    startEnabled: false,
-    nextVisible:  false,
-    abortVisible: false,
-    inputsLocked: false,
+    stateText:           'waiting for stream…',
+    stateColor:          '',
+    trialText:           '—',
+    startEnabled:        false,
+    nextVisible:         false,
+    abortVisible:        false,
+    inputsLocked:        false,
+    experimentStartedAt: null,
+    stateTimer:          null,   // { startedAt: Date.now(), duration: seconds | null }
   };
   #subjectCode = CONFIG.SUBJECT_CODE;
   #questionType = 'intero';
@@ -44,8 +46,10 @@ export class RemoteHud {
   set nextVisible(v)  { this.#snap.nextVisible   = v;   this.#push(); }
   set abortVisible(v) { this.#snap.abortVisible  = v;   this.#push(); }
   set inputsLocked(v) { this.#snap.inputsLocked  = v;   this.#push(); }
-  get subjectCode()   { return this.#subjectCode; }
-  get questionType()  { return this.#questionType; }
+  set experimentStartedAt(v) { this.#snap.experimentStartedAt = v; this.#push(); }
+  set stateTimer(v)          { this.#snap.stateTimer = v;          this.#push(); }
+  get subjectCode()          { return this.#subjectCode; }
+  get questionType()         { return this.#questionType; }
 
   #push() {
     window.api.hud.sendState({ ...this.#snap });

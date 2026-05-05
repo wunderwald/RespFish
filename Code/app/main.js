@@ -116,9 +116,9 @@ ipcMain.handle("append-csv", (_event, filePath, content) => {
 
 function createControlWindow() {
   controlWindow = new BrowserWindow({
-    width: 900,
+    width: 1100,
     height: 200,
-    minWidth: 600,
+    minWidth: 700,
     minHeight: 140,
     title: "iBreath — Experimenter",
     backgroundColor: "#000000",
