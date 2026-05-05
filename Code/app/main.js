@@ -5,6 +5,7 @@ const { spawn } = require("child_process");
 
 let bridgeProcess = null;
 let mainWindow = null;
+let controlWindow = null;
 
 // ── Python bridge ────────────────────────────────────────────────────────────
 
@@ -111,6 +112,41 @@ ipcMain.handle("append-csv", (_event, filePath, content) => {
   }
 });
 
+// ── Experimenter control window ───────────────────────────────────────────────
+
+function createControlWindow() {
+  controlWindow = new BrowserWindow({
+    width: 900,
+    height: 130,
+    minWidth: 600,
+    minHeight: 80,
+    title: "iBreath — Experimenter",
+    backgroundColor: "#0f485f",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  controlWindow.loadFile("experimenter.html");
+  controlWindow.on("closed", () => (controlWindow = null));
+}
+
+// Relay: scene window → experimenter window
+ipcMain.on("hud:state", (_event, data) => {
+  controlWindow?.webContents.send("hud:state", data);
+});
+
+// Relay: experimenter window → scene window
+ipcMain.on("hud:action", (_event, data) => {
+  mainWindow?.webContents.send("hud:action", data);
+});
+
+ipcMain.on("hud:open-control", () => {
+  if (!controlWindow) createControlWindow();
+  else controlWindow.focus();
+});
+
 // ── Window ───────────────────────────────────────────────────────────────────
 
 function createWindow() {
@@ -129,7 +165,10 @@ function createWindow() {
   });
 
   mainWindow.loadFile("index.html");
-  mainWindow.on("closed", () => (mainWindow = null));
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    controlWindow?.close();
+  });
 }
 
 // ── Camera permission ─────────────────────────────────────────────────────────

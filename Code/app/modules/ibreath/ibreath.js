@@ -12,7 +12,8 @@
  * Sub-modules:
  *   config.js      — CONFIG and STATE constants
  *   trialParams.js — makeTrialParams()
- *   hud.js         — experimenter control bar DOM
+ *   hud.js         — LocalHud (embedded experimenter bar)
+ *   remoteHud.js   — RemoteHud (IPC-backed, for experimenter window)
  *   renderer.js    — canvas drawing
  *   csv.js         — file output
  */
@@ -24,7 +25,7 @@ import {
 } from '../signal/signalUtils.js';
 import { CONFIG, STATE } from './config.js';
 import { makeTrialParams } from './trialParams.js';
-import { buildHUD } from './hud.js';
+import { LocalHud } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
 import { MarkerStream } from '../stream/markerStream.js';
@@ -69,33 +70,38 @@ export default class IBreath {
   #displayStartTime = null;
 
   // ── response (SHOW_QUESTIONS) ──────────────────────────────────────────
-  #pendingTrial      = null;   // trial awaiting subject response before CSV write
-  #responseStartTime = null;   // performance.now() when RESPONSE state was entered
+  #pendingTrial      = null;
+  #responseStartTime = null;
 
   // ── flash (FLASHING_IMAGE) ─────────────────────────────────────────────
   #flashShown = false;
   #flashStartTime = null;
   #flashEndSent = false;
-  #flashActive = false;   // shared between update and draw loops
+  #flashActive = false;
 
   // ── gaze ───────────────────────────────────────────────────────────────
-  #gazeManager = null;   // StreamManager for the gaze bridge
+  #gazeManager = null;
   #gazeX = null;
   #gazeY = null;
-  #gazeEnabled = false;  // locked at calibration start
+  #gazeEnabled = false;
 
   // ── sub-modules ────────────────────────────────────────────────────────
   #markers = null;
-  #hud = null;   // DOM refs from buildHUD()
-  #renderer = null;   // IBreathRenderer
-  #csv = null;   // IBreathCSV — created at calibration start
+  #hud = null;
+  #renderer = null;
+  #csv = null;
 
-  constructor({ statsContainer, sceneContainer, gazeStreamContainer }) {
-    this.#hud = buildHUD(statsContainer, CONFIG.SUBJECT_CODE, {
-      onStart: () => this.#beginCalibration(),
-      onNext: () => this.#advanceTrial(),
-      onAbort: () => this.#abortTrial(),
-    });
+  constructor({ statsContainer, sceneContainer, gazeStreamContainer, hudFactory }) {
+    const callbacks = {
+      onStart:    () => this.#beginCalibration(),
+      onNext:     () => this.#advanceTrial(),
+      onAbort:    () => this.#abortTrial(),
+      onResponse: (v) => this.#onResponse(v),
+    };
+    this.#hud = hudFactory
+      ? hudFactory(callbacks)
+      : new LocalHud(statsContainer, CONFIG.SUBJECT_CODE, callbacks);
+
     this.#renderer = new IBreathRenderer(sceneContainer);
 
     this.#gazeManager = new StreamManager({
@@ -137,10 +143,8 @@ export default class IBreath {
   setStatus({ type, text }) {
     this.#streamReady = (type === 'connected');
     if (this.#state === STATE.IDLE) {
-      this.#hud.stateEl.textContent = this.#streamReady
-        ? 'stream ready'
-        : text;
-      this.#hud.startBtn.disabled = !this.#streamReady;
+      this.#hud.stateText    = this.#streamReady ? 'stream ready' : text;
+      this.#hud.startEnabled = this.#streamReady;
     }
   }
 
@@ -169,8 +173,8 @@ export default class IBreath {
   // ── State machine ──────────────────────────────────────────────────────
 
   #beginCalibration() {
-    this.#subjectCode = this.#hud.subjectInput.value.trim() || 'TEST';
-    this.#questionType = this.#hud.questionTypeSelect.value;
+    this.#subjectCode = this.#hud.subjectCode;
+    this.#questionType = this.#hud.questionType;
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
     this.#trialIndex = 0;
     this.#trialData = [];
@@ -180,11 +184,10 @@ export default class IBreath {
     this.#smoother.reset();
 
     this.#state = STATE.CALIBRATING;
-    this.#hud.startBtn.disabled = true;
-    this.#hud.subjectInput.disabled = true;
-    this.#hud.questionTypeSelect.disabled = true;
+    this.#hud.startEnabled = false;
+    this.#hud.inputsLocked = true;
     this.#gazeManager.disable();
-    this.#hud.stateEl.textContent = 'calibrating…';
+    this.#hud.stateText = 'calibrating…';
 
     this.#csv = new IBreathCSV(this.#subjectCode, this.#questionType, this.#gazeEnabled, (msg) => this.#csvWarn(msg));
     this.#csv.init();
@@ -199,14 +202,14 @@ export default class IBreath {
     const lvls = this.#calStimulusLevels;
     this.#syncStimulusRange = [Math.min(...lvls) * 0.8, Math.max(...lvls) * 0.8];
 
-    this.#hud.trialEl.textContent = `0 / ${this.#trials.length}`;
+    this.#hud.trialText = `0 / ${this.#trials.length}`;
 
     if (CONFIG.AUTO_ADVANCE) {
       this.#advanceTrial();
     } else {
       this.#state = STATE.READY;
-      this.#hud.stateEl.textContent = 'ready — press Space or Next trial to begin';
-      this.#hud.nextBtn.style.display = '';
+      this.#hud.stateText   = 'ready — press Space or Next trial to begin';
+      this.#hud.nextVisible = true;
     }
   }
 
@@ -252,8 +255,8 @@ export default class IBreath {
       }
     }
 
-    this.#hud.nextBtn.style.display = 'none';
-    this.#hud.abortBtn.style.display = 'none';
+    this.#hud.nextVisible  = false;
+    this.#hud.abortVisible = false;
 
     if (CONFIG.ANIMATION_DISPLAY) {
       this.#displayStartTime = performance.now();
@@ -265,8 +268,8 @@ export default class IBreath {
     const flashNote = CONFIG.FLASHING_IMAGE
       ? (trial.flashImage ? `  ·  flash @ ${trial.flashTime}s` : '  ·  no flash')
       : '';
-    this.#hud.stateEl.textContent = (trial.synchronous ? 'sync trial' : 'async trial') + flashNote;
-    this.#hud.trialEl.textContent = `${this.#trialIndex + 1} / ${this.#trials.length}`;
+    this.#hud.stateText = (trial.synchronous ? 'sync trial' : 'async trial') + flashNote;
+    this.#hud.trialText = `${this.#trialIndex + 1} / ${this.#trials.length}`;
   }
 
   #beginTrial() {
@@ -275,7 +278,7 @@ export default class IBreath {
     trial.startTime = new Date().toISOString();
     this.#csv.initFrameCSV(trial.trialIndex);
     this.#state = STATE.TRIAL;
-    this.#hud.abortBtn.style.display = '';
+    this.#hud.abortVisible = true;
     this.#markers.send(`trial_start_t${trial.trialIndex}`);
   }
 
@@ -309,15 +312,14 @@ export default class IBreath {
     trial.flashShown = this.#flashShown;
     this.#csv.flushFrameCSV(trial, this.#frameRows);
     this.#markers.send(aborted ? `trial_abort_t${trial.trialIndex}` : `trial_end_t${trial.trialIndex}`);
-    this.#hud.abortBtn.style.display = 'none';
+    this.#hud.abortVisible = false;
     this.#trialIndex++;
 
     if (CONFIG.SHOW_QUESTIONS && !aborted) {
-      // Defer CSV write and memory push until subject responds (or times out)
       this.#pendingTrial      = trial;
       this.#responseStartTime = performance.now();
       this.#state             = STATE.RESPONSE;
-      this.#hud.stateEl.textContent = 'respond…';
+      this.#hud.stateText     = 'respond…';
       this.#markers.send(`response_start_t${trial.trialIndex}`);
     } else {
       this.#csv.appendTrialData(trial);
@@ -327,6 +329,7 @@ export default class IBreath {
   }
 
   #onResponse(sync) {
+    if (!this.#pendingTrial) return;
     const trial = this.#pendingTrial;
     this.#pendingTrial = null;
     trial.response = sync;
@@ -347,7 +350,7 @@ export default class IBreath {
     this.#itiDuration = trial.ITI;
     this.#state = STATE.ITI;
     this.#markers.send(`iti_start_t${trial.trialIndex}`);
-    this.#hud.stateEl.textContent = 'inter-trial interval…';
+    this.#hud.stateText = 'inter-trial interval…';
   }
 
   #abortTrial() {
@@ -357,10 +360,10 @@ export default class IBreath {
   #endExperiment() {
     this.#markers.send('experiment_done');
     this.#state = STATE.DONE;
-    this.#hud.nextBtn.style.display = 'none';
-    this.#hud.abortBtn.style.display = 'none';
-    this.#hud.stateEl.textContent = 'experiment complete';
-    this.#hud.trialEl.textContent = `${this.#trials.length} / ${this.#trials.length}`;
+    this.#hud.nextVisible  = false;
+    this.#hud.abortVisible = false;
+    this.#hud.stateText    = 'experiment complete';
+    this.#hud.trialText    = `${this.#trials.length} / ${this.#trials.length}`;
   }
 
   // ── Update loop (setInterval, continues when window loses focus) ──────
@@ -392,8 +395,8 @@ export default class IBreath {
           this.#advanceTrial();
         } else {
           this.#state = STATE.READY;
-          this.#hud.nextBtn.style.display = '';
-          this.#hud.stateEl.textContent = 'ready — press Space or Next trial';
+          this.#hud.nextVisible = true;
+          this.#hud.stateText   = 'ready — press Space or Next trial';
         }
       }
     }
@@ -464,13 +467,13 @@ export default class IBreath {
   // ── CSV error display ──────────────────────────────────────────────────
 
   #csvWarn(msg) {
-    if (!this.#hud?.stateEl) return;
-    const prev = this.#hud.stateEl.textContent;
-    this.#hud.stateEl.textContent = `⚠ CSV: ${msg}`;
-    this.#hud.stateEl.style.color = '#e09898';
+    if (!this.#hud) return;
+    const prev = this.#hud.stateText;
+    this.#hud.stateText  = `⚠ CSV: ${msg}`;
+    this.#hud.stateColor = '#e09898';
     setTimeout(() => {
-      this.#hud.stateEl.textContent = prev;
-      this.#hud.stateEl.style.color = '';
+      this.#hud.stateText  = prev;
+      this.#hud.stateColor = '';
     }, 5000);
   }
 }

@@ -71,4 +71,18 @@ contextBridge.exposeInMainWorld("api", {
    */
   appendCSV: (filePath, content) =>
     ipcRenderer.invoke("append-csv", filePath, content),
+
+  // HUD IPC — used by both the scene window (RemoteHud) and experimenter window
+  hud: {
+    // Scene window: push full state snapshot to the experimenter window
+    sendState:   (state)  => ipcRenderer.send('hud:state', state),
+    // Scene window: receive actions (start/next/abort/response/ready) from experimenter
+    onAction:    (cb)     => ipcRenderer.on('hud:action', (_e, d) => cb(d)),
+    // Experimenter window: send an action to the scene window
+    sendAction:  (action) => ipcRenderer.send('hud:action', action),
+    // Experimenter window: receive state snapshots from the scene window
+    onState:     (cb)     => ipcRenderer.on('hud:state',  (_e, d) => cb(d)),
+    // Scene window: request main to open the experimenter window
+    openControl: ()       => ipcRenderer.send('hud:open-control'),
+  },
 });

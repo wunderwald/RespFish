@@ -70,8 +70,16 @@ async function init() {
   };
   const { default: FrontendClass } = await import(FRONTEND_PATHS[FRONTEND]);
 
-  // 4. Instantiate — every frontend receives the same two containers.
-  const frontend = new FrontendClass({ statsContainer, sceneContainer, gazeStreamContainer });
+  // 4. Instantiate — ibreath uses a separate experimenter window for its HUD;
+  //    all other frontends ignore statsContainer.
+  let hudFactory;
+  if (FRONTEND === 'ibreath') {
+    statsContainer.style.display = 'none';
+    window.api.hud.openControl();
+    const { RemoteHud } = await import('./modules/ibreath/remoteHud.js');
+    hudFactory = (callbacks) => new RemoteHud(callbacks);
+  }
+  const frontend = new FrontendClass({ statsContainer, sceneContainer, gazeStreamContainer, hudFactory });
 
   // 5. Instantiate the stream manager and wire its events to the frontend.
   const stream = new StreamManager({ container: streamContainer, label: 'resp stream' });
