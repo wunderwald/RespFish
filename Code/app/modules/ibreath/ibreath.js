@@ -75,6 +75,7 @@ export default class IBreath {
   #flashShown = false;
   #flashStartTime = null;
   #flashEndSent = false;
+  #flashActive = false;   // shared between update and draw loops
 
   // ── sub-modules ────────────────────────────────────────────────────────
   #markers = null;
@@ -93,7 +94,8 @@ export default class IBreath {
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
       : { send() {} };
     this.#bindKeys();
-    requestAnimationFrame(() => this.#loop());
+    setInterval(() => this.#update(), 16);
+    requestAnimationFrame(() => this.#drawLoop());
   }
 
   // ── Public interface ───────────────────────────────────────────────────
@@ -339,12 +341,10 @@ export default class IBreath {
     this.#hud.trialEl.textContent = `${this.#trials.length} / ${this.#trials.length}`;
   }
 
-  // ── Main loop ──────────────────────────────────────────────────────────
+  // ── Update loop (setInterval, continues when window loses focus) ──────
 
-  #loop() {
+  #update() {
     const now = performance.now();
-
-    // ── Update phase ────────────────────────────────────────────────────
 
     if (this.#state === STATE.CALIBRATING) {
       if (now - this.#calStartTime >= CONFIG.CALIBRATION_SECS * 1000) {
@@ -376,8 +376,6 @@ export default class IBreath {
       }
     }
 
-    // Compute stimulus level and record frame row for the current TRIAL tick
-    let trialDrawData = null;
     if (this.#state === STATE.TRIAL) {
       const trial = this.#trials[this.#trialIndex];
       const tSecs = (now - this.#trialStartTime) / 1000;
@@ -392,8 +390,8 @@ export default class IBreath {
         this.#flashStartTime = now;
         this.#markers.send(`flash_start_t${trial.trialIndex}`);
       }
-      const flashActive = this.#flashShown && (now - this.#flashStartTime < CONFIG.FLASH_DURATION);
-      if (CONFIG.FLASHING_IMAGE && this.#flashShown && !flashActive && !this.#flashEndSent) {
+      this.#flashActive = this.#flashShown && (now - this.#flashStartTime < CONFIG.FLASH_DURATION);
+      if (CONFIG.FLASHING_IMAGE && this.#flashShown && !this.#flashActive && !this.#flashEndSent) {
         this.#flashEndSent = true;
         this.#markers.send(`flash_end_t${trial.trialIndex}`);
       }
@@ -403,17 +401,25 @@ export default class IBreath {
         raw: this.#lastRawSample,
         scaled: this.#lastScaledSample,
         stim: stimLevel,
-        flash: flashActive ? 1 : 0,
+        flash: this.#flashActive ? 1 : 0,
       });
 
       if (tSecs >= CONFIG.MAX_TRIAL_TIME) {
         this.#endTrial(false);
-      } else {
-        trialDrawData = { trial, stimLevel, flashActive };
       }
     }
+  }
 
-    // ── Draw phase ──────────────────────────────────────────────────────
+  // ── Draw loop (requestAnimationFrame, may pause when window loses focus)
+
+  #drawLoop() {
+    const now = performance.now();
+    const inTrial = this.#state === STATE.TRIAL;
+    const trialDrawData = inTrial ? {
+      trial:       this.#trials[this.#trialIndex],
+      stimLevel:   Math.max(0, Math.min(1, this.#stimulusLevel)),
+      flashActive: this.#flashActive,
+    } : null;
 
     this.#renderer.draw(this.#state, now, {
       calStartTime:      this.#calStartTime,
@@ -427,7 +433,7 @@ export default class IBreath {
       ...(trialDrawData ?? {}),
     });
 
-    requestAnimationFrame(() => this.#loop());
+    requestAnimationFrame(() => this.#drawLoop());
   }
 
   // ── CSV error display ──────────────────────────────────────────────────
