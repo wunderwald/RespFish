@@ -453,6 +453,8 @@ export default class IBreath {
       questionType:      this.#questionType,
       trialCount:        this.#trialData.length,
       subjectCode:       this.#subjectCode,
+      gazeX:             this.#gazeX,
+      gazeY:             this.#gazeY,
       ...(trialDrawData ?? {}),
     });
 
