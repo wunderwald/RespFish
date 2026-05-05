@@ -24,8 +24,9 @@
  * @returns {number}
  */
 export function mapRange(value, from, to) {
-  const factor = (value - from[0]) / (from[1] - from[0]);
-  return to[0] + factor * (to[1] - to[0]);
+  const span = from[1] - from[0];
+  if (span === 0) return (to[0] + to[1]) / 2;
+  return to[0] + ((value - from[0]) / span) * (to[1] - to[0]);
 }
 
 

@@ -45,12 +45,13 @@ export default class BioGame {
   #particles   = [];
   #fishBumpT   = null;
 
-  // ── Experiment data ───────────────────────────────────────────────────────
-  #subjectCode  = CONFIG.SUBJECT_CODE;
-  #group        = CONFIG.GROUP;
-  #naturalBpm   = CONFIG.NATURAL_BPM;
-  #showCurve    = CONFIG.SHOW_CURVE;
-  #dataDir      = CONFIG.DATA_DIR;
+  // ── Experiment settings (overridden by experimenter on start) ─────────────
+  #subjectCode      = CONFIG.SUBJECT_CODE;
+  #group            = CONFIG.GROUP;
+  #naturalBpm       = CONFIG.NATURAL_BPM;
+  #showCurve        = CONFIG.SHOW_CURVE;
+  #dataDir          = CONFIG.DATA_DIR;
+  #calibrationSecs  = CONFIG.CALIBRATION_SECS;
 
   // ── Block management ──────────────────────────────────────────────────────
   #blockIndex       = 0;
@@ -65,9 +66,9 @@ export default class BioGame {
   #normRange        = [0, 1]; // [min, max] of calibrated smoothed signal
 
   // ── Fish state ────────────────────────────────────────────────────────────
-  #fishNormY    = 0.5;    // normalised fish Y (0 = bottom, 1 = top)
+  #fishNormY     = 0.5;   // normalised fish Y (0 = bottom, 1 = top)
   #prevFishNormY = 0.5;
-  #fishTilt     = 0;      // current tilt in radians
+  #fishTilt      = 0;     // current tilt in radians
 
   // ── Starfishes ────────────────────────────────────────────────────────────
   #starfishes       = [];
@@ -90,6 +91,12 @@ export default class BioGame {
   #markers  = null;
   #renderer = null;
 
+  // ── Derived ───────────────────────────────────────────────────────────────
+
+  get #activeBpm() {
+    return this.#group === 'slow' ? CONFIG.SLOW_BPM : this.#naturalBpm;
+  }
+
   constructor({ sceneContainer }) {
     this.#renderer = new BioGameRenderer(sceneContainer);
 
@@ -100,7 +107,7 @@ export default class BioGame {
     window.api.frontend.onAction((action) => this.#onAction(action));
 
     // State machine tick — runs even when window loses focus
-    setInterval(() => this.#tick(), 16);
+    setInterval(() => this.#tick(), 100);
 
     // Render loop
     requestAnimationFrame((t) => this.#rafLoop(t));
@@ -120,7 +127,10 @@ export default class BioGame {
   setStatus({ type, text }) {
     this.#streamReady = (type === 'connected');
     if (this.#state === STATE.IDLE) {
-      this.#pushState({ stateText: this.#streamReady ? 'stream ready' : (text ?? 'no stream'), startEnabled: this.#streamReady });
+      this.#pushState({
+        stateText:    this.#streamReady ? 'stream ready' : (text ?? 'no stream'),
+        startEnabled: this.#streamReady,
+      });
     }
   }
 
@@ -129,18 +139,18 @@ export default class BioGame {
   #onAction({ type, subjectCode, group, naturalBpm, showCurve, dataDir, calibrationSecs }) {
     switch (type) {
       case 'start':
-        if (subjectCode      !== undefined) this.#subjectCode = subjectCode;
-        if (group            !== undefined) { this.#group = group; CONFIG.GROUP = group; }
-        if (naturalBpm       !== undefined) { this.#naturalBpm = naturalBpm; CONFIG.NATURAL_BPM = naturalBpm; }
-        if (showCurve        !== undefined) { this.#showCurve  = showCurve;  CONFIG.SHOW_CURVE  = showCurve; }
-        if (dataDir          !== undefined) { this.#dataDir    = dataDir;    CONFIG.DATA_DIR    = dataDir; }
-        if (calibrationSecs  !== undefined)  CONFIG.CALIBRATION_SECS = calibrationSecs;
+        if (subjectCode     !== undefined) this.#subjectCode     = subjectCode;
+        if (group           !== undefined) this.#group           = group;
+        if (naturalBpm      !== undefined) this.#naturalBpm      = naturalBpm;
+        if (showCurve       !== undefined) this.#showCurve       = showCurve;
+        if (dataDir         !== undefined) this.#dataDir         = dataDir;
+        if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
         if (this.#state === STATE.IDLE && this.#streamReady) this.#beginCalibration();
         break;
 
       case 'next':
-        if (this.#state === STATE.INTERMISSION) this.#startCountdown();
-        else if (this.#state === STATE.READY)   this.#startCountdown();
+        if (this.#state === STATE.INTERMISSION || this.#state === STATE.READY)
+          this.#startCountdown();
         break;
 
       case 'abort':
@@ -156,17 +166,20 @@ export default class BioGame {
   // ── State machine ─────────────────────────────────────────────────────────
 
   #beginCalibration() {
-    this.#calSamples  = [];
+    this.#calSamples   = [];
     this.#calStartTime = performance.now();
     this.#smoother.reset();
     this.#inputsLocked = true;
     this.#blockIndex   = 0;
     this.#scoreBlock   = [0, 0];
 
-    this.#csv = new BioGameCSV(this.#subjectCode, this.#group, (msg) => this.#csvWarn(msg));
+    this.#csv = new BioGameCSV(
+      this.#subjectCode, this.#group, this.#dataDir,
+      (msg) => this.#csvWarn(msg)
+    );
     this.#csv.init();
 
-    this.#setState(STATE.CALIBRATING);
+    this.#state = STATE.CALIBRATING;
     this.#markers.send('calibration_start');
     this.#pushState({ stateText: 'calibrating…', abortVisible: false, inputsLocked: true });
   }
@@ -174,17 +187,25 @@ export default class BioGame {
   #finishCalibration() {
     this.#markers.send('calibration_end');
     const lvls = this.#calSamples;
+
+    if (lvls.length === 0) {
+      console.warn('[BioGame] calibration produced no samples — retrying');
+      this.#calSamples   = [];
+      this.#calStartTime = performance.now();
+      return;
+    }
+
     // Same approach as iBreath: scale range by 0.8 to give headroom
     this.#normRange = [Math.min(...lvls) * 0.8, Math.max(...lvls) * 0.8];
     console.log(`[BioGame] norm range: [${this.#normRange[0].toFixed(3)}, ${this.#normRange[1].toFixed(3)}]`);
 
-    this.#setState(STATE.READY);
+    this.#state = STATE.READY;
     this.#pushState({ stateText: 'ready — press Space or Start', nextVisible: true });
   }
 
   #startCountdown() {
     this.#countdownStartTime = performance.now();
-    this.#setState(STATE.COUNTDOWN);
+    this.#state = STATE.COUNTDOWN;
     this.#markers.send(`countdown_start_block${this.#blockIndex}`);
     this.#pushState({ stateText: 'starting…', nextVisible: false });
   }
@@ -193,13 +214,17 @@ export default class BioGame {
     this.#blockStartTime  = performance.now();
     this.#lastFrameRecord = performance.now();
     this.#starfishes      = [];
-    this.#nextSpawnTime   = performance.now() + randBetween(CONFIG.STARFISH_SPAWN_MIN_MS, CONFIG.STARFISH_SPAWN_MAX_MS);
+    this.#nextSpawnTime   = performance.now() +
+      randBetween(CONFIG.STARFISH_SPAWN_MIN_MS, CONFIG.STARFISH_SPAWN_MAX_MS);
 
     this.#csv.initBlockCSV(this.#blockIndex);
 
-    this.#setState(STATE.PLAYING);
+    this.#state = STATE.PLAYING;
     this.#markers.send(`block_start_${this.#blockIndex}`);
-    this.#pushState({ stateText: `game ${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`, abortVisible: true });
+    this.#pushState({
+      stateText:   `game ${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`,
+      abortVisible: true,
+    });
   }
 
   #endBlock(aborted = false) {
@@ -216,17 +241,17 @@ export default class BioGame {
     }
 
     this.#blockIndex++;
-    this.#setState(STATE.INTERMISSION);
+    this.#state = STATE.INTERMISSION;
     this.#pushState({
-      stateText:   'intermission',
-      score:       this.#scoreBlock[0],
+      stateText:    'intermission',
+      score:        this.#scoreBlock[0],
       abortVisible: false,
       nextVisible:  true,
     });
   }
 
   #endExperiment() {
-    this.#setState(STATE.DONE);
+    this.#state = STATE.DONE;
     this.#markers.send('experiment_done');
     const total = this.#scoreBlock[0] + this.#scoreBlock[1];
     this.#pushState({ stateText: 'done', abortVisible: false, nextVisible: false, score: total });
@@ -238,21 +263,19 @@ export default class BioGame {
     const now = performance.now();
 
     if (this.#state === STATE.CALIBRATING) {
-      if (now - this.#calStartTime >= CONFIG.CALIBRATION_SECS * 1000) {
+      if (now - this.#calStartTime >= this.#calibrationSecs * 1000) {
         this.#finishCalibration();
       }
     }
 
     if (this.#state === STATE.COUNTDOWN) {
-      const elapsed = (now - this.#countdownStartTime) / 1000;
-      if (elapsed >= CONFIG.COUNTDOWN_SECS) {
+      if ((now - this.#countdownStartTime) / 1000 >= CONFIG.COUNTDOWN_SECS) {
         this.#startBlock();
       }
     }
 
     if (this.#state === STATE.PLAYING) {
-      const blockElapsed = (now - this.#blockStartTime) / 1000;
-      if (blockElapsed >= CONFIG.BLOCK_DURATION_SECS) {
+      if ((now - this.#blockStartTime) / 1000 >= CONFIG.BLOCK_DURATION_SECS) {
         this.#endBlock(false);
       }
     }
@@ -276,7 +299,12 @@ export default class BioGame {
       this.#recordFrame(now);
     }
 
-    this.#renderer.draw(this.#buildRenderData(now, dt));
+    try {
+      this.#renderer.draw(this.#buildRenderData(now, dt));
+    } catch (e) {
+      console.error('[BioGame] draw error:', e);
+    }
+
     requestAnimationFrame((t) => this.#rafLoop(t));
   }
 
@@ -291,30 +319,28 @@ export default class BioGame {
     this.#fishNormY     = norm;
 
     // Smooth tilt: nose-up when moving up, nose-down when moving down
-    const vel   = dt > 0 ? (norm - this.#prevFishNormY) / dt : 0;
-    const tgt   = clamp(-vel * 1.8, -Math.PI / 6, Math.PI / 6);
-    const tau   = 0.18;
-    this.#fishTilt = lerp(this.#fishTilt, tgt, 1 - Math.exp(-dt / tau));
+    const vel = dt > 0 ? (norm - this.#prevFishNormY) / dt : 0;
+    const tgt = clamp(-vel * 1.8, -Math.PI / 6, Math.PI / 6);
+    this.#fishTilt = lerp(this.#fishTilt, tgt, 1 - Math.exp(-dt / 0.18));
   }
 
   // ── Starfish spawning and movement ────────────────────────────────────────
 
   #updateStarfishes(now, dt) {
     const blockTime = (now - this.#blockStartTime) / 1000;
-    const bpm = this.#group === 'slow' ? CONFIG.SLOW_BPM : this.#naturalBpm;
+    const bpm = this.#activeBpm;
 
     // Spawn
     if (now >= this.#nextSpawnTime) {
       const tOffAtRightEdge = (1.0 - CONFIG.FISH_X_RATIO) / CONFIG.STARFISH_SCROLL_SPEED;
-      const spawnNormY = targetCurveY(blockTime + tOffAtRightEdge, bpm);
       this.#starfishes.push({
-        xRatio:   1.0,
-        normY:    spawnNormY,
-        checked:  false,
+        xRatio:    1.0,
+        normY:     targetCurveY(blockTime + tOffAtRightEdge, bpm),
+        checked:   false,
         collected: false,
-        missed:   false,
-        collectT: null,
-        missT:    null,
+        missed:    false,
+        collectT:  null,
+        missT:     null,
       });
       this.#nextSpawnTime = now + randBetween(CONFIG.STARFISH_SPAWN_MIN_MS, CONFIG.STARFISH_SPAWN_MAX_MS);
     }
@@ -325,14 +351,13 @@ export default class BioGame {
 
       // Keep star on the curve until it's been checked
       if (!star.checked) {
-        const tOff   = (star.xRatio - CONFIG.FISH_X_RATIO) / CONFIG.STARFISH_SCROLL_SPEED;
-        star.normY   = targetCurveY(blockTime + tOff, bpm);
+        const tOff = (star.xRatio - CONFIG.FISH_X_RATIO) / CONFIG.STARFISH_SCROLL_SPEED;
+        star.normY = targetCurveY(blockTime + tOff, bpm);
 
         // Collection check: when star crosses the fish's x
         if (star.xRatio <= CONFIG.FISH_X_RATIO) {
           star.checked = true;
-          const dy = Math.abs(star.normY - this.#fishNormY);
-          if (dy < CONFIG.STARFISH_HIT_RADIUS) {
+          if (Math.abs(star.normY - this.#fishNormY) < CONFIG.STARFISH_HIT_RADIUS) {
             this.#collectStar(star, blockTime);
           } else {
             this.#missStar(star, blockTime);
@@ -364,6 +389,13 @@ export default class BioGame {
     this.#pushState({ score: this.#scoreBlock[this.#blockIndex] });
   }
 
+  #missStar(star, blockTime) {
+    star.missed = true;
+    star.missT  = 0;
+    this.#markers.send(`star_miss_b${this.#blockIndex}`);
+    this.#csv.appendEvent(this.#blockIndex, 'star_miss', '', blockTime.toFixed(2));
+  }
+
   // ── Particles ─────────────────────────────────────────────────────────────
 
   static #BURST_COLORS = ['#ffe066', '#ffb347', '#fffbe6', '#ffd700', '#ff9f43'];
@@ -373,13 +405,13 @@ export default class BioGame {
       const angle = (i / 18) * Math.PI * 2 + randBetween(-0.2, 0.2);
       const speed = randBetween(0.08, 0.22);
       this.#particles.push({
-        x:    xRatio,
-        y:    normY,
-        vx:   Math.cos(angle) * speed,
-        vy:   Math.sin(angle) * speed,
-        life: 1,
+        x:     xRatio,
+        y:     normY,
+        vx:    Math.cos(angle) * speed,
+        vy:    Math.sin(angle) * speed,
+        life:  1,
         color: BioGame.#BURST_COLORS[Math.floor(Math.random() * BioGame.#BURST_COLORS.length)],
-        r:    randBetween(0.003, 0.007),
+        r:     randBetween(0.003, 0.007),
       });
     }
   }
@@ -400,23 +432,11 @@ export default class BioGame {
     if (this.#fishBumpT > 0.3) this.#fishBumpT = null;
   }
 
-  #missStar(star, blockTime) {
-    star.missed = true;
-    star.missT  = 0;
-    this.#markers.send(`star_miss_b${this.#blockIndex}`);
-    this.#csv.appendEvent(this.#blockIndex, 'star_miss', '', blockTime.toFixed(2));
-  }
-
   // ── Frame data recording ──────────────────────────────────────────────────
 
   #recordFrame(now) {
     if (now - this.#lastFrameRecord < CONFIG.FRAME_INTERVAL_MS) return;
     this.#lastFrameRecord = now;
-
-    const blockTime = (now - this.#blockStartTime) / 1000;
-    const bpm  = this.#group === 'slow' ? CONFIG.SLOW_BPM : this.#naturalBpm;
-    const tgt  = targetCurveY(blockTime, bpm);
-    const [rMin, rMax] = this.#normRange;
 
     this.#csv.bufferFrame({
       t:        new Date().toISOString(),
@@ -425,7 +445,7 @@ export default class BioGame {
       smoothed: this.#smoother.value,
       norm:     this.#fishNormY,
       fishY:    this.#fishNormY,
-      targetY:  tgt,
+      targetY:  targetCurveY((now - this.#blockStartTime) / 1000, this.#activeBpm),
       stars:    this.#starfishes.filter(s => !s.checked).length,
     });
   }
@@ -433,18 +453,16 @@ export default class BioGame {
   // ── Render data builder ───────────────────────────────────────────────────
 
   #buildRenderData(now, dt) {
-    const blockTime    = this.#blockStartTime != null ? (now - this.#blockStartTime) / 1000 : 0;
-    const blockElapsed = blockTime;
-    const bpm  = this.#group === 'slow' ? CONFIG.SLOW_BPM : this.#naturalBpm;
-    const calElapsed   = this.#calStartTime != null ? (now - this.#calStartTime) / 1000 : 0;
+    const blockTime = this.#blockStartTime != null ? (now - this.#blockStartTime) / 1000 : 0;
+    const calElapsed = this.#calStartTime != null ? (now - this.#calStartTime) / 1000 : 0;
 
     let countdownValue = 3, countdownProgress = 0;
     if (this.#countdownStartTime != null) {
       const cdE = (now - this.#countdownStartTime) / 1000;
-      if      (cdE < 1)    { countdownValue = 3; countdownProgress = cdE; }
-      else if (cdE < 2)    { countdownValue = 2; countdownProgress = cdE - 1; }
-      else if (cdE < 3)    { countdownValue = 1; countdownProgress = cdE - 2; }
-      else                 { countdownValue = 0; countdownProgress = (cdE - 3) / 0.75; }
+      if      (cdE < 1) { countdownValue = 3; countdownProgress = cdE; }
+      else if (cdE < 2) { countdownValue = 2; countdownProgress = cdE - 1; }
+      else if (cdE < 3) { countdownValue = 1; countdownProgress = cdE - 2; }
+      else              { countdownValue = 0; countdownProgress = (cdE - 3) / 0.75; }
     }
 
     return {
@@ -452,7 +470,7 @@ export default class BioGame {
       now,
       bgScrollX:         this.#bgScrollX,
       blockTime,
-      bpm,
+      bpm:               this.#activeBpm,
       fishNormY:         this.#fishNormY,
       fishNormSize:      this.#fishNormY,  // size tracks Y directly
       fishTilt:          this.#fishTilt,
@@ -465,9 +483,8 @@ export default class BioGame {
       scoreBlock2:       this.#scoreBlock[1],
       group:             this.#group,
       showCurve:         this.#showCurve,
-      blockElapsed,
-      calProgress:       clamp(calElapsed / CONFIG.CALIBRATION_SECS, 0, 1),
-      calRemaining:      Math.max(0, Math.ceil(CONFIG.CALIBRATION_SECS - calElapsed)),
+      calProgress:       clamp(calElapsed / this.#calibrationSecs, 0, 1),
+      calRemaining:      Math.max(0, Math.ceil(this.#calibrationSecs - calElapsed)),
       countdownValue,
       countdownProgress: clamp(countdownProgress, 0, 1),
     };
@@ -475,16 +492,10 @@ export default class BioGame {
 
   // ── Experimenter state push ───────────────────────────────────────────────
 
-  #setState(s) {
-    this.#state = s;
-  }
-
   #pushState(overrides = {}) {
-    const score = this.#scoreBlock[this.#blockIndex] ?? 0;
     window.api.frontend.sendState({
       stateText:    `game ${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`,
-      blockText:    `${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`,
-      score,
+      score:        this.#scoreBlock[this.#blockIndex] ?? 0,
       startEnabled: this.#streamReady && this.#state === STATE.IDLE,
       startText:    'Start',
       nextVisible:  false,

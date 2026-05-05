@@ -456,19 +456,23 @@ export default class IBreath {
       flashActive: this.#flashActive,
     } : null;
 
-    this.#renderer.draw(this.#state, now, {
-      calStartTime:      this.#calStartTime,
-      itiStartTime:      this.#itiStartTime,
-      itiDuration:       this.#itiDuration,
-      displayElapsed:    this.#displayStartTime != null ? (now - this.#displayStartTime) / 1000 : 0,
-      responseStartTime: this.#responseStartTime,
-      questionType:      this.#questionType,
-      trialCount:        this.#trialData.length,
-      subjectCode:       this.#subjectCode,
-      gazeX:             this.#gazeX,
-      gazeY:             this.#gazeY,
-      ...(trialDrawData ?? {}),
-    });
+    try {
+      this.#renderer.draw(this.#state, now, {
+        calStartTime:      this.#calStartTime,
+        itiStartTime:      this.#itiStartTime,
+        itiDuration:       this.#itiDuration,
+        displayElapsed:    this.#displayStartTime != null ? (now - this.#displayStartTime) / 1000 : 0,
+        responseStartTime: this.#responseStartTime,
+        questionType:      this.#questionType,
+        trialCount:        this.#trialData.length,
+        subjectCode:       this.#subjectCode,
+        gazeX:             this.#gazeX,
+        gazeY:             this.#gazeY,
+        ...(trialDrawData ?? {}),
+      });
+    } catch (e) {
+      console.error('[IBreath] draw error:', e);
+    }
 
     requestAnimationFrame(() => this.#drawLoop());
   }

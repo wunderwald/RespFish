@@ -25,19 +25,19 @@
  *
  *   // Write a header row when a trial starts
  *   await window.api.writeCSV(
- *     'subjectData/P01/frameData_1.csv',
+ *     'iBreathData/P01/frameData_1.csv',
  *     'trialIndex,timestamp,gaze_x,gaze_y,breathLevel_input,breathLevel_scaled,stimulusLevel\n'
  *   );
  *
  *   // Append one row per frame during the trial
  *   await window.api.appendCSV(
- *     'subjectData/P01/frameData_1.csv',
+ *     'iBreathData/P01/frameData_1.csv',
  *     `1,2024-01-01T12:00:00.000Z,640,400,0.42,0.61,0.55\n`
  *   );
  *
  *   // Write the trial summary after the trial ends
  *   await window.api.writeCSV(
- *     'subjectData/P01/trialData.csv',
+ *     'iBreathData/P01/trialData.csv',
  *     header + rows
  *   );
  */

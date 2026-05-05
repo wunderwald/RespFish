@@ -420,7 +420,7 @@ export class BioGameRenderer {
     const tilt     = -0.2 * Math.cos(now / 1000 * 1.5);
     const topPad   = h * 0.10;
     const playH    = h * 0.80;
-    const fishScreenX = CONFIG.FISH_X_RATIO * w + (w * 0.5 - CONFIG.FISH_X_RATIO * w); // centre
+    const fishScreenX = w / 2;
     const fishScreenY = topPad + (1 - bobNormY) * playH;
     const fishH = CONFIG.FISH_SIZE_MIN * h + (CONFIG.FISH_SIZE_MAX - CONFIG.FISH_SIZE_MIN) * h * 0.5;
     this.#drawFish(ctx, fishScreenX, fishScreenY, fishH * 1.3, tilt);
@@ -447,8 +447,7 @@ export class BioGameRenderer {
   #drawPlaying(ctx, w, h, data, dt) {
     const {
       fishNormY, fishNormSize, fishTilt = 0, fishBumpT,
-      starfishes, particles, score, blockTime, bpm, showCurve, group,
-      blockElapsed, now,
+      starfishes, particles, score, blockTime, bpm, showCurve, group, now,
     } = data;
 
     // Playfield geometry (10% padding top & bottom)
@@ -481,7 +480,7 @@ export class BioGameRenderer {
     // Score + timer — only for slow condition
     if (group === 'slow') {
       this.#drawScoreDisplay(ctx, 18, 16, score, dt);
-      this.#drawTimerBar(ctx, w, h, blockElapsed, now);
+      this.#drawTimerBar(ctx, w, h, blockTime, now);
     }
   }
 
@@ -499,8 +498,6 @@ export class BioGameRenderer {
       ctx.arc(sx, sy, r, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.shadowBlur  = 0;
-    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
