@@ -1,8 +1,17 @@
 /* bioGame.css — biofeedback game scene styles */
 
+#scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #071830;
+}
+
 #bg-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  display: block;
 }
