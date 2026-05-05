@@ -1,7 +1,8 @@
 /* stream.css — stream selection bar (modules/stream.js) */
 
 #stream-bar,
-#gaze-bar {
+#gaze-bar,
+#timer-bar {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -14,7 +15,11 @@
   letter-spacing: 0.04em;
 }
 #stream-bar .label,
-#gaze-bar .label { opacity: 0.6; }
+#gaze-bar .label,
+#timer-bar .label { opacity: 0.6; }
+
+#timer-bar #ib-state-text { margin-right: 6px; }
+#timer-bar #ib-clock { display: flex; align-items: center; gap: 6px; opacity: 0.75; }
 
 .stream-select {
   background: transparent;
