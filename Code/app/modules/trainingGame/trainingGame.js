@@ -172,6 +172,7 @@ export class TrainingGame {
       state:            this.#state,
       countdownElapsed: this.#countdownStart != null ? now - this.#countdownStart : 0,
       score:            this.#score,
+      gameElapsed:      this.#gameStartTime != null ? (now - this.#gameStartTime) / 1000 : 0,
       activeCloud:      this.#activeCloud,
       failedClouds:     this.#failedClouds,
       particles:        this.#particles,

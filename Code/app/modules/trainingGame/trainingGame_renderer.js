@@ -20,6 +20,7 @@ export class Cloud {
     this._state = 'sliding_in';
     this._t = 0;
     this._slideInMs = slideInMs;
+    this._seed = Math.random() * Math.PI * 2;
   }
 
   get alive() { return this._state !== 'gone'; }
@@ -94,25 +95,32 @@ export class Particle {
 export class TrainingGameRenderer {
   #canvas;
   #ctx;
+  #skyPatches;
 
   constructor(container) {
     container.innerHTML = '<canvas id="game-canvas"></canvas>';
     this.#canvas = container.querySelector('#game-canvas');
     this.#ctx = this.#canvas.getContext('2d');
+    this.#skyPatches = Array.from({ length: 14 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: 0.15 + Math.random() * 0.35,
+      a: 0.04 + Math.random() * 0.07,
+    }));
   }
 
   get canvas() { return this.#canvas; }
 
-  draw({ state, countdownElapsed, score, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
+  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
-    ctx.clearRect(0, 0, w, h);
+    this.#drawBackground(ctx, w, h);
 
     switch (state) {
       case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
       case STATE.COUNTDOWN: return this.#drawCountdown(ctx, w, h, countdownElapsed);
-      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now });
+      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now });
       case STATE.GAME_OVER: return this.#drawGameOver(ctx, w, h, score);
     }
   }
@@ -173,21 +181,26 @@ export class TrainingGameRenderer {
     return 0;
   }
 
-  #drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
+  #drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now }) {
     const cx = w / 2;
     const cy = h / 2;
 
-    this.#drawSun(ctx, cx, cy, this.#cloudSadness(activeCloud, exhaleProgress));
+    const sunDx = Math.cos(now / 3200) * 4;
+    const sunDy = Math.sin(now / 2200) * 5;
+    this.#drawSun(ctx, cx + sunDx, cy + sunDy, this.#cloudSadness(activeCloud, exhaleProgress));
 
     for (const cloud of failedClouds) {
-      if (cloud.alive) this.#drawCloud(ctx, cloud.x, cloud.y, cloud.size, cloud.alpha);
+      if (!cloud.alive) continue;
+      const fx = Math.cos(now / 3800 + cloud._seed) * 3;
+      const fy = Math.sin(now / 2500 + cloud._seed * 1.3) * 5;
+      this.#drawCloud(ctx, cloud.x + fx, cloud.y + fy, cloud.size, cloud.alpha);
     }
 
     if (activeCloud?.alive) {
       const shaking = phase === 'exhale' && inBreath;
-      const sx = shaking ? Math.sin(now / 38) * 6 : 0;
-      const sy = shaking ? Math.cos(now / 31) * 5 : 0;
-      this.#drawCloud(ctx, activeCloud.x + sx, activeCloud.y + sy, activeCloud.size, activeCloud.alpha);
+      const fx = shaking ? Math.sin(now / 38) * 6 : Math.cos(now / 3800 + activeCloud._seed) * 3;
+      const fy = shaking ? Math.cos(now / 31) * 5 : Math.sin(now / 2500 + activeCloud._seed * 1.3) * 5;
+      this.#drawCloud(ctx, activeCloud.x + fx, activeCloud.y + fy, activeCloud.size, activeCloud.alpha);
     }
 
     for (const p of particles) {
@@ -198,6 +211,84 @@ export class TrainingGameRenderer {
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+
+    this.#drawScoreOverlay(ctx, score);
+    this.#drawTimerBar(ctx, w, h, gameElapsed, now);
+  }
+
+  #drawBackground(ctx, w, h) {
+    const sky = ctx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0,   '#8bbfe0');
+    sky.addColorStop(0.5, '#c2dff2');
+    sky.addColorStop(1,   '#daeefa');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, w, h);
+
+    for (const p of this.#skyPatches) {
+      const px = p.x * w, py = p.y * h;
+      const pr = p.r * Math.max(w, h);
+      const grd = ctx.createRadialGradient(px, py, 0, px, py, pr);
+      grd.addColorStop(0, `rgba(255,255,255,${p.a})`);
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+
+  #drawScoreOverlay(ctx, score) {
+    ctx.textAlign    = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle    = 'rgba(80,60,20,0.75)';
+    ctx.font         = '300 48px Nunito, sans-serif';
+    ctx.fillText(score, 22, 14);
+    ctx.fillStyle = 'rgba(80,60,20,0.40)';
+    ctx.font      = '200 13px Nunito, sans-serif';
+    ctx.fillText('score', 24, 64);
+  }
+
+  #drawTimerBar(ctx, w, h, gameElapsed, now) {
+    const total    = CONFIG.GAME_DURATION_SECS;
+    const timeLeft = Math.max(0, total - gameElapsed);
+    const ratio    = Math.max(0, Math.min(1, timeLeft / total));
+
+    const barMaxW  = Math.min(240, w * 0.25);
+    const barH     = 9;
+    const padRight = 20;
+    const padTop   = 18;
+    const barRight = w - padRight;
+    const barY     = padTop;
+
+    ctx.fillStyle = 'rgba(80,60,20,0.18)';
+    ctx.beginPath();
+    ctx.roundRect(barRight - barMaxW, barY, barMaxW, barH, 4);
+    ctx.fill();
+
+    const filledW = barMaxW * ratio;
+    if (filledW > 2) {
+      let barColor;
+      if (timeLeft > 20) {
+        barColor = 'rgba(80,60,20,0.55)';
+      } else if (timeLeft > 8) {
+        const t = (20 - timeLeft) / 12;
+        barColor = `rgba(200,${Math.round(lerp(80, 40, t))},20,0.75)`;
+      } else {
+        const flash = 0.55 + 0.45 * Math.sin(now * 0.008);
+        barColor = `rgba(220,50,30,${flash})`;
+      }
+      ctx.fillStyle = barColor;
+      ctx.beginPath();
+      ctx.roundRect(barRight - filledW, barY, filledW, barH, 4);
+      ctx.fill();
+    }
+
+    const secs = Math.ceil(timeLeft);
+    const mm   = String(Math.floor(secs / 60));
+    const ss   = String(secs % 60).padStart(2, '0');
+    ctx.fillStyle    = 'rgba(80,60,20,0.45)';
+    ctx.font         = '300 12px Nunito, sans-serif';
+    ctx.textAlign    = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${mm}:${ss}`, barRight, barY + barH + 5);
   }
 
   #drawSun(ctx, cx, cy, sadness = 0) {
