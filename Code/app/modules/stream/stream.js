@@ -131,7 +131,7 @@ export class StreamManager {
           break;
 
         case "sample":
-          this.#emit("sample", { value: msg.value, timestamp: msg.timestamp });
+          this.#emit("sample", { value: msg.value, channels: msg.channels, timestamp: msg.timestamp });
           break;
 
         case "connected":
