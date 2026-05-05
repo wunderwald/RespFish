@@ -60,9 +60,10 @@ export default class IBreath {
   #syncStimulusSignal = [];
   #frameRows = [];
 
-  // ── ITI ────────────────────────────────────────────────────────────────
+  // ── ITI / display ─────────────────────────────────────────────────────
   #itiStartTime = null;
   #itiDuration = 0;
+  #displayStartTime = null;
 
   // ── response (SHOW_QUESTIONS) ──────────────────────────────────────────
   #pendingTrial      = null;   // trial awaiting subject response before CSV write
@@ -215,20 +216,29 @@ export default class IBreath {
       }
     }
 
-    this.#trialStartTime = performance.now();
-    trial.startTime = new Date().toISOString();
-
-    // Write header now — a mid-trial crash still leaves a valid (partial) file
-    this.#csv.initFrameCSV(trial.trialIndex);
-
-    this.#state = STATE.TRIAL;
     this.#hud.nextBtn.style.display = 'none';
-    this.#hud.abortBtn.style.display = '';
+    this.#hud.abortBtn.style.display = 'none';
+
+    if (CONFIG.ANIMATION_DISPLAY) {
+      this.#displayStartTime = performance.now();
+      this.#state = STATE.DISPLAY;
+    } else {
+      this.#beginTrial();
+    }
     const flashNote = CONFIG.FLASHING_IMAGE
       ? (trial.flashImage ? `  ·  flash @ ${trial.flashTime}s` : '  ·  no flash')
       : '';
     this.#hud.stateEl.textContent = (trial.synchronous ? 'sync trial' : 'async trial') + flashNote;
     this.#hud.trialEl.textContent = `${this.#trialIndex + 1} / ${this.#trials.length}`;
+  }
+
+  #beginTrial() {
+    const trial = this.#trials[this.#trialIndex];
+    this.#trialStartTime = performance.now();
+    trial.startTime = new Date().toISOString();
+    this.#csv.initFrameCSV(trial.trialIndex);
+    this.#state = STATE.TRIAL;
+    this.#hud.abortBtn.style.display = '';
   }
 
   #onTrialSample(scaled) {
@@ -322,6 +332,12 @@ export default class IBreath {
       }
     }
 
+    if (this.#state === STATE.DISPLAY) {
+      if (now - this.#displayStartTime >= CONFIG.DISPLAY_SECS * 1000) {
+        this.#beginTrial();
+      }
+    }
+
     if (this.#state === STATE.RESPONSE) {
       if (now - this.#responseStartTime >= CONFIG.RESPONSE_TIMEOUT_SECS * 1000) {
         this.#onResponse('timeout');
@@ -378,6 +394,7 @@ export default class IBreath {
       calStartTime:      this.#calStartTime,
       itiStartTime:      this.#itiStartTime,
       itiDuration:       this.#itiDuration,
+      displayElapsed:    this.#displayStartTime != null ? (now - this.#displayStartTime) / 1000 : 0,
       responseStartTime: this.#responseStartTime,
       trialCount:        this.#trialData.length,
       subjectCode:       this.#subjectCode,

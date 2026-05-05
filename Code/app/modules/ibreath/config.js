@@ -46,6 +46,10 @@ export const CONFIG = {
   FLASH_TIME_MIN: 5,            // earliest flash onset (seconds into trial)
   FLASH_TIME_MAX: 20,           // latest flash onset (seconds into trial)
 
+  // Display (pre-trial animation)
+  ANIMATION_DISPLAY: true, // show animated display between ITI/READY and trial
+  DISPLAY_SECS: 5,         // seconds to show the animated display before each trial
+
   // Experiment control
   AUTO_ADVANCE: true,      // skip the READY state — advance to next trial automatically
 };
@@ -54,6 +58,7 @@ export const STATE = {
   IDLE: 'idle',
   CALIBRATING: 'calibrating',
   READY: 'ready',      // between trials — waiting for experimenter
+  DISPLAY: 'display',  // 5-second pre-trial animation
   TRIAL: 'trial',
   RESPONSE: 'response',   // post-trial question (SHOW_QUESTIONS only)
   ITI: 'iti',

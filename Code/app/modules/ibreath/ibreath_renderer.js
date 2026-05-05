@@ -2,6 +2,7 @@
 // Receives pre-computed state and data — no experiment logic here.
 
 import { STATE, CONFIG } from './config.js';
+import { drawDisplay } from './animationDisplay.js';
 
 export class IBreathRenderer {
   #canvas = null;
@@ -32,6 +33,8 @@ export class IBreathRenderer {
         return this.#drawCalibrating(ctx, w, h, now, data.calStartTime);
       case STATE.READY:
         return this.#drawReady(ctx, w, h);
+      case STATE.DISPLAY:
+        return this.#drawDisplayState(ctx, w, h, data.displayElapsed);
       case STATE.TRIAL:
         return this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive);
       case STATE.RESPONSE:
@@ -78,6 +81,10 @@ export class IBreathRenderer {
     ctx.stroke();
 
     this.#centerText(ctx, cx, cy, String(remaining), 'rgba(255,255,255,0.7)', 52, '200');
+  }
+
+  #drawDisplayState(ctx, w, h, elapsed) {
+    drawDisplay(ctx, w, h, elapsed);
   }
 
   #drawReady(ctx, w, h) {
