@@ -7,15 +7,14 @@ from pylsl import StreamInlet, resolve_byprop, resolve_streams as lsl_resolve_st
 
 from config import DISCOVERY_WAIT, DISCOVERY_INTERVAL, PULL_TIMEOUT, SAMPLE_RATE_LOG_INTERVAL
 
-log = logging.getLogger("lsl_bridge")
-
-
 # ── Shared state ───────────────────────────────────────────────────────────────
 
 class BridgeState:
     """Shared mutable state threaded through all signal-bridge coroutines."""
 
-    def __init__(self):
+    def __init__(self, label: str = "signal"):
+        self.label = label
+        self.log = logging.getLogger(f"lsl_bridge.{label}")
         self.clients: set = set()
         self.stream_info: dict | None = None
         self.connected: bool = False
@@ -66,11 +65,11 @@ async def stream_discoverer(state: BridgeState) -> None:
             if names != prev_names:
                 state.available_streams = streams
                 prev_names = names
-                log.info(f"Available streams: {names or '(none)'}")
+                state.log.info(f"Available streams: {names or '(none)'}")
                 await _broadcast(state, {"type": "streams", "streams": streams})
 
         except Exception as exc:
-            log.warning(f"Discovery error: {exc}")
+            state.log.warning(f"Discovery error: {exc}")
 
         await asyncio.sleep(DISCOVERY_INTERVAL)
 
@@ -87,7 +86,7 @@ async def read_one_stream(
     inlet = None
 
     try:
-        log.info(f"Searching for LSL stream '{name}' …")
+        state.log.info(f"Searching for LSL stream '{name}' …")
         await _broadcast(state, {"type": "searching", "stream_name": name})
 
         while inlet is None and not stop.is_set():
@@ -101,7 +100,7 @@ async def read_one_stream(
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                log.warning(f"Resolve failed: {exc} — retrying …")
+                state.log.warning(f"Resolve failed: {exc} — retrying …")
                 await asyncio.sleep(2.0)
 
         if stop.is_set() or inlet is None:
@@ -110,7 +109,7 @@ async def read_one_stream(
         info = _info_to_dict(inlet.info())
         state.stream_info = info
         state.connected = True
-        log.info(f"Connected: {info}")
+        state.log.info(f"Connected: {info}")
         await _broadcast(state, {"type": "connected", "stream": info})
 
         sample_count = 0
@@ -133,7 +132,7 @@ async def read_one_stream(
             now = loop.time()
             elapsed = now - last_log
             if SAMPLE_RATE_LOG_INTERVAL is not None and elapsed >= SAMPLE_RATE_LOG_INTERVAL:
-                log.info(f"Sample rate: {sample_count / elapsed:.0f} Hz")
+                state.log.info(f"Sample rate: {sample_count / elapsed:.0f} Hz")
                 sample_count = 0
                 last_log = now
 
@@ -147,7 +146,7 @@ async def read_one_stream(
     except asyncio.CancelledError:
         pass
     except Exception as exc:
-        log.warning(f"Unexpected error in read loop: {exc}")
+        state.log.warning(f"Unexpected error in read loop: {exc}")
     finally:
         state.connected = False
         state.stream_info = None
@@ -203,7 +202,7 @@ async def ws_handler(websocket, state: BridgeState) -> None:
     """Registers a new client, sends current state, and listens for select_stream requests."""
     state.clients.add(websocket)
     remote = websocket.remote_address
-    log.info(f"Client connected: {remote}  (total: {len(state.clients)})")
+    state.log.info(f"Client connected: {remote}  (total: {len(state.clients)})")
 
     await websocket.send(json.dumps({
         "type":    "streams",
@@ -232,12 +231,12 @@ async def ws_handler(websocket, state: BridgeState) -> None:
                 msg = json.loads(raw)
                 if msg.get("type") == "select_stream":
                     name = msg.get("name")
-                    log.info(f"Client requested stream: {name!r}")
+                    state.log.info(f"Client requested stream: {name!r}")
                     state.selected_stream_name = name
                     state.stream_change_event.set()
             except json.JSONDecodeError:
                 pass
     finally:
         state.clients.discard(websocket)
-        log.info(
+        state.log.info(
             f"Client disconnected: {remote}  (total: {len(state.clients)})")

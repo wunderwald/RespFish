@@ -20,13 +20,13 @@ log = logging.getLogger("lsl_bridge")
 
 
 async def main() -> None:
-    state = BridgeState()
+    state = BridgeState(label="resp")
     state.stream_change_event = asyncio.Event()
 
     asyncio.create_task(stream_discoverer(state))
     asyncio.create_task(lsl_reader(state))
 
-    gaze_state = BridgeState()
+    gaze_state = BridgeState(label="gaze")
     gaze_state.stream_change_event = asyncio.Event()
     asyncio.create_task(stream_discoverer(gaze_state))
     asyncio.create_task(lsl_reader(gaze_state))
