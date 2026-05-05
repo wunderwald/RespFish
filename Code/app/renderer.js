@@ -38,9 +38,10 @@ const GAZE_ENABLED = false;
 
 // ── Mount points (defined in index.html) ─────────────────────────────────────
 
-const streamContainer = document.getElementById("stream-bar");
-const statsContainer  = document.getElementById("stats");
-const sceneContainer  = document.getElementById("scene");
+const streamContainer     = document.getElementById("stream-bar");
+const gazeStreamContainer = document.getElementById("gaze-bar");
+const statsContainer      = document.getElementById("stats");
+const sceneContainer      = document.getElementById("scene");
 
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 
@@ -70,10 +71,10 @@ async function init() {
   const { default: FrontendClass } = await import(FRONTEND_PATHS[FRONTEND]);
 
   // 4. Instantiate — every frontend receives the same two containers.
-  const frontend = new FrontendClass({ statsContainer, sceneContainer });
+  const frontend = new FrontendClass({ statsContainer, sceneContainer, gazeStreamContainer });
 
   // 5. Instantiate the stream manager and wire its events to the frontend.
-  const stream = new StreamManager({ container: streamContainer });
+  const stream = new StreamManager({ container: streamContainer, label: 'resp stream' });
   stream.on("sample", ({ value }) => frontend.pushSample(value));
   stream.on("status", (event)     => frontend.setStatus(event));
 }

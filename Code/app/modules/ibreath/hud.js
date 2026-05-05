@@ -23,7 +23,6 @@ export function buildHUD(container, subjectCode, { onStart, onNext, onAbort }) {
         <option value="extero">Control (extero)</option>
       </select>
     </span>
-    <span id="ib-gaze-stream"></span>
     <span id="ib-controls">
       <button id="ib-start-btn"  disabled>Start</button>
       <button id="ib-next-btn"   style="display:none">Next trial</button>
@@ -35,8 +34,7 @@ export function buildHUD(container, subjectCode, { onStart, onNext, onAbort }) {
   const trialEl = container.querySelector('#ib-trial');
   const subjectInput         = container.querySelector('#ib-subject');
   const questionTypeSelect   = container.querySelector('#ib-question-type');
-  const gazeStreamContainer  = container.querySelector('#ib-gaze-stream');
-  const startBtn         = container.querySelector('#ib-start-btn');
+  const startBtn             = container.querySelector('#ib-start-btn');
   const nextBtn          = container.querySelector('#ib-next-btn');
   const abortBtn         = container.querySelector('#ib-abort-btn');
 
@@ -44,5 +42,5 @@ export function buildHUD(container, subjectCode, { onStart, onNext, onAbort }) {
   nextBtn.addEventListener('click', onNext);
   abortBtn.addEventListener('click', onAbort);
 
-  return { stateEl, trialEl, subjectInput, questionTypeSelect, gazeStreamContainer, startBtn, nextBtn, abortBtn };
+  return { stateEl, trialEl, subjectInput, questionTypeSelect, startBtn, nextBtn, abortBtn };
 }

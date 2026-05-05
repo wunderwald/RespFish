@@ -90,7 +90,7 @@ export default class IBreath {
   #renderer = null;   // IBreathRenderer
   #csv = null;   // IBreathCSV — created at calibration start
 
-  constructor({ statsContainer, sceneContainer }) {
+  constructor({ statsContainer, sceneContainer, gazeStreamContainer }) {
     this.#hud = buildHUD(statsContainer, CONFIG.SUBJECT_CODE, {
       onStart: () => this.#beginCalibration(),
       onNext: () => this.#advanceTrial(),
@@ -99,8 +99,9 @@ export default class IBreath {
     this.#renderer = new IBreathRenderer(sceneContainer);
 
     this.#gazeManager = new StreamManager({
-      container: this.#hud.gazeStreamContainer,
+      container: gazeStreamContainer,
       wsUrl: CONFIG.GAZE_STREAM_URL,
+      label: 'gaze stream',
     });
     this.#gazeManager.on('sample', ({ channels }) => {
       this.#gazeX = channels?.[0] ?? null;

@@ -1,6 +1,7 @@
 /* stream.css — stream selection bar (modules/stream.js) */
 
-#stream-bar {
+#stream-bar,
+#gaze-bar {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -12,9 +13,10 @@
   color: #aed4ed;
   letter-spacing: 0.04em;
 }
-#stream-bar .label { opacity: 0.6; }
+#stream-bar .label,
+#gaze-bar .label { opacity: 0.6; }
 
-#stream-select {
+.stream-select {
   background: transparent;
   border: none;
   color: #aed4ed;
@@ -26,10 +28,10 @@
   outline: none;
   min-width: 140px;
 }
-#stream-select option {
+.stream-select option {
   background: #0f485f;
   color: #aed4ed;
 }
-#stream-select option[data-offline="true"] {
+.stream-select option[data-offline="true"] {
   color: #e07878;
 }

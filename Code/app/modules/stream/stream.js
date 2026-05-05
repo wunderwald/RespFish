@@ -25,9 +25,9 @@ export class StreamManager {
   #selectEl = null;
   #wsUrl;
 
-  constructor({ container, wsUrl = "ws://localhost:8765" }) {
+  constructor({ container, wsUrl = "ws://localhost:8765", label = "stream" }) {
     this.#wsUrl = wsUrl;
-    this.#buildUI(container);
+    this.#buildUI(container, label);
     this.#connect();
   }
 
@@ -44,14 +44,14 @@ export class StreamManager {
 
   // UI
 
-  #buildUI(container) {
+  #buildUI(container, label) {
     container.innerHTML = `
-      <span class="label">stream</span>
-      <select id="stream-select">
+      <span class="label">${label}</span>
+      <select class="stream-select">
         <option value="" disabled selected>no streams found</option>
       </select>
     `;
-    this.#selectEl = container.querySelector("#stream-select");
+    this.#selectEl = container.querySelector(".stream-select");
     this.#selectEl.addEventListener("change", () => {
       const name = this.#selectEl.value;
       if (!name) return;
