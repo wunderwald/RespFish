@@ -101,6 +101,9 @@ if (frontend === 'ibreath') {
     <label><input type="checkbox" id="s-debug-gaze"   ${CONFIG.DEBUG_GAZE    ? 'checked' : ''}> show gaze position</label>
     <label><input type="checkbox" id="s-auto-advance" ${CONFIG.AUTO_ADVANCE  ? 'checked' : ''}> auto-advance trials</label>
     <label><input type="checkbox" id="s-flash-images" ${CONFIG.FLASHING_IMAGE ? 'checked' : ''}> include flash images</label>
+    <span class="label">cal secs</span>
+    <input id="s-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
+           value="${CONFIG.CALIBRATION_SECS}" />
     <span class="label">data dir</span>
     <span id="s-data-dir-text">${CONFIG.DATA_DIR}</span>
     <button id="s-pick-dir">…</button>
@@ -171,13 +174,14 @@ if (frontend === 'ibreath') {
 
   startBtn.addEventListener('click', () => {
     window.api.hud.sendAction({
-      type:         'start',
-      subjectCode:  subjectInput.value.trim() || 'TEST',
-      questionType: questionTypeSelect.value,
-      debugGaze:    document.getElementById('s-debug-gaze').checked,
-      autoAdvance:  document.getElementById('s-auto-advance').checked,
-      flashingImage: document.getElementById('s-flash-images').checked,
-      dataDir:      document.getElementById('s-data-dir-text').textContent,
+      type:            'start',
+      subjectCode:     subjectInput.value.trim() || 'TEST',
+      questionType:    questionTypeSelect.value,
+      debugGaze:       document.getElementById('s-debug-gaze').checked,
+      autoAdvance:     document.getElementById('s-auto-advance').checked,
+      flashingImage:   document.getElementById('s-flash-images').checked,
+      dataDir:         document.getElementById('s-data-dir-text').textContent,
+      calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
     });
   });
   nextBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'next' }));
@@ -299,7 +303,7 @@ if (frontend === 'ibreath') {
     </span>
     <span id="ib-controls">
       <button id="bg-start-btn"  disabled>Start</button>
-      <button id="bg-next-btn"   style="display:none">Start Block 2</button>
+      <button id="bg-next-btn"   style="display:none">Start Game 2</button>
       <button id="bg-abort-btn"  style="display:none">Abort</button>
     </span>
   `;
@@ -310,6 +314,9 @@ if (frontend === 'ibreath') {
     <span class="label">settings</span>
     <label><input type="checkbox" id="bg-show-curve" ${BG.SHOW_CURVE ? 'checked' : ''}>
       show target curve</label>
+    <span class="label">cal secs</span>
+    <input id="bg-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
+           value="${BG.CALIBRATION_SECS}" />
     <span class="label">data dir</span>
     <span id="bg-data-dir-text">${BG.DATA_DIR}</span>
     <button id="bg-pick-dir">…</button>
@@ -361,12 +368,13 @@ if (frontend === 'ibreath') {
 
   bgStartBtn.addEventListener('click', () => {
     window.api.frontend.sendAction({
-      type:        'start',
-      subjectCode: bgSubjectEl.value.trim() || 'TEST',
-      group:       bgGroupEl.value,
-      naturalBpm:  parseFloat(bgNatBpmEl.value) || BG.NATURAL_BPM,
-      showCurve:   document.getElementById('bg-show-curve').checked,
-      dataDir:     document.getElementById('bg-data-dir-text').textContent,
+      type:            'start',
+      subjectCode:     bgSubjectEl.value.trim() || 'TEST',
+      group:           bgGroupEl.value,
+      naturalBpm:      parseFloat(bgNatBpmEl.value) || BG.NATURAL_BPM,
+      showCurve:       document.getElementById('bg-show-curve').checked,
+      dataDir:         document.getElementById('bg-data-dir-text').textContent,
+      calibrationSecs: parseInt(document.getElementById('bg-cal-secs').value) || BG.CALIBRATION_SECS,
     });
   });
   bgNextBtn.addEventListener('click',  () => window.api.frontend.sendAction({ type: 'next' }));
