@@ -7,8 +7,6 @@
  *   - receives user actions (start/next/abort/response) from the experimenter
  *     window via hud:action IPC and calls the appropriate callbacks
  */
-import { CONFIG } from './ibreath/config.js';
-
 export class RemoteHud {
   #snap = {
     stateText:           'waiting for stream…',
@@ -21,7 +19,7 @@ export class RemoteHud {
     experimentStartedAt: null,
     stateTimer:          null,   // { startedAt: Date.now(), duration: seconds | null }
   };
-  #subjectCode = CONFIG.SUBJECT_CODE;
+  #subjectCode = 'TEST';
   #questionType = 'intero';
 
   constructor({ onStart, onNext, onAbort, onResponse }) {
