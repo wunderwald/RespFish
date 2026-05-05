@@ -49,6 +49,9 @@ export const CONFIG = {
   ANIMATION_DISPLAY: true, // show animated display between ITI/READY and trial
   DISPLAY_SECS: 5,         // seconds to show the animated display before each trial
 
+  // Gaze input (optional LSL stream via second bridge)
+  GAZE_STREAM_URL: 'ws://localhost:8766',
+
   // Marker output (LSL via WebSocket)
   SEND_MARKERS: true,
   MARKER_STREAM_URL: 'ws://localhost:9001',
