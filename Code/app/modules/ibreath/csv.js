@@ -20,22 +20,27 @@ import { CONFIG } from './config.js';
 export class IBreathCSV {
   #subjectCode;
   #questionType;
+  #gazeEnabled;
   #onWarn;
+  #frameHeader;
+  #trialHeader;
 
-  static #FRAME_HEADER =
-    'trialIndex,timestamp,breathLevel_input,breathLevel_scaled,stimulusLevel' +
-    (CONFIG.FLASHING_IMAGE ? ',flashActive' : '') + '\n';
-
-  static #TRIAL_HEADER =
-    'trialIndex,subject,group,synchronous,img,lr,slowfast,' +
-    'ITI,startTime,endTime,aborted' +
-    (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
-    (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
-
-  constructor(subjectCode, questionType, onWarn) {
-    this.#subjectCode = subjectCode;
+  constructor(subjectCode, questionType, gazeEnabled, onWarn) {
+    this.#subjectCode  = subjectCode;
     this.#questionType = questionType;
-    this.#onWarn = onWarn;
+    this.#gazeEnabled  = gazeEnabled;
+    this.#onWarn       = onWarn;
+
+    this.#frameHeader =
+      'trialIndex,timestamp,breathLevel_input,breathLevel_scaled,stimulusLevel' +
+      (CONFIG.FLASHING_IMAGE ? ',flashActive' : '') +
+      (gazeEnabled ? ',gazeX,gazeY' : '') + '\n';
+
+    this.#trialHeader =
+      'trialIndex,subject,group,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,slowfast,' +
+      'ITI,startTime,endTime,aborted' +
+      (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
+      (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
   }
 
   async init() {
@@ -52,7 +57,7 @@ export class IBreathCSV {
     }
 
     const trialFile = `${dir}/trialData.csv`;
-    const result = await window.api.writeCSV(trialFile, IBreathCSV.#TRIAL_HEADER);
+    const result = await window.api.writeCSV(trialFile, this.#trialHeader);
     if (!result.ok) {
       this.#warn(`Could not init trialData.csv: ${result.error}`);
     } else {
@@ -64,7 +69,7 @@ export class IBreathCSV {
     if (!window.api) return;
     const result = await window.api.writeCSV(
       this.#framePath(trialIndex),
-      IBreathCSV.#FRAME_HEADER
+      this.#frameHeader
     );
     if (!result.ok) {
       this.#warn(`Could not init frameData_${trialIndex}.csv: ${result.error}`);
@@ -77,7 +82,8 @@ export class IBreathCSV {
     const rows = frameRows.map(r =>
       `${trial.trialIndex},${r.t},` +
       `${r.raw.toFixed(6)},${r.scaled.toFixed(6)},${r.stim.toFixed(6)}` +
-      (CONFIG.FLASHING_IMAGE ? `,${r.flash}` : '')
+      (CONFIG.FLASHING_IMAGE ? `,${r.flash}` : '') +
+      (this.#gazeEnabled ? `,${r.gazeX ?? ''},${r.gazeY ?? ''}` : '')
     ).join('\n') + '\n';
 
     const result = await window.api.appendCSV(this.#framePath(trial.trialIndex), rows);
@@ -98,6 +104,7 @@ export class IBreathCSV {
       `${trial.synchronous},` +
       `${trial.img},` +
       `${trial.lr},` +
+      `${trial.stimX0},${trial.stimY0},${trial.stimX1},${trial.stimY1},` +
       `${trial.slowfast ?? ''},` +
       `${trial.ITI},` +
       `${trial.startTime ?? ''},` +

@@ -40,6 +40,10 @@ export function makeTrialParams(numTrials) {
       synchronous: sync,
       img: 'cloud',  // CSV field — no image file used
       lr: lrSeq[i], // true = left, false = right
+      stimX0: lrSeq[i] ? 0 : 0.5,  // normalized bounding rect of the stimulus half
+      stimY0: 0,
+      stimX1: lrSeq[i] ? 0.5 : 1,
+      stimY1: 1,
       ITI: iti,      // ms
       slowfast: null,     // only set for async trials
       flashImage: null,     // image name, or null if no flash this trial

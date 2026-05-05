@@ -28,6 +28,7 @@ import { buildHUD } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
 import { MarkerStream } from '../stream/markerStream.js';
+import { GazeReceiver } from './gazeReceiver.js';
 
 export { CONFIG };
 
@@ -76,6 +77,9 @@ export default class IBreath {
   #flashStartTime = null;
   #flashEndSent = false;
   #flashActive = false;   // shared between update and draw loops
+
+  // ── gaze ───────────────────────────────────────────────────────────────
+  #gaze = null;   // GazeReceiver, or null if not configured
 
   // ── sub-modules ────────────────────────────────────────────────────────
   #markers = null;
@@ -162,9 +166,13 @@ export default class IBreath {
     this.#hud.startBtn.disabled = true;
     this.#hud.subjectInput.disabled = true;
     this.#hud.questionTypeSelect.disabled = true;
+    this.#hud.gazeUrlInput.disabled = true;
+
+    const gazeUrl = this.#hud.gazeUrlInput.value.trim();
+    this.#gaze = gazeUrl ? new GazeReceiver(gazeUrl) : null;
     this.#hud.stateEl.textContent = 'calibrating…';
 
-    this.#csv = new IBreathCSV(this.#subjectCode, this.#questionType, (msg) => this.#csvWarn(msg));
+    this.#csv = new IBreathCSV(this.#subjectCode, this.#questionType, !!this.#gaze, (msg) => this.#csvWarn(msg));
     this.#csv.init();
     this.#markers.send('calibration_start');
   }
@@ -402,6 +410,7 @@ export default class IBreath {
         scaled: this.#lastScaledSample,
         stim: stimLevel,
         flash: this.#flashActive ? 1 : 0,
+        ...(this.#gaze ? { gazeX: this.#gaze.x ?? '', gazeY: this.#gaze.y ?? '' } : {}),
       });
 
       if (tSecs >= CONFIG.MAX_TRIAL_TIME) {
