@@ -10,102 +10,49 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 36px;
-  padding: 40px;
+  gap: 32px;
   user-select: none;
   -webkit-app-region: drag;
 }
 
-/* ── Header ──────────────────────────────────────────────────────────────── */
-
-header { text-align: center; }
-
 h1 {
-  font-size: 1.9rem;
+  font-size: 1.7rem;
   font-weight: 200;
   letter-spacing: 0.14em;
   color: #aed4ed;
 }
 
-.subtitle {
-  margin-top: 6px;
-  font-size: 0.76rem;
-  letter-spacing: 0.05em;
-  opacity: 0.38;
-}
-
-/* ── Experiment cards ─────────────────────────────────────────────────────── */
-
 main {
-  display: flex;
-  gap: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
   -webkit-app-region: no-drag;
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 18px;
-  padding: 28px 30px;
-  width: 230px;
-  text-align: left;
+  border-radius: 14px;
+  padding: 0 32px;
+  height: 72px;
+  width: 220px;
   cursor: pointer;
-  color: inherit;
+  color: rgba(255, 255, 255, 0.75);
   font-family: inherit;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  transition: background 0.18s, border-color 0.18s, transform 0.15s;
+  font-weight: 300;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
 }
 
 .card:hover {
   background: rgba(174, 212, 237, 0.09);
-  border-color: rgba(174, 212, 237, 0.38);
-  transform: translateY(-2px);
+  border-color: rgba(174, 212, 237, 0.35);
+  color: #aed4ed;
+  transform: translateY(-1px);
 }
 
 .card:active {
   transform: translateY(0);
   background: rgba(174, 212, 237, 0.14);
 }
-
-.card-title {
-  font-size: 1.05rem;
-  font-weight: 400;
-  color: #aed4ed;
-  letter-spacing: 0.03em;
-}
-
-.card-desc {
-  font-size: 0.73rem;
-  line-height: 1.55;
-  opacity: 0.45;
-}
-
-/* ── Footer links ────────────────────────────────────────────────────────── */
-
-footer {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  -webkit-app-region: no-drag;
-}
-
-.secondary-link {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.28);
-  font-family: inherit;
-  font-weight: 300;
-  font-size: 0.71rem;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: color 0.18s;
-}
-
-.secondary-link:hover { color: rgba(255, 255, 255, 0.6); }
-
-.sep { color: rgba(255, 255, 255, 0.15); font-size: 0.7rem; }

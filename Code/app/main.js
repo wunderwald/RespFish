@@ -211,8 +211,8 @@ function createWindow(frontend) {
 
 function createLauncherWindow() {
   launcherWindow = new BrowserWindow({
-    width: 560,
-    height: 400,
+    width: 520,
+    height: 340,
     resizable: false,
     title: "RespFish",
     backgroundColor: "#0b1e30",
@@ -232,17 +232,16 @@ function createLauncherWindow() {
 }
 
 function launchFrontend(frontend) {
-  // Close launcher without triggering its quit guard
+  // Create experiment windows FIRST so there is never a windowless moment.
+  // If the launcher closes before mainWindow exists, window-all-closed fires
+  // and app.quit() is called — creating the windows synchronously prevents that.
+  createWindow(frontend);
+  createControlWindow(frontend);
   if (launcherWindow) {
     launcherWindow.removeAllListeners("closed");
     launcherWindow.close();
     launcherWindow = null;
   }
-  // Bridge has been running since app start; short delay is enough
-  setTimeout(() => {
-    createWindow(frontend);
-    createControlWindow(frontend);
-  }, 200);
 }
 
 // ── Camera permission ─────────────────────────────────────────────────────────
