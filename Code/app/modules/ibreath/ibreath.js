@@ -167,11 +167,12 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, autoAdvance, flashingImage, dataDir } = {}) {
-    if (debugGaze     !== undefined) CONFIG.DEBUG_GAZE     = debugGaze;
-    if (autoAdvance   !== undefined) CONFIG.AUTO_ADVANCE   = autoAdvance;
-    if (flashingImage !== undefined) CONFIG.FLASHING_IMAGE = flashingImage;
-    if (dataDir       !== undefined) CONFIG.DATA_DIR       = dataDir;
+  #beginCalibration({ debugGaze, autoAdvance, flashingImage, dataDir, calibrationSecs } = {}) {
+    if (debugGaze       !== undefined) CONFIG.DEBUG_GAZE        = debugGaze;
+    if (autoAdvance     !== undefined) CONFIG.AUTO_ADVANCE      = autoAdvance;
+    if (flashingImage   !== undefined) CONFIG.FLASHING_IMAGE    = flashingImage;
+    if (dataDir         !== undefined) CONFIG.DATA_DIR          = dataDir;
+    if (calibrationSecs !== undefined) CONFIG.CALIBRATION_SECS = calibrationSecs;
 
     this.#subjectCode = this.#hud.subjectCode;
     this.#questionType = this.#hud.questionType;

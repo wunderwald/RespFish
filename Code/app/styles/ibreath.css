@@ -18,8 +18,9 @@
 #stats span { white-space: nowrap; }
 #stats .label { opacity: 0.6; margin-right: 4px; }
 
-/* Subject code input */
-#ib-subject {
+/* Subject code inputs (iBreath + bioGame share same underline style) */
+#ib-subject,
+#bg-subject {
   background: transparent;
   border: none;
   border-bottom: 1px solid rgba(174, 212, 237, 0.4);
@@ -33,10 +34,38 @@
   padding: 1px 2px;
   transition: border-color 0.2s;
 }
-#ib-subject:focus {
+#ib-subject:focus,
+#bg-subject:focus {
   border-bottom-color: rgba(174, 212, 237, 0.9);
 }
-#ib-subject:disabled {
+#ib-subject:disabled,
+#bg-subject:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Number inputs in settings bars (cal secs etc.) */
+.settings-num {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(174, 212, 237, 0.4);
+  color: #aed4ed;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 300;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  width: 46px;
+  outline: none;
+  padding: 1px 2px;
+  transition: border-color 0.2s;
+  -moz-appearance: textfield;
+}
+.settings-num::-webkit-inner-spin-button,
+.settings-num::-webkit-outer-spin-button { -webkit-appearance: none; }
+.settings-num:focus {
+  border-bottom-color: rgba(174, 212, 237, 0.9);
+}
+.settings-num:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -74,12 +103,14 @@
   cursor: default;
 }
 
-/* Abort button — distinct colour so it's easy to find in a hurry */
-#ib-abort-btn {
+/* Abort buttons — distinct colour so they're easy to find in a hurry */
+#ib-abort-btn,
+#bg-abort-btn {
   border-color: rgba(224, 120, 120, 0.45) !important;
   color: #e09898 !important;
 }
-#ib-abort-btn:hover:not(:disabled) {
+#ib-abort-btn:hover:not(:disabled),
+#bg-abort-btn:hover:not(:disabled) {
   background: rgba(224, 120, 120, 0.15) !important;
   border-color: rgba(224, 120, 120, 0.7) !important;
 }

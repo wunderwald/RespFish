@@ -66,7 +66,7 @@ export class BioGameRenderer {
         break;
 
       case STATE.READY:
-        this.#drawReady(ctx, w, h, renderData.blockIndex ?? 0);
+        this.#drawReady(ctx, w, h, renderData.blockIndex ?? 0, now);
         break;
 
       case STATE.COUNTDOWN:
@@ -415,10 +415,16 @@ export class BioGameRenderer {
     this.#drawCenter(ctx, w, cy + r + 28, 'calibrating signal…', 'rgba(255,255,255,0.28)', 14);
   }
 
-  #drawReady(ctx, w, h, blockIndex) {
-    const label = blockIndex === 0 ? 'Block 1 ready' : 'Block 2 ready';
-    this.#drawCenter(ctx, w, h * 0.42, label, 'rgba(255,255,255,0.65)', 26, '300');
-    this.#drawCenter(ctx, w, h * 0.58, 'Press Space or Start to begin', 'rgba(255,255,255,0.30)', 16);
+  #drawReady(ctx, w, h, blockIndex, now) {
+    const bobNormY = 0.5 + 0.25 * Math.sin(now / 1000 * 1.5);
+    const tilt     = -0.2 * Math.cos(now / 1000 * 1.5);
+    const topPad   = h * 0.10;
+    const playH    = h * 0.80;
+    const fishScreenX = CONFIG.FISH_X_RATIO * w + (w * 0.5 - CONFIG.FISH_X_RATIO * w); // centre
+    const fishScreenY = topPad + (1 - bobNormY) * playH;
+    const fishH = CONFIG.FISH_SIZE_MIN * h + (CONFIG.FISH_SIZE_MAX - CONFIG.FISH_SIZE_MIN) * h * 0.5;
+    this.#drawFish(ctx, fishScreenX, fishScreenY, fishH * 1.3, tilt);
+    this.#drawCenter(ctx, w, h * 0.80, 'Press Space or Start to begin', 'rgba(255,255,255,0.30)', 16);
   }
 
   #drawCountdown(ctx, w, h, value, progress) {
@@ -440,8 +446,8 @@ export class BioGameRenderer {
 
   #drawPlaying(ctx, w, h, data, dt) {
     const {
-      fishNormY, fishNormSize, fishTilt = 0,
-      starfishes, score, blockTime, bpm, showCurve, group,
+      fishNormY, fishNormSize, fishTilt = 0, fishBumpT,
+      starfishes, particles, score, blockTime, bpm, showCurve, group,
       blockElapsed, now,
     } = data;
 
@@ -458,17 +464,44 @@ export class BioGameRenderer {
     // Starfishes
     this.#drawStarfishes(ctx, w, h, topPad, playH, starfishes);
 
-    // Fish
+    // Particles
+    if (particles?.length) {
+      this.#drawParticles(ctx, w, h, topPad, playH, particles);
+    }
+
+    // Fish (with collect-bump scale)
     const fishScreenX = CONFIG.FISH_X_RATIO * w;
     const fishScreenY = normToScreenY(fishNormY);
-    const fishH = (CONFIG.FISH_SIZE_MIN + fishNormSize * (CONFIG.FISH_SIZE_MAX - CONFIG.FISH_SIZE_MIN)) * h;
-    this.#drawFish(ctx, fishScreenX, fishScreenY, fishH, fishTilt);
+    const baseH = (CONFIG.FISH_SIZE_MIN + fishNormSize * (CONFIG.FISH_SIZE_MAX - CONFIG.FISH_SIZE_MIN)) * h;
+    const bumpScale = fishBumpT != null
+      ? 1 + 0.28 * Math.sin(Math.PI * fishBumpT / 0.3)
+      : 1;
+    this.#drawFish(ctx, fishScreenX, fishScreenY, baseH * bumpScale, fishTilt);
 
     // Score + timer — only for slow condition
     if (group === 'slow') {
       this.#drawScoreDisplay(ctx, 18, 16, score, dt);
       this.#drawTimerBar(ctx, w, h, blockElapsed, now);
     }
+  }
+
+  #drawParticles(ctx, w, h, topPad, playH, particles) {
+    ctx.save();
+    for (const p of particles) {
+      const sx = p.x * w;
+      const sy = topPad + (1 - p.y) * playH;
+      const r  = p.r * h;
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle   = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur  = 6;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   #drawIntermission(ctx, w, h, score) {
@@ -478,7 +511,7 @@ export class BioGameRenderer {
 
     const cy = h / 2;
 
-    this.#drawCenter(ctx, w, cy - 80, 'Block 1 complete!', 'rgba(255,255,255,0.85)', 30, '300');
+    this.#drawCenter(ctx, w, cy - 80, 'Game 1 complete  ·  Good job!', 'rgba(255,255,255,0.85)', 30, '300');
 
     // Big score
     const scoreStr = `★  ${score}  ★`;
@@ -493,7 +526,7 @@ export class BioGameRenderer {
 
     const label = score === 1 ? '1 starfish caught' : `${score} starfish caught`;
     this.#drawCenter(ctx, w, cy + 60, label, 'rgba(255,255,255,0.55)', 18);
-    this.#drawCenter(ctx, w, cy + 110, 'Press Space to start Block 2', 'rgba(255,255,255,0.28)', 15);
+    this.#drawCenter(ctx, w, cy + 110, 'Press Space', 'rgba(255,255,255,0.28)', 15);
   }
 
   #drawDone(ctx, w, h, score1, score2) {
@@ -514,7 +547,7 @@ export class BioGameRenderer {
     ctx.fillText(`★  ${total}  ★`, w / 2, cy);
     ctx.shadowBlur   = 0;
 
-    this.#drawCenter(ctx, w, cy + 65,  `Block 1: ${score1}  ·  Block 2: ${score2}`, 'rgba(255,255,255,0.42)', 16);
+    this.#drawCenter(ctx, w, cy + 65,  `Game 1: ${score1}  ·  Game 2: ${score2}`, 'rgba(255,255,255,0.42)', 16);
     this.#drawCenter(ctx, w, cy + 100, 'Total starfish', 'rgba(255,255,255,0.28)', 14);
   }
 

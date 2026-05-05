@@ -41,6 +41,10 @@ export default class BioGame {
   #streamReady  = false;
   #inputsLocked = false;
 
+  // ── Particles + fish bump ─────────────────────────────────────────────────
+  #particles   = [];
+  #fishBumpT   = null;
+
   // ── Experiment data ───────────────────────────────────────────────────────
   #subjectCode  = CONFIG.SUBJECT_CODE;
   #group        = CONFIG.GROUP;
@@ -122,14 +126,15 @@ export default class BioGame {
 
   // ── Action handler (from experimenter window) ─────────────────────────────
 
-  #onAction({ type, subjectCode, group, naturalBpm, showCurve, dataDir }) {
+  #onAction({ type, subjectCode, group, naturalBpm, showCurve, dataDir, calibrationSecs }) {
     switch (type) {
       case 'start':
-        if (subjectCode !== undefined) this.#subjectCode = subjectCode;
-        if (group       !== undefined) { this.#group = group; CONFIG.GROUP = group; }
-        if (naturalBpm  !== undefined) { this.#naturalBpm = naturalBpm; CONFIG.NATURAL_BPM = naturalBpm; }
-        if (showCurve   !== undefined) { this.#showCurve  = showCurve;  CONFIG.SHOW_CURVE  = showCurve; }
-        if (dataDir     !== undefined) { this.#dataDir    = dataDir;    CONFIG.DATA_DIR    = dataDir; }
+        if (subjectCode      !== undefined) this.#subjectCode = subjectCode;
+        if (group            !== undefined) { this.#group = group; CONFIG.GROUP = group; }
+        if (naturalBpm       !== undefined) { this.#naturalBpm = naturalBpm; CONFIG.NATURAL_BPM = naturalBpm; }
+        if (showCurve        !== undefined) { this.#showCurve  = showCurve;  CONFIG.SHOW_CURVE  = showCurve; }
+        if (dataDir          !== undefined) { this.#dataDir    = dataDir;    CONFIG.DATA_DIR    = dataDir; }
+        if (calibrationSecs  !== undefined)  CONFIG.CALIBRATION_SECS = calibrationSecs;
         if (this.#state === STATE.IDLE && this.#streamReady) this.#beginCalibration();
         break;
 
@@ -194,7 +199,7 @@ export default class BioGame {
 
     this.#setState(STATE.PLAYING);
     this.#markers.send(`block_start_${this.#blockIndex}`);
-    this.#pushState({ stateText: `block ${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`, abortVisible: true });
+    this.#pushState({ stateText: `game ${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`, abortVisible: true });
   }
 
   #endBlock(aborted = false) {
@@ -266,6 +271,8 @@ export default class BioGame {
     if (this.#state === STATE.PLAYING) {
       this.#bgScrollX += CONFIG.BG_SCROLL_SPEED * dt;
       this.#updateStarfishes(now, dt);
+      this.#updateParticles(dt);
+      this.#updateFishBump(dt);
       this.#recordFrame(now);
     }
 
@@ -352,8 +359,45 @@ export default class BioGame {
     this.#markers.send(`star_collect_b${this.#blockIndex}_s${this.#scoreBlock[this.#blockIndex]}`);
     this.#csv.appendEvent(this.#blockIndex, 'star_collect',
       this.#scoreBlock[this.#blockIndex], blockTime.toFixed(2));
-    // Throttled push to not flood IPC on every collect
+    this.#burstParticles(star.xRatio, star.normY);
+    this.#fishBumpT = 0;
     this.#pushState({ score: this.#scoreBlock[this.#blockIndex] });
+  }
+
+  // ── Particles ─────────────────────────────────────────────────────────────
+
+  static #BURST_COLORS = ['#ffe066', '#ffb347', '#fffbe6', '#ffd700', '#ff9f43'];
+
+  #burstParticles(xRatio, normY) {
+    for (let i = 0; i < 18; i++) {
+      const angle = (i / 18) * Math.PI * 2 + randBetween(-0.2, 0.2);
+      const speed = randBetween(0.08, 0.22);
+      this.#particles.push({
+        x:    xRatio,
+        y:    normY,
+        vx:   Math.cos(angle) * speed,
+        vy:   Math.sin(angle) * speed,
+        life: 1,
+        color: BioGame.#BURST_COLORS[Math.floor(Math.random() * BioGame.#BURST_COLORS.length)],
+        r:    randBetween(0.003, 0.007),
+      });
+    }
+  }
+
+  #updateParticles(dt) {
+    for (const p of this.#particles) {
+      p.x    += p.vx * dt;
+      p.y    += p.vy * dt;
+      p.vy   -= 0.25 * dt; // slight gravity
+      p.life -= dt * 2.2;
+    }
+    this.#particles = this.#particles.filter(p => p.life > 0);
+  }
+
+  #updateFishBump(dt) {
+    if (this.#fishBumpT === null) return;
+    this.#fishBumpT += dt;
+    if (this.#fishBumpT > 0.3) this.#fishBumpT = null;
   }
 
   #missStar(star, blockTime) {
@@ -412,7 +456,9 @@ export default class BioGame {
       fishNormY:         this.#fishNormY,
       fishNormSize:      this.#fishNormY,  // size tracks Y directly
       fishTilt:          this.#fishTilt,
+      fishBumpT:         this.#fishBumpT,
       starfishes:        this.#starfishes,
+      particles:         this.#particles,
       score:             this.#scoreBlock[this.#blockIndex],
       blockIndex:        this.#blockIndex,
       scoreBlock1:       this.#scoreBlock[0],
@@ -436,7 +482,7 @@ export default class BioGame {
   #pushState(overrides = {}) {
     const score = this.#scoreBlock[this.#blockIndex] ?? 0;
     window.api.frontend.sendState({
-      stateText:    `block ${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`,
+      stateText:    `game ${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`,
       blockText:    `${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`,
       score,
       startEnabled: this.#streamReady && this.#state === STATE.IDLE,
