@@ -27,6 +27,7 @@ import { makeTrialParams } from './trialParams.js';
 import { buildHUD } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
+import { MarkerStream } from '../stream/markerStream.js';
 
 export { CONFIG };
 
@@ -72,8 +73,10 @@ export default class IBreath {
   // ── flash (FLASHING_IMAGE) ─────────────────────────────────────────────
   #flashShown = false;
   #flashStartTime = null;
+  #flashEndSent = false;
 
   // ── sub-modules ────────────────────────────────────────────────────────
+  #markers = null;
   #hud = null;   // DOM refs from buildHUD()
   #renderer = null;   // IBreathRenderer
   #csv = null;   // IBreathCSV — created at calibration start
@@ -85,6 +88,9 @@ export default class IBreath {
       onAbort: () => this.#abortTrial(),
     });
     this.#renderer = new IBreathRenderer(sceneContainer);
+    this.#markers = CONFIG.SEND_MARKERS
+      ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
+      : { send() {} };
     this.#bindKeys();
     requestAnimationFrame(() => this.#loop());
   }
@@ -155,9 +161,11 @@ export default class IBreath {
 
     this.#csv = new IBreathCSV(this.#subjectCode, (msg) => this.#csvWarn(msg));
     this.#csv.init();
+    this.#markers.send('calibration_start');
   }
 
   #finishCalibration() {
+    this.#markers.send('calibration_end');
     const sampleRate = this.#calSamples.length / CONFIG.CALIBRATION_SECS;
     this.#asyncGen.calibrate(this.#calSamples, sampleRate, null);
 
@@ -204,6 +212,7 @@ export default class IBreath {
     this.#stimulusLevel = 0;
     this.#flashShown = false;
     this.#flashStartTime = null;
+    this.#flashEndSent = false;
     this.#smoother.reset();
 
     // Pre-fill smoother with 64 samples (matching MATLAB pre-buffer)
@@ -222,6 +231,7 @@ export default class IBreath {
     if (CONFIG.ANIMATION_DISPLAY) {
       this.#displayStartTime = performance.now();
       this.#state = STATE.DISPLAY;
+      this.#markers.send(`display_start_t${trial.trialIndex}`);
     } else {
       this.#beginTrial();
     }
@@ -239,6 +249,7 @@ export default class IBreath {
     this.#csv.initFrameCSV(trial.trialIndex);
     this.#state = STATE.TRIAL;
     this.#hud.abortBtn.style.display = '';
+    this.#markers.send(`trial_start_t${trial.trialIndex}`);
   }
 
   #onTrialSample(scaled) {
@@ -270,6 +281,7 @@ export default class IBreath {
 
     trial.flashShown = this.#flashShown;
     this.#csv.flushFrameCSV(trial, this.#frameRows);
+    this.#markers.send(aborted ? `trial_abort_t${trial.trialIndex}` : `trial_end_t${trial.trialIndex}`);
     this.#hud.abortBtn.style.display = 'none';
     this.#trialIndex++;
 
@@ -279,6 +291,7 @@ export default class IBreath {
       this.#responseStartTime = performance.now();
       this.#state             = STATE.RESPONSE;
       this.#hud.stateEl.textContent = 'respond…';
+      this.#markers.send(`response_start_t${trial.trialIndex}`);
     } else {
       this.#csv.appendTrialData(trial);
       this.#trialData.push({ ...trial });
@@ -291,6 +304,8 @@ export default class IBreath {
     this.#pendingTrial = null;
     trial.response = sync;
 
+    const respMarker = sync === true ? 'yes' : sync === false ? 'no' : 'timeout';
+    this.#markers.send(`response_${respMarker}_t${trial.trialIndex}`);
     this.#csv.appendTrialData(trial);
     this.#trialData.push({ ...trial });
     this.#startITIorEnd(trial);
@@ -304,6 +319,7 @@ export default class IBreath {
     this.#itiStartTime = performance.now();
     this.#itiDuration = trial.ITI;
     this.#state = STATE.ITI;
+    this.#markers.send(`iti_start_t${trial.trialIndex}`);
     this.#hud.stateEl.textContent = 'inter-trial interval…';
   }
 
@@ -312,6 +328,7 @@ export default class IBreath {
   }
 
   #endExperiment() {
+    this.#markers.send('experiment_done');
     this.#state = STATE.DONE;
     this.#hud.nextBtn.style.display = 'none';
     this.#hud.abortBtn.style.display = 'none';
@@ -370,8 +387,13 @@ export default class IBreath {
       if (CONFIG.FLASHING_IMAGE && trial.flashImage && !this.#flashShown && tSecs >= trial.flashTime) {
         this.#flashShown = true;
         this.#flashStartTime = now;
+        this.#markers.send(`flash_start_t${trial.trialIndex}`);
       }
       const flashActive = this.#flashShown && (now - this.#flashStartTime < CONFIG.FLASH_DURATION);
+      if (CONFIG.FLASHING_IMAGE && this.#flashShown && !flashActive && !this.#flashEndSent) {
+        this.#flashEndSent = true;
+        this.#markers.send(`flash_end_t${trial.trialIndex}`);
+      }
 
       this.#frameRows.push({
         t: new Date().toISOString(),
