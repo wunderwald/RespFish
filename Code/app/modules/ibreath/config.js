@@ -50,6 +50,10 @@ export const CONFIG = {
   ANIMATION_DISPLAY: true, // show animated display between ITI/READY and trial
   DISPLAY_SECS: 5,         // seconds to show the animated display before each trial
 
+  // Marker output (LSL via WebSocket)
+  SEND_MARKERS: true,
+  MARKER_STREAM_URL: 'ws://localhost:9001',
+
   // Experiment control
   AUTO_ADVANCE: true,      // skip the READY state — advance to next trial automatically
 };
