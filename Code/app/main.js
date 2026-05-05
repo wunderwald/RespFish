@@ -212,7 +212,7 @@ function createWindow(frontend) {
 function createLauncherWindow() {
   launcherWindow = new BrowserWindow({
     width: 520,
-    height: 340,
+    height: 430,
     resizable: false,
     title: "RespFish",
     backgroundColor: "#0b1e30",

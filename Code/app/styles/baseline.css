@@ -1,0 +1,16 @@
+/* baseline.css — full-screen neutral display */
+
+body  { padding: 0; gap: 0; background: #0f0f0f; }
+
+#scene {
+  position: fixed; inset: 0;
+  width: 100vw; height: 100vh;
+  border-radius: 0; box-shadow: none;
+  background: #0f0f0f;
+}
+
+#bl-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+}

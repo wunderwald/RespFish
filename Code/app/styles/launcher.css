@@ -56,3 +56,8 @@ main {
   transform: translateY(0);
   background: rgba(174, 212, 237, 0.14);
 }
+
+.card-solo {
+  grid-column: 1 / -1;
+  justify-self: center;
+}

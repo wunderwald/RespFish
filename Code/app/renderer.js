@@ -65,6 +65,7 @@ async function init() {
     ibreath:    './modules/ibreath/ibreath.js',
     gazetest:   './modules/webgazer/gazetest.js',
     bioGame:    './modules/bioGame/bioGame.js',
+    baseline:   './modules/baseline/baseline.js',
   };
   const { default: FrontendClass } = await import(FRONTEND_PATHS[FRONTEND]);
 

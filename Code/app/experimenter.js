@@ -7,19 +7,24 @@ import { CONFIG as BG }  from './modules/bioGame/bioGame_config.js';
 
 const frontend = new URLSearchParams(location.search).get('frontend') || 'ibreath';
 
-// ── Resp stream (always) ──────────────────────────────────────────────────────
+// ── Resp stream (all frontends except baseline) ───────────────────────────────
 
-const respStream = new StreamManager({
-  container: document.getElementById('stream-bar'),
-  label: 'resp stream',
-  filter: 'resp',
-});
-respStream.on('sample', ({ value, channels }) => {
-  window.api.stream.sendSample({ value, channels });
-});
-respStream.on('status', (event) => {
-  window.api.stream.sendStatus(event);
-});
+let respStream = null;
+if (frontend !== 'baseline') {
+  respStream = new StreamManager({
+    container: document.getElementById('stream-bar'),
+    label: 'resp stream',
+    filter: 'resp',
+  });
+  respStream.on('sample', ({ value, channels }) => {
+    window.api.stream.sendSample({ value, channels });
+  });
+  respStream.on('status', (event) => {
+    window.api.stream.sendStatus(event);
+  });
+} else {
+  document.getElementById('stream-bar').style.display = 'none';
+}
 
 // ── Gaze stream (ibreath + gazetest only) ─────────────────────────────────────
 
@@ -391,6 +396,36 @@ if (frontend === 'ibreath') {
   });
 
   // ── Request current state on load ─────────────────────────────────────────────
+
+  window.api.frontend.sendAction({ type: 'ready' });
+
+} else if (frontend === 'baseline') {
+  // ── Baseline HUD ─────────────────────────────────────────────────────────────
+
+  statsEl.innerHTML = `
+    <span id="bl-status">standby</span>
+    <span id="ib-controls">
+      <button id="bl-start-btn">Start</button>
+      <button id="bl-abort-btn" style="display:none">Abort</button>
+    </span>
+  `;
+
+  const blStatusEl = document.getElementById('bl-status');
+  const blStartBtn = document.getElementById('bl-start-btn');
+  const blAbortBtn = document.getElementById('bl-abort-btn');
+
+  window.api.frontend.onState(({ stateText, startEnabled, abortVisible }) => {
+    if (stateText    !== undefined) blStatusEl.textContent   = stateText;
+    if (startEnabled !== undefined) blStartBtn.disabled      = !startEnabled;
+    if (abortVisible !== undefined) blAbortBtn.style.display = abortVisible ? '' : 'none';
+  });
+
+  blStartBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'start' }));
+  blAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape') window.api.frontend.sendAction({ type: 'abort' });
+  });
 
   window.api.frontend.sendAction({ type: 'ready' });
 

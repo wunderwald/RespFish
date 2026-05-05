@@ -9,7 +9,8 @@
     "visualizer": "FRONTEND=visualizer electron .",
     "trainingGame": "FRONTEND=trainingGame electron .",
     "gazetest":   "FRONTEND=gazetest   electron .",
-    "bioGame":    "FRONTEND=bioGame    electron ."
+    "bioGame":    "FRONTEND=bioGame    electron .",
+    "baseline":   "FRONTEND=baseline   electron ."
   },
   "devDependencies": {
     "electron": "^35.0.0"
