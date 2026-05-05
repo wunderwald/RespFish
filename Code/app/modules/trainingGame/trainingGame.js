@@ -178,6 +178,7 @@ export class TrainingGame {
       phase:            this.#phase,
       inBreath:         this.#inBreath,
       lastNorm:         this.#lastNorm,
+      exhaleProgress:   this.#phase === 'exhale' ? Math.min(1, this.#exhaleTimeAbove / (this.#beatMs / 2)) : 0,
       now,
     };
   }

@@ -103,7 +103,7 @@ export class TrainingGameRenderer {
 
   get canvas() { return this.#canvas; }
 
-  draw({ state, countdownElapsed, score, activeCloud, failedClouds, particles, phase, inBreath, now }) {
+  draw({ state, countdownElapsed, score, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
@@ -112,7 +112,7 @@ export class TrainingGameRenderer {
     switch (state) {
       case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
       case STATE.COUNTDOWN: return this.#drawCountdown(ctx, w, h, countdownElapsed);
-      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, now });
+      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now });
       case STATE.GAME_OVER: return this.#drawGameOver(ctx, w, h, score);
     }
   }
@@ -165,19 +165,19 @@ export class TrainingGameRenderer {
     ctx.restore();
   }
 
-  #cloudSadness(cloud) {
-    if (!cloud || !cloud.alive)              return 0;
-    if (cloud._state === 'sliding_in')       return cloud._t;
-    if (cloud._state === 'covering')         return 1;
-    if (cloud._state === 'success_fade')     return cloud.alpha;
+  #cloudSadness(cloud, exhaleProgress = 0) {
+    if (!cloud || !cloud.alive)          return 0;
+    if (cloud._state === 'sliding_in')   return cloud._t;
+    if (cloud._state === 'covering')     return 1 - exhaleProgress;
+    if (cloud._state === 'success_fade') return cloud.alpha;
     return 0;
   }
 
-  #drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, now }) {
+  #drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
     const cx = w / 2;
     const cy = h / 2;
 
-    this.#drawSun(ctx, cx, cy, this.#cloudSadness(activeCloud));
+    this.#drawSun(ctx, cx, cy, this.#cloudSadness(activeCloud, exhaleProgress));
 
     for (const cloud of failedClouds) {
       if (cloud.alive) this.#drawCloud(ctx, cloud.x, cloud.y, cloud.size, cloud.alpha);
@@ -232,12 +232,13 @@ export class TrainingGameRenderer {
       ctx.fill();
     }
 
-    const mY     = cy + r * lerp(0.05, 0.52, sadness);
-    const mR     =  r * lerp(0.38, 0.32, sadness);
-    const mStart =      lerp(0.2,  1.2,  sadness) * Math.PI;
-    const mEnd   =      lerp(0.8,  1.8,  sadness) * Math.PI;
+    // Quadratic bezier mouth: control point bows down (smile) → flat → bows up (frown)
+    const mW   = r * 0.38;
+    const mY   = cy + r * 0.38;
+    const bend = r * 0.35 * (1 - 2 * sadness);  // +r*0.35 = U, 0 = –, -r*0.35 = n
     ctx.beginPath();
-    ctx.arc(cx, mY, mR, mStart, mEnd);
+    ctx.moveTo(cx - mW, mY);
+    ctx.quadraticCurveTo(cx, mY + bend, cx + mW, mY);
     ctx.strokeStyle = '#7a4a00';
     ctx.lineWidth = r * 0.08;
     ctx.lineCap = 'round';
