@@ -5,7 +5,7 @@ import logging
 import websockets
 from pylsl import StreamInlet, resolve_byprop, resolve_streams as lsl_resolve_streams
 
-from config import DISCOVERY_WAIT, DISCOVERY_INTERVAL, PULL_TIMEOUT
+from config import DISCOVERY_WAIT, DISCOVERY_INTERVAL, PULL_TIMEOUT, SAMPLE_RATE_LOG_INTERVAL
 
 log = logging.getLogger("lsl_bridge")
 
@@ -16,10 +16,10 @@ class BridgeState:
     """Shared mutable state threaded through all signal-bridge coroutines."""
 
     def __init__(self):
-        self.clients: set             = set()
+        self.clients: set = set()
         self.stream_info: dict | None = None
-        self.connected: bool          = False
-        self.available_streams: list  = []
+        self.connected: bool = False
+        self.available_streams: list = []
         self.selected_stream_name: str | None = None
         # set after the event loop starts (in main)
         self.stream_change_event: asyncio.Event
@@ -61,7 +61,7 @@ async def stream_discoverer(state: BridgeState) -> None:
                 lambda: lsl_resolve_streams(wait_time=DISCOVERY_WAIT),
             )
             streams = [_info_to_dict(r) for r in results]
-            names   = frozenset(s["name"] for s in streams)
+            names = frozenset(s["name"] for s in streams)
 
             if names != prev_names:
                 state.available_streams = streams
@@ -83,7 +83,7 @@ async def read_one_stream(
     stop: asyncio.Event,
 ) -> None:
     """Connect to the named LSL stream and forward samples until stop is set or stream is lost."""
-    loop  = asyncio.get_running_loop()
+    loop = asyncio.get_running_loop()
     inlet = None
 
     try:
@@ -109,17 +109,18 @@ async def read_one_stream(
 
         info = _info_to_dict(inlet.info())
         state.stream_info = info
-        state.connected   = True
+        state.connected = True
         log.info(f"Connected: {info}")
         await _broadcast(state, {"type": "connected", "stream": info})
 
         sample_count = 0
-        last_log     = loop.time()
+        last_log = loop.time()
 
         while not stop.is_set():
             sample, timestamp = await loop.run_in_executor(
                 None,
-                lambda: inlet.pull_sample(timeout=PULL_TIMEOUT),  # type: ignore
+                lambda: inlet.pull_sample(
+                    timeout=PULL_TIMEOUT),  # type: ignore
             )
             if stop.is_set():
                 break
@@ -130,10 +131,11 @@ async def read_one_stream(
             sample_count += 1
 
             now = loop.time()
-            if now - last_log >= 1.0:
-                log.info(f"Sample rate: {sample_count} Hz")
+            elapsed = now - last_log
+            if SAMPLE_RATE_LOG_INTERVAL is not None and elapsed >= SAMPLE_RATE_LOG_INTERVAL:
+                log.info(f"Sample rate: {sample_count / elapsed:.0f} Hz")
                 sample_count = 0
-                last_log     = now
+                last_log = now
 
             await _broadcast(state, {
                 "type":      "sample",
@@ -146,7 +148,7 @@ async def read_one_stream(
     except Exception as exc:
         log.warning(f"Unexpected error in read loop: {exc}")
     finally:
-        state.connected   = False
+        state.connected = False
         state.stream_info = None
         if inlet is not None:
             try:
@@ -182,7 +184,7 @@ async def lsl_reader(state: BridgeState) -> None:
 
         name = state.selected_stream_name
         if name is None:
-            state.connected   = False
+            state.connected = False
             state.stream_info = None
             await _broadcast(state, {"type": "disconnected", "reason": "No stream selected."})
             current_task = None
@@ -236,4 +238,5 @@ async def ws_handler(websocket, state: BridgeState) -> None:
                 pass
     finally:
         state.clients.discard(websocket)
-        log.info(f"Client disconnected: {remote}  (total: {len(state.clients)})")
+        log.info(
+            f"Client disconnected: {remote}  (total: {len(state.clients)})")
