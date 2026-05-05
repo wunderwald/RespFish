@@ -138,12 +138,8 @@ export class BioGameRenderer {
         g.addColorStop(0, `rgba(100,210,255,${alpha})`);
         g.addColorStop(1, 'rgba(100,210,255,0)');
         ctx.fillStyle = g;
-        ctx.save();
-        ctx.translate(mx, by);
-        ctx.scale(rx / Math.max(rx, ry), ry / Math.max(rx, ry));
         ctx.beginPath();
-        ctx.arc(0, 0, Math.max(rx, ry), 0, Math.PI * 2);
-        ctx.restore();
+        ctx.ellipse(mx, by, rx, ry, 0, 0, Math.PI * 2);
         ctx.fill();
       }
     }
