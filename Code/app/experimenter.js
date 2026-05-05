@@ -6,7 +6,7 @@ import { CONFIG }        from './modules/ibreath/config.js';
 
 const frontend = new URLSearchParams(location.search).get('frontend') || 'ibreath';
 
-// ── Stream selectors ──────────────────────────────────────────────────────────
+// ── Resp stream (always) ──────────────────────────────────────────────────────
 
 const respStream = new StreamManager({
   container: document.getElementById('stream-bar'),
@@ -20,23 +20,38 @@ respStream.on('status', (event) => {
   window.api.stream.sendStatus(event);
 });
 
-const gazeStream = new StreamManager({
-  container: document.getElementById('gaze-bar'),
-  wsUrl: CONFIG.GAZE_STREAM_URL,
-  label: 'gaze stream',
-  filter: 'gaze',
-});
-gazeStream.on('sample', ({ channels }) => {
-  window.api.stream.sendGazeSample({ channels });
-});
-gazeStream.on('status', ({ type }) => {
-  if (type === 'disconnected') window.api.stream.sendGazeSample({ channels: null });
-});
+// ── Gaze stream (ibreath + gazetest only) ─────────────────────────────────────
 
-// ── Timer bar visibility ──────────────────────────────────────────────────────
+let gazeStream = null;
+if (['ibreath', 'gazetest'].includes(frontend)) {
+  gazeStream = new StreamManager({
+    container: document.getElementById('gaze-bar'),
+    wsUrl: CONFIG.GAZE_STREAM_URL,
+    label: 'gaze stream',
+    filter: 'gaze',
+  });
+  gazeStream.on('sample', ({ channels }) => {
+    window.api.stream.sendGazeSample({ channels });
+  });
+  gazeStream.on('status', ({ type }) => {
+    if (type === 'disconnected') window.api.stream.sendGazeSample({ channels: null });
+  });
+} else {
+  document.getElementById('gaze-bar').style.display = 'none';
+}
+
+// ── Timer bar (ibreath only) ──────────────────────────────────────────────────
 
 if (frontend !== 'ibreath') {
   document.getElementById('timer-bar').style.display = 'none';
+}
+
+// ── Settings bar (ibreath only) ───────────────────────────────────────────────
+
+const settingsBar = document.getElementById('settings-bar');
+
+if (frontend !== 'ibreath') {
+  settingsBar.style.display = 'none';
 }
 
 // ── Frontend-specific stats section ──────────────────────────────────────────
@@ -69,6 +84,23 @@ if (frontend === 'ibreath') {
       <button id="ib-abort-btn"  style="display:none">Abort trial</button>
     </span>
   `;
+
+  // ── iBreath settings bar ────────────────────────────────────────────────────
+
+  settingsBar.innerHTML = `
+    <span class="label">settings</span>
+    <label><input type="checkbox" id="s-debug-gaze"   ${CONFIG.DEBUG_GAZE    ? 'checked' : ''}> show gaze position</label>
+    <label><input type="checkbox" id="s-auto-advance" ${CONFIG.AUTO_ADVANCE  ? 'checked' : ''}> auto-advance trials</label>
+    <label><input type="checkbox" id="s-flash-images" ${CONFIG.FLASHING_IMAGE ? 'checked' : ''}> include flash images</label>
+    <span class="label">data dir</span>
+    <span id="s-data-dir-text">${CONFIG.DATA_DIR}</span>
+    <button id="s-pick-dir">…</button>
+  `;
+
+  document.getElementById('s-pick-dir').addEventListener('click', async () => {
+    const picked = await window.api.pickDir();
+    if (picked) document.getElementById('s-data-dir-text').textContent = picked;
+  });
 
   const stateEl            = document.getElementById('ib-state-text');   // in #timer-bar
   const elapsedEl          = document.getElementById('ib-elapsed');       // in #timer-bar
@@ -114,11 +146,14 @@ if (frontend === 'ibreath') {
     if (nextVisible  !== undefined) nextBtn.style.display      = nextVisible  ? '' : 'none';
     if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
     if (inputsLocked !== undefined) {
-      subjectInput.disabled        = inputsLocked;
-      questionTypeSelect.disabled  = inputsLocked;
+      subjectInput.disabled       = inputsLocked;
+      questionTypeSelect.disabled = inputsLocked;
       if (inputsLocked) {
         respStream.disable();
-        gazeStream.disable();
+        gazeStream?.disable();
+        for (const el of settingsBar.querySelectorAll('input, button, select')) {
+          el.disabled = true;
+        }
       }
     }
   });
@@ -130,6 +165,10 @@ if (frontend === 'ibreath') {
       type:         'start',
       subjectCode:  subjectInput.value.trim() || 'TEST',
       questionType: questionTypeSelect.value,
+      debugGaze:    document.getElementById('s-debug-gaze').checked,
+      autoAdvance:  document.getElementById('s-auto-advance').checked,
+      flashingImage: document.getElementById('s-flash-images').checked,
+      dataDir:      document.getElementById('s-data-dir-text').textContent,
     });
   });
   nextBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'next' }));
@@ -157,7 +196,7 @@ if (frontend === 'ibreath') {
   statsEl.innerHTML = `
     <span id="fe-state">waiting for stream…</span>
     <span><span class="label">score</span><span id="fe-score">—</span></span>
-    <button id="fe-start-btn" disabled>Start</button>
+    <span id="ib-controls"><button id="fe-start-btn" disabled>Start</button></span>
   `;
   const feStateEl  = document.getElementById('fe-state');
   const feScoreEl  = document.getElementById('fe-score');
@@ -220,6 +259,5 @@ if (frontend === 'ibreath') {
   });
 
 } else {
-  // Unknown frontend — hide stats bar
   statsEl.style.display = 'none';
 }

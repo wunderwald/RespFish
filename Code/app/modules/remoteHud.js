@@ -25,11 +25,12 @@ export class RemoteHud {
   #questionType = 'intero';
 
   constructor({ onStart, onNext, onAbort, onResponse }) {
-    window.api.hud.onAction(({ type, subjectCode, questionType, value }) => {
-      if (subjectCode !== undefined) this.#subjectCode = subjectCode;
+    window.api.hud.onAction(({ type, subjectCode, questionType, value,
+                               debugGaze, autoAdvance, flashingImage, dataDir }) => {
+      if (subjectCode  !== undefined) this.#subjectCode  = subjectCode;
       if (questionType !== undefined) this.#questionType = questionType;
       switch (type) {
-        case 'start':    onStart(); break;
+        case 'start':    onStart({ debugGaze, autoAdvance, flashingImage, dataDir }); break;
         case 'next':     onNext(); break;
         case 'abort':    onAbort(); break;
         case 'response': onResponse?.(value); break;

@@ -91,7 +91,7 @@ export default class IBreath {
 
   constructor({ statsContainer, sceneContainer, hudFactory }) {
     const callbacks = {
-      onStart:    () => this.#beginCalibration(),
+      onStart:    (settings) => this.#beginCalibration(settings),
       onNext:     () => this.#advanceTrial(),
       onAbort:    () => this.#abortTrial(),
       onResponse: (v) => this.#onResponse(v),
@@ -167,7 +167,12 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration() {
+  #beginCalibration({ debugGaze, autoAdvance, flashingImage, dataDir } = {}) {
+    if (debugGaze     !== undefined) CONFIG.DEBUG_GAZE     = debugGaze;
+    if (autoAdvance   !== undefined) CONFIG.AUTO_ADVANCE   = autoAdvance;
+    if (flashingImage !== undefined) CONFIG.FLASHING_IMAGE = flashingImage;
+    if (dataDir       !== undefined) CONFIG.DATA_DIR       = dataDir;
+
     this.#subjectCode = this.#hud.subjectCode;
     this.#questionType = this.#hud.questionType;
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);

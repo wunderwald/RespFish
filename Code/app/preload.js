@@ -86,6 +86,8 @@ contextBridge.exposeInMainWorld("api", {
     openControl: ()       => ipcRenderer.send('hud:open-control'),
   },
 
+  pickDir: () => ipcRenderer.invoke("pick-directory"),
+
   // Frontend IPC — scene window pushes state, experimenter window sends actions
   frontend: {
     sendState:  (data) => ipcRenderer.send('frontend:state', data),

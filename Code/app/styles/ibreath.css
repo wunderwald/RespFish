@@ -47,7 +47,8 @@
   gap: 8px;
 }
 
-#ib-controls button {
+#stats button,
+#settings-bar button {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 99px;
@@ -61,12 +62,14 @@
   transition: background 0.2s, border-color 0.2s;
 }
 
-#ib-controls button:hover:not(:disabled) {
+#stats button:hover:not(:disabled),
+#settings-bar button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.48);
 }
 
-#ib-controls button:disabled {
+#stats button:disabled,
+#settings-bar button:disabled {
   opacity: 0.3;
   cursor: default;
 }

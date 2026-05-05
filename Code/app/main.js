@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
@@ -112,15 +112,29 @@ ipcMain.handle("append-csv", (_event, filePath, content) => {
   }
 });
 
+/**
+ * pick-directory
+ * Opens a native folder-picker dialog.
+ * Returns the selected path string, or null if cancelled.
+ */
+ipcMain.handle("pick-directory", async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win, {
+    title: "Select data output directory",
+    properties: ["openDirectory", "createDirectory"],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 // ── Experimenter control window ───────────────────────────────────────────────
 
 function createControlWindow() {
   controlWindow = new BrowserWindow({
     width: 1100,
-    height: 200,
+    height: 260,
     minWidth: 700,
-    minHeight: 140,
-    title: "iBreath — Experimenter",
+    minHeight: 200,
+    title: "Experimenter Controls",
     backgroundColor: "#000000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
