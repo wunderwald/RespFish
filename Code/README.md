@@ -44,8 +44,18 @@ Any script that opens a `pylsl.StreamOutlet` and pushes normalized `[0, 1]` floa
 ## Data output (iBreath)
 
 Written to `app/subjectData/<SUBJECT_CODE>/`:
-- `trialData.csv` — one row per trial
-- `frameData_N.csv` — per-frame breath and stimulus values for trial N
+- `trialData.csv` — one row per trial, including stimulus rectangle (`stimX0/Y0/X1/Y1`, normalized)
+- `frameData_N.csv` — per-frame breath, stimulus, and (if configured) gaze values for trial N
+
+## Gaze input (iBreath)
+
+The HUD contains a **gaze** stream selector, identical to the breath stream selector. It connects to the LSL bridge on port 8766 (configured via `GAZE_STREAM_URL` in `config.js`) and lists all available LSL streams. Select the eye-tracker stream before pressing Start — the dropdown locks once calibration begins. If no gaze stream is selected or no bridge is reachable, gaze data is simply omitted.
+
+The bridge expects a multi-channel LSL stream; gaze coordinates are read from channels 0 (X) and 1 (Y), both normalized `[0, 1]`.
+
+When a gaze stream is active, `frameData_N.csv` gains two columns: `gazeX` and `gazeY`. Frames where no data has arrived yet record empty values.
+
+`trialData.csv` always includes `stimX0, stimY0, stimX1, stimY1` — the normalized bounding rectangle of the half-screen in which the cloud stimulus appeared — for postprocessing gaze within the stimulus region.
 
 ## Marker output (iBreath)
 
