@@ -8,4 +8,4 @@ DISCOVERY_INTERVAL = 2.0   # extra sleep between discovery rounds
 PULL_TIMEOUT = 2.0   # seconds to wait for a single sample
 
 # Set to None to suppress sample-rate log lines entirely
-SAMPLE_RATE_LOG_INTERVAL = 10.0  # seconds
+SAMPLE_RATE_LOG_INTERVAL = None  # seconds
