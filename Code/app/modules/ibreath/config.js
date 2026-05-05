@@ -51,6 +51,7 @@ export const CONFIG = {
 
   // Gaze input (optional LSL stream via second bridge)
   GAZE_STREAM_URL: 'ws://localhost:8766',
+  DEBUG_GAZE: true,       // overlay a dot at the current gaze position
 
   // Marker output (LSL via WebSocket)
   SEND_MARKERS: true,
