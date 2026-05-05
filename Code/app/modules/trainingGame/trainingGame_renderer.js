@@ -111,24 +111,32 @@ export class TrainingGameRenderer {
 
   get canvas() { return this.#canvas; }
 
-  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, fadingCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
+  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
 
     let skyDarkness = 0;
     if (state === STATE.PLAYING) {
-      const sadCloud = activeCloud ?? fadingCloud;
-      skyDarkness  = this.#cloudSadness(sadCloud, exhaleProgress) * 0.45;
-      for (const cloud of failedClouds) skyDarkness += cloud.alpha * 0.18;
-      skyDarkness  = Math.min(skyDarkness, 0.85);
+      if (activeCloud) {
+        skyDarkness += this.#cloudSadness(activeCloud, exhaleProgress) * 0.45;
+      }
+      for (const cloud of failedClouds) {
+        if (cloud._state === 'sliding_out') {
+          // mirror the mouth formula so sky and face change identically
+          skyDarkness += (1 - (cloud._startExhaleProgress ?? 0)) * (1 - easeOut(cloud._t)) * 0.45;
+        } else {
+          skyDarkness += cloud.alpha * 0.20; // resting — permanent dimming, fades over a minute
+        }
+      }
+      skyDarkness = Math.min(skyDarkness, 0.85);
     }
     this.#drawBackground(ctx, w, h, skyDarkness);
 
     switch (state) {
       case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
       case STATE.COUNTDOWN: return this.#drawCountdown(ctx, w, h, countdownElapsed);
-      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, fadingCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now });
+      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now });
       case STATE.GAME_OVER: return this.#drawGameOver(ctx, w, h, score);
     }
   }
@@ -185,21 +193,20 @@ export class TrainingGameRenderer {
 
   #cloudSadness(cloud, exhaleProgress = 0) {
     if (!cloud || !cloud.alive)          return 0;
-    if (cloud._state === 'sliding_in')   return cloud._t;
+    if (cloud._state === 'sliding_in')   return lerp(cloud._prevSadness ?? 0, 1, cloud._t);
     if (cloud._state === 'covering')     return 1 - exhaleProgress;
     if (cloud._state === 'success_fade') return cloud.alpha;
-    if (cloud._state === 'sliding_out')  return 1 - easeOut(cloud._t);
+    if (cloud._state === 'sliding_out')  return (1 - (cloud._startExhaleProgress ?? 0)) * (1 - easeOut(cloud._t));
     return 0;
   }
 
-  #drawPlaying(ctx, w, h, { activeCloud, fadingCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now }) {
+  #drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now }) {
     const cx = w / 2;
     const cy = h / 2;
 
     const sunDx = Math.cos(now / 3200) * 4;
     const sunDy = Math.sin(now / 2200) * 5;
-    const sadCloud = activeCloud ?? fadingCloud;
-    this.#drawSun(ctx, cx + sunDx, cy + sunDy, this.#cloudSadness(sadCloud, exhaleProgress));
+    this.#drawSun(ctx, cx + sunDx, cy + sunDy, this.#cloudSadness(activeCloud, exhaleProgress));
 
     for (const cloud of failedClouds) {
       if (!cloud.alive) continue;

@@ -180,7 +180,6 @@ export class TrainingGame {
       score:            this.#score,
       gameElapsed:      this.#gameStartTime != null ? (now - this.#gameStartTime) / 1000 : 0,
       activeCloud:      this.#activeCloud,
-      fadingCloud:      this.#failedClouds.at(-1)?._state === 'sliding_out' ? this.#failedClouds.at(-1) : null,
       failedClouds:     this.#failedClouds,
       particles:        this.#particles,
       phase:            this.#phase,
@@ -233,6 +232,7 @@ export class TrainingGame {
     const exhalePhaseMs = this.#beatMs / 2;
     const ratio = this.#exhaleTimeAbove / exhalePhaseMs;
     const success = ratio >= CONFIG.EXHALE_SUCCESS_RATIO;
+    let prevSadness = 0;
 
     if (this.#activeCloud) {
       if (success) {
@@ -246,9 +246,11 @@ export class TrainingGame {
         const angle = (this.#failAngleIndex * Math.PI * 2) / 12;
         const failX = c.width  / 2 + Math.cos(angle) * CONFIG.FAIL_ORBIT_R;
         const failY = c.height / 2 + Math.sin(angle) * CONFIG.FAIL_ORBIT_R;
+        this.#activeCloud._startExhaleProgress = Math.min(1, ratio);
         this.#activeCloud.slideTo(failX, failY);
         this.#failedClouds.push(this.#activeCloud);
         this.#failAngleIndex = (this.#failAngleIndex + 1) % 12;
+        prevSadness = 1 - Math.min(1, ratio);
       }
       this.#activeCloud = null;
     }
@@ -256,6 +258,7 @@ export class TrainingGame {
     this.#phase = 'inhale';
     this.#phaseStartTime = now;
     this.#spawnCloud();
+    if (prevSadness > 0 && this.#activeCloud) this.#activeCloud._prevSadness = prevSadness;
   }
 
   #burstParticles(x, y) {
