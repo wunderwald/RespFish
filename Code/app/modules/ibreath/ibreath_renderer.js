@@ -38,7 +38,7 @@ export class IBreathRenderer {
       case STATE.TRIAL:
         return this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive);
       case STATE.RESPONSE:
-        return this.#drawResponse(ctx, w, h, now, data.responseStartTime);
+        return this.#drawResponse(ctx, w, h, now, data.responseStartTime, data.questionType);
       case STATE.ITI:
         return this.#drawITI(ctx, w, h, now, data.itiStartTime, data.itiDuration);
       case STATE.DONE:
@@ -122,7 +122,7 @@ export class IBreathRenderer {
     ctx.stroke();
   }
 
-  #drawResponse(ctx, w, h, now, responseStartTime) {
+  #drawResponse(ctx, w, h, now, responseStartTime, questionType) {
     const elapsed   = now - responseStartTime;
     const timeout   = CONFIG.RESPONSE_TIMEOUT_SECS * 1000;
     const progress  = Math.min(elapsed / timeout, 1);
@@ -130,7 +130,7 @@ export class IBreathRenderer {
     const cx = w / 2, cy = h / 2;
     const r  = 40;
 
-    const question = CONFIG.QUESTION_TYPE === 'intero'
+    const question = questionType === 'intero'
       ? 'Was the animation in sync with your breathing?'
       : 'Did you see a flashing image?';
 

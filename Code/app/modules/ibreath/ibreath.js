@@ -157,6 +157,7 @@ export default class IBreath {
     this.#state = STATE.CALIBRATING;
     this.#hud.startBtn.disabled = true;
     this.#hud.subjectInput.disabled = true;
+    this.#hud.questionTypeSelect.disabled = true;
     this.#hud.stateEl.textContent = 'calibrating…';
 
     this.#csv = new IBreathCSV(this.#subjectCode, (msg) => this.#csvWarn(msg));
@@ -418,6 +419,7 @@ export default class IBreath {
       itiDuration:       this.#itiDuration,
       displayElapsed:    this.#displayStartTime != null ? (now - this.#displayStartTime) / 1000 : 0,
       responseStartTime: this.#responseStartTime,
+      questionType:      this.#hud.questionTypeSelect.value,
       trialCount:        this.#trialData.length,
       subjectCode:       this.#subjectCode,
       ...(trialDrawData ?? {}),
