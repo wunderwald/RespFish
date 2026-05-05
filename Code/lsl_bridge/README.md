@@ -4,6 +4,7 @@ Python bridge between LSL and the RespFish Electron app. Started automatically b
 
 ```
 LSL stream  →  signal_bridge  →  WebSocket :8765  →  app (breath signal)
+LSL stream  →  signal_bridge  →  WebSocket :8766  →  app (gaze signal)
 app         →  WebSocket :9001  →  marker_bridge  →  LSL outlet
 ```
 
@@ -21,6 +22,7 @@ Requires the `.venv` from the repo root: `pip install pylsl websockets`.
 | Port | Direction | Protocol | Purpose |
 |------|-----------|----------|---------|
 | 8765 | bridge → app | JSON over WebSocket | breath signal samples + stream list |
+| 8766 | bridge → app | JSON over WebSocket | gaze signal samples + stream list |
 | 9001 | app → bridge | plain text WebSocket | experiment markers → LSL |
 
 ## Modules
