@@ -26,11 +26,11 @@ export const CONFIG = {
   FISH_SIZE_MAX:         0.17,  // height as fraction of canvas height (full exhale)
 
   // ── Starfishes ───────────────────────────────────────────────────────────
-  STARFISH_SPAWN_MIN_MS: 200,
-  STARFISH_SPAWN_MAX_MS: 1200,
+  STARFISH_SPAWN_MIN_MS: 1500,
+  STARFISH_SPAWN_MAX_MS: 3500,
   STARFISH_SIZE_RATIO:   0.045, // size as fraction of canvas height
   STARFISH_SCROLL_SPEED: 0.12,  // canvas widths per second
-  STARFISH_HIT_RADIUS:   0.09,  // normalised Y tolerance for collection (generous)
+  STARFISH_HIT_RADIUS:   0.12,  // normalised Y tolerance for collection (generous)
 
   // ── Background ───────────────────────────────────────────────────────────
   BG_SCROLL_SPEED:       0.05,  // canvas widths per second
