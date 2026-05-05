@@ -28,7 +28,7 @@ export function drawDisplay(ctx, w, h, t) {
   }
 }
 
-// ── Helpers (ported from game.js) ─────────────────────────────────────────────
+// ── Helpers (ported from trainingGame.js) ────────────────────────────────────
 
 function drawSun(ctx, cx, cy, r) {
   const rayCount = 12;

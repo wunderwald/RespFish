@@ -7,7 +7,7 @@
     "start":      "electron .",
     "ibreath":    "FRONTEND=ibreath    electron .",
     "visualizer": "FRONTEND=visualizer electron .",
-    "game":       "FRONTEND=game       electron .",
+    "trainingGame": "FRONTEND=trainingGame electron .",
     "gazetest":   "FRONTEND=gazetest   electron ."
   },
   "devDependencies": {

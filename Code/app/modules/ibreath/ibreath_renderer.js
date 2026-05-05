@@ -210,7 +210,7 @@ export class IBreathRenderer {
   }
 
   // Procedural cloud — five overlapping circles with a white-to-light-blue
-  // radial gradient. Ported from game.js #drawCloud.
+  // radial gradient. Ported from trainingGame.js #drawCloud.
   #drawCloud(ctx, x, y, size, alpha) {
     ctx.globalAlpha = alpha;
 

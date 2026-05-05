@@ -129,9 +129,9 @@ class Particle {
   get alpha() { return Math.max(0, 1 - this.elapsed / this.life); }
 }
 
-// ── Game ──────────────────────────────────────────────────────────────────────
+// ── TrainingGame ──────────────────────────────────────────────────────────────
 
-export class Game {
+export class TrainingGame {
   // game state
   #state = STATE.IDLE;
   #score = 0;
@@ -581,4 +581,4 @@ export class Game {
   }
 }
 
-export default Game;
+export default TrainingGame;

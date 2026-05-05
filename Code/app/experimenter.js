@@ -190,7 +190,7 @@ if (frontend === 'ibreath') {
 
   window.api.hud.sendAction({ type: 'ready' });
 
-} else if (frontend === 'game') {
+} else if (frontend === 'trainingGame') {
   // ── Game controls ────────────────────────────────────────────────────────────
 
   statsEl.innerHTML = `

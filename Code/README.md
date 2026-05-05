@@ -31,7 +31,7 @@ cd gaze && python simulate_gaze.py
 # Launch the app with a specific frontend (bridge starts automatically)
 cd app && npm run ibreath       # iBreath experiment (default)
 cd app && npm run visualizer    # real-time waveform
-cd app && npm run game          # breath-controlled game
+cd app && npm run trainingGame  # breath-controlled training game
 cd app && npm run gazetest      # gaze debug overlay
 ```
 
