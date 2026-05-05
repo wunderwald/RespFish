@@ -28,7 +28,7 @@ export class IBreathCSV {
   static #TRIAL_HEADER =
     'trialIndex,subject,synchronous,img,lr,slowfast,' +
     'ITI,startTime,endTime,aborted' +
-    (CONFIG.SYNC_DETECTION ? ',response' : '') +
+    (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
     (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
 
   constructor(subjectCode, onWarn) {
@@ -100,7 +100,7 @@ export class IBreathCSV {
       `${trial.startTime ?? ''},` +
       `${trial.endTime ?? ''},` +
       `${trial.aborted}` +
-      (CONFIG.SYNC_DETECTION ? `,${trial.response ?? ''}` : '') +
+      (CONFIG.SHOW_QUESTIONS ? `,${trial.response ?? ''}` : '') +
       (CONFIG.FLASHING_IMAGE
         ? `,${trial.flashImage ?? ''},${trial.flashTime ?? ''},` +
         `${trial.flashX ?? ''},${trial.flashY ?? ''},${trial.flashShown}`

@@ -34,9 +34,10 @@ export const CONFIG = {
   // Data output base directory (relative to Electron app dir)
   DATA_DIR: "subjectData",
 
-  // Variations
-  SYNC_DETECTION: true,    // show post-trial "was it in sync?" response screen
-  AUTO_ADVANCE: true,   // skip the READY state — advance to next trial automatically
+  // Questions after trials
+  SHOW_QUESTIONS: true,      // show a post-trial response question after each trial
+  QUESTION_TYPE: 'intero',  // 'intero' — "was it in sync with your breathing?" (target group) or 'extero' — "did you see a flashing image?"        (control group)
+  RESPONSE_TIMEOUT_SECS: 5,        // seconds before a non-response is recorded as 'timeout'
 
   // Flash image
   FLASHING_IMAGE: true,         // show a flash image in 50% of trials
@@ -44,6 +45,9 @@ export const CONFIG = {
   FLASH_DURATION: 250,          // ms the flash is visible
   FLASH_TIME_MIN: 5,            // earliest flash onset (seconds into trial)
   FLASH_TIME_MAX: 20,           // latest flash onset (seconds into trial)
+
+  // Experiment control
+  AUTO_ADVANCE: true,      // skip the READY state — advance to next trial automatically
 };
 
 export const STATE = {
@@ -51,7 +55,7 @@ export const STATE = {
   CALIBRATING: 'calibrating',
   READY: 'ready',      // between trials — waiting for experimenter
   TRIAL: 'trial',
-  RESPONSE: 'response',   // post-trial sync detection question (SYNC_DETECTION only)
+  RESPONSE: 'response',   // post-trial question (SHOW_QUESTIONS only)
   ITI: 'iti',
   DONE: 'done',
 };

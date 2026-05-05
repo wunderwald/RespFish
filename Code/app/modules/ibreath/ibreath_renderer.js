@@ -35,7 +35,7 @@ export class IBreathRenderer {
       case STATE.TRIAL:
         return this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive);
       case STATE.RESPONSE:
-        return this.#drawResponse(ctx, w, h);
+        return this.#drawResponse(ctx, w, h, now, data.responseStartTime);
       case STATE.ITI:
         return this.#drawITI(ctx, w, h, now, data.itiStartTime, data.itiDuration);
       case STATE.DONE:
@@ -115,14 +115,37 @@ export class IBreathRenderer {
     ctx.stroke();
   }
 
-  #drawResponse(ctx, w, h) {
+  #drawResponse(ctx, w, h, now, responseStartTime) {
+    const elapsed   = now - responseStartTime;
+    const timeout   = CONFIG.RESPONSE_TIMEOUT_SECS * 1000;
+    const progress  = Math.min(elapsed / timeout, 1);
+    const remaining = Math.max(0, Math.ceil(CONFIG.RESPONSE_TIMEOUT_SECS - elapsed / 1000));
     const cx = w / 2, cy = h / 2;
-    this.#centerText(ctx, cx, cy - 20,
-      'Was the animation in sync with your breathing?',
-      'rgba(255,255,255,0.85)', 22);
-    this.#centerText(ctx, cx, cy + 30,
-      '← yes          no →',
-      'rgba(255,255,255,0.4)', 16);
+    const r  = 40;
+
+    const question = CONFIG.QUESTION_TYPE === 'intero'
+      ? 'Was the animation in sync with your breathing?'
+      : 'Did you see a flashing image?';
+
+    this.#centerText(ctx, cx, cy - 80, question, 'rgba(255,255,255,0.85)', 22);
+
+    // Countdown arc (same style as calibration)
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth   = 4;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth   = 4;
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+
+    this.#centerText(ctx, cx, cy, String(remaining), 'rgba(255,255,255,0.7)', 36, '200');
+
+    this.#centerText(ctx, cx, cy + 80, '← yes          no →', 'rgba(255,255,255,0.4)', 16);
   }
 
   #drawITI(ctx, w, h, now, itiStartTime, itiDuration) {

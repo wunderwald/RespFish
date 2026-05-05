@@ -64,8 +64,9 @@ export default class IBreath {
   #itiStartTime = null;
   #itiDuration = 0;
 
-  // ── response (SYNC_DETECTION) ──────────────────────────────────────────
-  #pendingTrial = null;   // trial awaiting subject response before CSV write
+  // ── response (SHOW_QUESTIONS) ──────────────────────────────────────────
+  #pendingTrial      = null;   // trial awaiting subject response before CSV write
+  #responseStartTime = null;   // performance.now() when RESPONSE state was entered
 
   // ── flash (FLASHING_IMAGE) ─────────────────────────────────────────────
   #flashShown = false;
@@ -262,10 +263,11 @@ export default class IBreath {
     this.#hud.abortBtn.style.display = 'none';
     this.#trialIndex++;
 
-    if (CONFIG.SYNC_DETECTION && !aborted) {
-      // Defer CSV write and memory push until subject responds
-      this.#pendingTrial = trial;
-      this.#state = STATE.RESPONSE;
+    if (CONFIG.SHOW_QUESTIONS && !aborted) {
+      // Defer CSV write and memory push until subject responds (or times out)
+      this.#pendingTrial      = trial;
+      this.#responseStartTime = performance.now();
+      this.#state             = STATE.RESPONSE;
       this.#hud.stateEl.textContent = 'respond…';
     } else {
       this.#csv.appendTrialData(trial);
@@ -320,6 +322,12 @@ export default class IBreath {
       }
     }
 
+    if (this.#state === STATE.RESPONSE) {
+      if (now - this.#responseStartTime >= CONFIG.RESPONSE_TIMEOUT_SECS * 1000) {
+        this.#onResponse('timeout');
+      }
+    }
+
     if (this.#state === STATE.ITI) {
       if (now - this.#itiStartTime >= this.#itiDuration) {
         if (CONFIG.AUTO_ADVANCE) {
@@ -367,11 +375,12 @@ export default class IBreath {
     // ── Draw phase ──────────────────────────────────────────────────────
 
     this.#renderer.draw(this.#state, now, {
-      calStartTime: this.#calStartTime,
-      itiStartTime: this.#itiStartTime,
-      itiDuration: this.#itiDuration,
-      trialCount: this.#trialData.length,
-      subjectCode: this.#subjectCode,
+      calStartTime:      this.#calStartTime,
+      itiStartTime:      this.#itiStartTime,
+      itiDuration:       this.#itiDuration,
+      responseStartTime: this.#responseStartTime,
+      trialCount:        this.#trialData.length,
+      subjectCode:       this.#subjectCode,
       ...(trialDrawData ?? {}),
     });
 
