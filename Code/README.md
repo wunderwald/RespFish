@@ -28,15 +28,21 @@ cd resp && python mic_breath.py              # microphone
 # Optionally simulate gaze (for testing without an eye-tracker)
 cd gaze && python simulate_gaze.py
 
-# Launch the app with a specific frontend (bridge starts automatically)
-cd app && npm run ibreath       # iBreath experiment (default)
+# Launch the app
+cd app && npm start              # start screen — choose a frontend in the UI
+```
+
+The start screen shows four options: **iBreath**, **Biofeedback Game**, **Training Game**, **Signal Visualizer**. Click one to open its scene window and experimenter window.
+
+To skip the start screen and go directly to a frontend:
+
+```bash
+cd app && npm run ibreath       # iBreath experiment
 cd app && npm run bioGame       # biofeedback breath game
 cd app && npm run visualizer    # real-time waveform
 cd app && npm run trainingGame  # breath-controlled training game
 cd app && npm run gazetest      # gaze debug overlay
 ```
-
-`npm start` (no frontend arg) also launches ibreath.
 
 ## Add a frontend
 
