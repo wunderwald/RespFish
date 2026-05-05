@@ -38,6 +38,7 @@ export default class IBreath {
 
   // ── experiment data ────────────────────────────────────────────────────
   #subjectCode = CONFIG.SUBJECT_CODE;
+  #questionType = 'intero';
   #trials = [];
   #trialIndex = 0;
   #trialData = [];
@@ -146,6 +147,7 @@ export default class IBreath {
 
   #beginCalibration() {
     this.#subjectCode = this.#hud.subjectInput.value.trim() || 'TEST';
+    this.#questionType = this.#hud.questionTypeSelect.value;
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
     this.#trialIndex = 0;
     this.#trialData = [];
@@ -160,7 +162,7 @@ export default class IBreath {
     this.#hud.questionTypeSelect.disabled = true;
     this.#hud.stateEl.textContent = 'calibrating…';
 
-    this.#csv = new IBreathCSV(this.#subjectCode, (msg) => this.#csvWarn(msg));
+    this.#csv = new IBreathCSV(this.#subjectCode, this.#questionType, (msg) => this.#csvWarn(msg));
     this.#csv.init();
     this.#markers.send('calibration_start');
   }
@@ -419,7 +421,7 @@ export default class IBreath {
       itiDuration:       this.#itiDuration,
       displayElapsed:    this.#displayStartTime != null ? (now - this.#displayStartTime) / 1000 : 0,
       responseStartTime: this.#responseStartTime,
-      questionType:      this.#hud.questionTypeSelect.value,
+      questionType:      this.#questionType,
       trialCount:        this.#trialData.length,
       subjectCode:       this.#subjectCode,
       ...(trialDrawData ?? {}),
