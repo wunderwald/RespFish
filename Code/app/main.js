@@ -151,6 +151,12 @@ function setupPermissions() {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
+// Prevent Chromium from throttling timers and rAF when the window loses focus.
+// Without this, requestAnimationFrame stalls when the app is not the active
+// window, which delays state transitions and marker sends.
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+
 app.whenReady().then(() => {
   setupPermissions();
   startBridge();
