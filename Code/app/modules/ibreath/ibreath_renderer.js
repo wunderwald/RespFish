@@ -27,23 +27,35 @@ export class IBreathRenderer {
     ctx.clearRect(0, 0, w, h);
 
     switch (state) {
-      case STATE.IDLE:
-        return this.#drawIdle(ctx, w, h);
-      case STATE.CALIBRATING:
-        return this.#drawCalibrating(ctx, w, h, now, data.calStartTime);
-      case STATE.READY:
-        return this.#drawReady(ctx, w, h);
-      case STATE.DISPLAY:
-        return this.#drawDisplayState(ctx, w, h, data.displayElapsed);
-      case STATE.TRIAL:
-        return this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive);
-      case STATE.RESPONSE:
-        return this.#drawResponse(ctx, w, h, now, data.responseStartTime, data.questionType);
-      case STATE.ITI:
-        return this.#drawITI(ctx, w, h, now, data.itiStartTime, data.itiDuration);
-      case STATE.DONE:
-        return this.#drawDone(ctx, w, h, data.trialCount, data.subjectCode);
+      case STATE.IDLE:        this.#drawIdle(ctx, w, h); break;
+      case STATE.CALIBRATING: this.#drawCalibrating(ctx, w, h, now, data.calStartTime); break;
+      case STATE.READY:       this.#drawReady(ctx, w, h); break;
+      case STATE.DISPLAY:     this.#drawDisplayState(ctx, w, h, data.displayElapsed); break;
+      case STATE.TRIAL:       this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive); break;
+      case STATE.RESPONSE:    this.#drawResponse(ctx, w, h, now, data.responseStartTime, data.questionType); break;
+      case STATE.ITI:         this.#drawITI(ctx, w, h, now, data.itiStartTime, data.itiDuration); break;
+      case STATE.DONE:        this.#drawDone(ctx, w, h, data.trialCount, data.subjectCode); break;
     }
+
+    if (CONFIG.DEBUG_GAZE && data.gazeX != null && data.gazeY != null) {
+      this.#drawGazeDot(ctx, w, h, data.gazeX, data.gazeY);
+    }
+  }
+
+  #drawGazeDot(ctx, w, h, gx, gy) {
+    const x = gx * w;
+    const y = gy * h;
+    const r = 10;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 80, 80, 0.75)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fill();
+    ctx.restore();
   }
 
   // ── State draw methods ─────────────────────────────────────────────────
