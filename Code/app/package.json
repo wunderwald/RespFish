@@ -8,7 +8,8 @@
     "ibreath":    "FRONTEND=ibreath    electron .",
     "visualizer": "FRONTEND=visualizer electron .",
     "trainingGame": "FRONTEND=trainingGame electron .",
-    "gazetest":   "FRONTEND=gazetest   electron ."
+    "gazetest":   "FRONTEND=gazetest   electron .",
+    "bioGame":    "FRONTEND=bioGame    electron ."
   },
   "devDependencies": {
     "electron": "^35.0.0"

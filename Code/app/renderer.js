@@ -21,7 +21,7 @@ import { GazeManager } from "./modules/webgazer/gazeCalibration.js";
 
 // ── Active frontend ───────────────────────────────────────────────────────────
 //
-// Set via the npm script: npm run ibreath | trainingGame | visualizer | gazetest
+// Set via the npm script: npm run ibreath | trainingGame | visualizer | gazetest | bioGame
 // Falls back to 'ibreath' if no ?frontend= param is present.
 
 const FRONTEND = new URLSearchParams(location.search).get('frontend') || 'ibreath';
@@ -64,6 +64,7 @@ async function init() {
     trainingGame: './modules/trainingGame/trainingGame.js',
     ibreath:    './modules/ibreath/ibreath.js',
     gazetest:   './modules/webgazer/gazetest.js',
+    bioGame:    './modules/bioGame/bioGame.js',
   };
   const { default: FrontendClass } = await import(FRONTEND_PATHS[FRONTEND]);
 

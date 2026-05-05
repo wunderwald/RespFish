@@ -23,7 +23,7 @@ respStream.on('status', (event) => {
 // ── Gaze stream (ibreath + gazetest only) ─────────────────────────────────────
 
 let gazeStream = null;
-if (['ibreath', 'gazetest'].includes(frontend)) {
+if (['ibreath', 'gazetest', 'bioGame'].includes(frontend)) {
   gazeStream = new StreamManager({
     container: document.getElementById('gaze-bar'),
     wsUrl: CONFIG.GAZE_STREAM_URL,
@@ -42,7 +42,7 @@ if (['ibreath', 'gazetest'].includes(frontend)) {
 
 // ── Timer bar (ibreath only) ──────────────────────────────────────────────────
 
-if (frontend !== 'ibreath') {
+if (!['ibreath'].includes(frontend)) {
   document.getElementById('timer-bar').style.display = 'none';
 }
 
@@ -58,7 +58,7 @@ if (frontend !== 'ibreath') {
 
 const logBar = document.getElementById('log-bar');
 
-if (frontend !== 'trainingGame') {
+if (!['trainingGame'].includes(frontend)) {
   logBar.style.display = 'none';
 }
 
@@ -265,6 +265,24 @@ if (frontend === 'ibreath') {
     if (accuracy     !== undefined) gtAccEl.textContent    = accuracy;
     if (sps          !== undefined) gtSpsEl.textContent    = sps;
     if (streamStatus !== undefined) gtStreamEl.textContent = streamStatus;
+  });
+
+} else if (frontend === 'bioGame') {
+  // ── BioGame controls ─────────────────────────────────────────────────────────
+
+  statsEl.innerHTML = `
+    <span id="bg-state">waiting for stream…</span>
+    <span id="ib-controls"><button id="bg-start-btn" disabled>Start</button></span>
+  `;
+  const bgStateEl  = document.getElementById('bg-state');
+  const bgStartBtn = document.getElementById('bg-start-btn');
+
+  bgStartBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'start' }));
+
+  window.api.frontend.onState(({ stateText, btnEnabled, btnText }) => {
+    if (stateText  !== undefined) bgStateEl.textContent  = stateText;
+    if (btnEnabled !== undefined) bgStartBtn.disabled    = !btnEnabled;
+    if (btnText    !== undefined) bgStartBtn.textContent = btnText;
   });
 
 } else {
