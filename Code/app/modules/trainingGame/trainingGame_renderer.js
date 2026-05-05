@@ -165,12 +165,19 @@ export class TrainingGameRenderer {
     ctx.restore();
   }
 
+  #cloudSadness(cloud) {
+    if (!cloud || !cloud.alive)              return 0;
+    if (cloud._state === 'sliding_in')       return cloud._t;
+    if (cloud._state === 'covering')         return 1;
+    if (cloud._state === 'success_fade')     return cloud.alpha;
+    return 0;
+  }
+
   #drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, now }) {
     const cx = w / 2;
     const cy = h / 2;
 
-    const isCovered = activeCloud?._state === 'covering';
-    this.#drawSun(ctx, cx, cy, isCovered);
+    this.#drawSun(ctx, cx, cy, this.#cloudSadness(activeCloud));
 
     for (const cloud of failedClouds) {
       if (cloud.alive) this.#drawCloud(ctx, cloud.x, cloud.y, cloud.size, cloud.alpha);
@@ -193,7 +200,7 @@ export class TrainingGameRenderer {
     ctx.globalAlpha = 1;
   }
 
-  #drawSun(ctx, cx, cy, sad = false) {
+  #drawSun(ctx, cx, cy, sadness = 0) {
     const r = CONFIG.SUN_RADIUS;
 
     ctx.strokeStyle = 'rgba(255,210,50,0.85)';
@@ -225,12 +232,12 @@ export class TrainingGameRenderer {
       ctx.fill();
     }
 
+    const mY     = cy + r * lerp(0.05, 0.52, sadness);
+    const mR     =  r * lerp(0.38, 0.32, sadness);
+    const mStart =      lerp(0.2,  1.2,  sadness) * Math.PI;
+    const mEnd   =      lerp(0.8,  1.8,  sadness) * Math.PI;
     ctx.beginPath();
-    if (sad) {
-      ctx.arc(cx, cy + r * 0.52, r * 0.32, 1.2 * Math.PI, 1.8 * Math.PI);
-    } else {
-      ctx.arc(cx, cy + r * 0.05, r * 0.38, 0.2 * Math.PI, 0.8 * Math.PI);
-    }
+    ctx.arc(cx, mY, mR, mStart, mEnd);
     ctx.strokeStyle = '#7a4a00';
     ctx.lineWidth = r * 0.08;
     ctx.lineCap = 'round';

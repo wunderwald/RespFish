@@ -267,7 +267,7 @@ export class TrainingGame {
       [-margin, Math.random() * c.height],
     ][edge];
 
-    this.#activeCloud = new Cloud({ startX: sx, startY: sy, sunX: cx, sunY: cy, slideInMs: this.#beatMs / 2 });
+    this.#activeCloud = new Cloud({ startX: sx, startY: sy, sunX: cx, sunY: cy, slideInMs: CONFIG.CLOUD_SLIDE_IN_MS });
   }
 }
 
