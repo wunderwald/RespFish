@@ -30,6 +30,7 @@ cd gaze && python simulate_gaze.py
 
 # Launch the app with a specific frontend (bridge starts automatically)
 cd app && npm run ibreath       # iBreath experiment (default)
+cd app && npm run bioGame       # biofeedback breath game
 cd app && npm run visualizer    # real-time waveform
 cd app && npm run trainingGame  # breath-controlled training game
 cd app && npm run gazetest      # gaze debug overlay
@@ -56,9 +57,16 @@ The new frontend is then launchable with `npm run <name>`.
 
 Any script that opens a `pylsl.StreamOutlet` and pushes normalized `[0, 1]` floats works. The bridge discovers streams by name automatically.
 
+## Data output (bioGame)
+
+Written to `app/bioGameData/<SUBJECT_CODE>/`. See [docs/bioGame.md](docs/bioGame.md) for full column descriptions.
+
+- `block_<N>_frames.csv` — 20 Hz frame data (breath, fish position, target curve)
+- `block_<N>_events.csv` — timestamped events (starfish collected/missed, block end)
+
 ## Data output (iBreath)
 
-Written to `app/subjectData/<SUBJECT_CODE>/`:
+Written to `app/iBreathData/<SUBJECT_CODE>/`:
 - `trialData.csv` — one row per trial, including stimulus rectangle (`stimX0/Y0/X1/Y1`, normalized)
 - `frameData_N.csv` — per-frame breath, stimulus, and (if configured) gaze values for trial N
 
