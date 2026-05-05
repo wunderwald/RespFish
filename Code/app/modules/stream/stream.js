@@ -31,11 +31,15 @@ export class StreamManager {
     this.#connect();
   }
 
-  // public event API
+  // public API
 
   on(event, cb) {
     (this.#handlers[event] ??= []).push(cb);
     return this;
+  }
+
+  disable() {
+    if (this.#selectEl) this.#selectEl.disabled = true;
   }
 
   // UI
