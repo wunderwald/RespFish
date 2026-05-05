@@ -27,7 +27,11 @@ Requires the `.venv` from the repo root: `pip install pylsl websockets`.
 
 | File | Contents |
 |------|----------|
-| `config.py` | ports and timing constants |
+| `config.py` | ports, timing constants, log settings |
 | `signal_bridge.py` | LSL stream discovery, sample forwarding, WebSocket handler |
 | `marker_bridge.py` | receives marker strings, pushes to LSL outlet `RespFishMarkers` |
 | `main.py` | wires everything together, entry point |
+
+## Config
+
+All tunables are in `config.py`:
