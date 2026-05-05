@@ -26,11 +26,11 @@ export class RemoteHud {
 
   constructor({ onStart, onNext, onAbort, onResponse }) {
     window.api.hud.onAction(({ type, subjectCode, questionType, value,
-                               debugGaze, autoAdvance, flashingImage, dataDir }) => {
+                               debugGaze, autoAdvance, flashingImage, dataDir, calibrationSecs }) => {
       if (subjectCode  !== undefined) this.#subjectCode  = subjectCode;
       if (questionType !== undefined) this.#questionType = questionType;
       switch (type) {
-        case 'start':    onStart({ debugGaze, autoAdvance, flashingImage, dataDir }); break;
+        case 'start':    onStart({ debugGaze, autoAdvance, flashingImage, dataDir, calibrationSecs }); break;
         case 'next':     onNext(); break;
         case 'abort':    onAbort(); break;
         case 'response': onResponse?.(value); break;
