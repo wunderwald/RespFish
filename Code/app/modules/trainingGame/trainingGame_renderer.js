@@ -115,7 +115,14 @@ export class TrainingGameRenderer {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
-    this.#drawBackground(ctx, w, h);
+
+    let skyDarkness = 0;
+    if (state === STATE.PLAYING) {
+      skyDarkness  = this.#cloudSadness(activeCloud, exhaleProgress) * 0.45;
+      for (const cloud of failedClouds) skyDarkness += cloud.alpha * 0.18;
+      skyDarkness  = Math.min(skyDarkness, 0.85);
+    }
+    this.#drawBackground(ctx, w, h, skyDarkness);
 
     switch (state) {
       case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
@@ -216,7 +223,7 @@ export class TrainingGameRenderer {
     this.#drawTimerBar(ctx, w, h, gameElapsed, now);
   }
 
-  #drawBackground(ctx, w, h) {
+  #drawBackground(ctx, w, h, darkness = 0) {
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0,   '#8bbfe0');
     sky.addColorStop(0.5, '#c2dff2');
@@ -231,6 +238,11 @@ export class TrainingGameRenderer {
       grd.addColorStop(0, `rgba(255,255,255,${p.a})`);
       grd.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    if (darkness > 0) {
+      ctx.fillStyle = `rgba(20,35,70,${darkness * 0.6})`;
       ctx.fillRect(0, 0, w, h);
     }
   }

@@ -39,15 +39,17 @@
   cursor: default;
 }
 
-/* ── Scene — daytime sky (overrides water gradient from base layout) ──────── */
+/* ── Full-window layout ───────────────────────────────────────────────────── */
+
+body  { padding: 0; gap: 0; }
 
 #scene {
-  background: linear-gradient(
-    180deg,
-    #98b2c3 0%,
-    #75a9cc 40%,
-    #2d688d 100%
-  );
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* ── Game canvas ───────────────────────────────────────────────────────────── */
