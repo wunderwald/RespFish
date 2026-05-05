@@ -1,7 +1,32 @@
-// Experimenter control window — mirrors the iBreath HUD via IPC.
+// Experimenter control window — HUD + stream selection for iBreath.
+import { StreamManager } from './modules/stream/stream.js';
+import { CONFIG }        from './modules/ibreath/config.js';
+
+// ── Stream selectors ──────────────────────────────────────────────────────────
+
+const respStream = new StreamManager({
+  container: document.getElementById('stream-bar'),
+  label: 'resp stream',
+});
+respStream.on('sample', ({ value, channels }) => {
+  window.api.stream.sendSample({ value, channels });
+});
+respStream.on('status', (event) => {
+  window.api.stream.sendStatus(event);
+});
+
+const gazeStream = new StreamManager({
+  container: document.getElementById('gaze-bar'),
+  wsUrl: CONFIG.GAZE_STREAM_URL,
+  label: 'gaze stream',
+});
+gazeStream.on('sample', ({ channels }) => {
+  window.api.stream.sendGazeSample({ channels });
+});
+
+// ── HUD bar ───────────────────────────────────────────────────────────────────
 
 const container = document.getElementById('stats');
-
 container.innerHTML = `
   <span id="ib-state-text">waiting for stream…</span>
   <span>
@@ -10,7 +35,7 @@ container.innerHTML = `
   </span>
   <span>
     <span class="label">subject</span>
-    <input id="ib-subject" type="text" value="TEST"
+    <input id="ib-subject" type="text" value="${CONFIG.SUBJECT_CODE}"
            placeholder="subject code" autocomplete="off" spellcheck="false" />
   </span>
   <span>
@@ -27,27 +52,31 @@ container.innerHTML = `
   </span>
 `;
 
-const stateEl           = document.getElementById('ib-state-text');
-const trialEl           = document.getElementById('ib-trial');
-const subjectInput      = document.getElementById('ib-subject');
+const stateEl            = document.getElementById('ib-state-text');
+const trialEl            = document.getElementById('ib-trial');
+const subjectInput       = document.getElementById('ib-subject');
 const questionTypeSelect = document.getElementById('ib-question-type');
-const startBtn          = document.getElementById('ib-start-btn');
-const nextBtn           = document.getElementById('ib-next-btn');
-const abortBtn          = document.getElementById('ib-abort-btn');
+const startBtn           = document.getElementById('ib-start-btn');
+const nextBtn            = document.getElementById('ib-next-btn');
+const abortBtn           = document.getElementById('ib-abort-btn');
 
 // ── Receive state from scene window ───────────────────────────────────────────
 
 window.api.hud.onState(({ stateText, stateColor, trialText,
                            startEnabled, nextVisible, abortVisible, inputsLocked }) => {
-  if (stateText    !== undefined) stateEl.textContent       = stateText;
-  if (stateColor   !== undefined) stateEl.style.color       = stateColor;
-  if (trialText    !== undefined) trialEl.textContent       = trialText;
-  if (startEnabled !== undefined) startBtn.disabled         = !startEnabled;
-  if (nextVisible  !== undefined) nextBtn.style.display     = nextVisible  ? '' : 'none';
-  if (abortVisible !== undefined) abortBtn.style.display    = abortVisible ? '' : 'none';
+  if (stateText    !== undefined) stateEl.textContent        = stateText;
+  if (stateColor   !== undefined) stateEl.style.color        = stateColor;
+  if (trialText    !== undefined) trialEl.textContent        = trialText;
+  if (startEnabled !== undefined) startBtn.disabled          = !startEnabled;
+  if (nextVisible  !== undefined) nextBtn.style.display      = nextVisible  ? '' : 'none';
+  if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
   if (inputsLocked !== undefined) {
-    subjectInput.disabled       = inputsLocked;
-    questionTypeSelect.disabled = inputsLocked;
+    subjectInput.disabled        = inputsLocked;
+    questionTypeSelect.disabled  = inputsLocked;
+    if (inputsLocked) {
+      respStream.disable();
+      gazeStream.disable();
+    }
   }
 });
 
@@ -60,7 +89,6 @@ startBtn.addEventListener('click', () => {
     questionType: questionTypeSelect.value,
   });
 });
-
 nextBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'next' }));
 abortBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'abort' }));
 
@@ -76,6 +104,6 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// ── Request current state on load ─────────────────────────────────────────────
+// ── Request current HUD state on load ─────────────────────────────────────────
 
 window.api.hud.sendAction({ type: 'ready' });
