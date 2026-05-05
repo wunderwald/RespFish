@@ -103,7 +103,8 @@ export class StreamManager {
       sel.value = this.#selectedStream;
     } else if (!this.#userSelectedNone && this.#filter && this.#currentStreams.length > 0) {
       const match = this.#currentStreams.find(s =>
-        s.name.toLowerCase().includes(this.#filter.toLowerCase())
+        s.name.toLowerCase().includes(this.#filter.toLowerCase()) &&
+        !s.name.toLowerCase().includes('markers')
       );
       if (match) {
         sel.value = match.name;
