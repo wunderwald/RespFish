@@ -32,6 +32,7 @@ export class TrainingGame {
   #lastFrameTime = null;
   #lastDebugPush = 0;
   #spawnTimeoutId = null;
+  #heldSadness = 0;
 
   // HUD state
   #hudStateText  = 'waiting for stream…';
@@ -96,6 +97,7 @@ export class TrainingGame {
     clearTimeout(this.#spawnTimeoutId);
     this.#state = STATE.PLAYING;
     this.#score = 0;
+    this.#heldSadness = 0;
     this.#activeCloud = null;
     this.#failedClouds = [];
     this.#failAngleIndex = 0;
@@ -190,6 +192,7 @@ export class TrainingGame {
       inBreath:         this.#inBreath,
       lastNorm:         this.#lastNorm,
       exhaleProgress:   this.#phase === 'exhale' ? Math.min(1, this.#exhaleTimeAbove / (this.#beatMs / 2)) : 0,
+      heldSadness:      this.#heldSadness,
       now,
     };
   }
@@ -255,6 +258,7 @@ export class TrainingGame {
         this.#failedClouds.push(this.#activeCloud);
         this.#failAngleIndex = (this.#failAngleIndex + 1) % 12;
         prevSadness = 1 - Math.min(1, ratio);
+        this.#heldSadness = prevSadness;
       }
       this.#activeCloud = null;
     }
@@ -264,7 +268,8 @@ export class TrainingGame {
     this.#spawnTimeoutId = setTimeout(() => {
       if (this.#state !== STATE.PLAYING) return;
       this.#spawnCloud();
-      if (prevSadness > 0 && this.#activeCloud) this.#activeCloud._prevSadness = prevSadness;
+      if (this.#activeCloud) this.#activeCloud._prevSadness = this.#heldSadness;
+      this.#heldSadness = 0;
     }, CONFIG.CLOUD_SPAWN_DELAY_MS);
   }
 

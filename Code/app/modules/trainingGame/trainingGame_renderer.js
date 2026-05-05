@@ -111,16 +111,14 @@ export class TrainingGameRenderer {
 
   get canvas() { return this.#canvas; }
 
-  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
+  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, heldSadness, now }) {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
 
     let skyDarkness = 0;
     if (state === STATE.PLAYING) {
-      if (activeCloud) {
-        skyDarkness += this.#cloudSadness(activeCloud, exhaleProgress) * 0.45;
-      }
+      skyDarkness += (activeCloud ? this.#cloudSadness(activeCloud, exhaleProgress) : heldSadness) * 0.45;
       for (const cloud of failedClouds) {
         if (cloud._state === 'sliding_out') {
           // mirror the mouth formula so sky and face change identically
@@ -136,7 +134,7 @@ export class TrainingGameRenderer {
     switch (state) {
       case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
       case STATE.COUNTDOWN: return this.#drawCountdown(ctx, w, h, countdownElapsed);
-      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now });
+      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, heldSadness, gameElapsed, score, now });
       case STATE.GAME_OVER: return this.#drawGameOver(ctx, w, h, score);
     }
   }
@@ -204,13 +202,14 @@ export class TrainingGameRenderer {
     return 0;
   }
 
-  #drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now }) {
+  #drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, heldSadness, gameElapsed, score, now }) {
     const cx = w / 2;
     const cy = h / 2;
 
     const sunDx = Math.cos(now / 3200) * 4;
     const sunDy = Math.sin(now / 2200) * 5;
-    this.#drawSun(ctx, cx + sunDx, cy + sunDy, this.#cloudSadness(activeCloud, exhaleProgress));
+    const sadness = activeCloud ? this.#cloudSadness(activeCloud, exhaleProgress) : heldSadness;
+    this.#drawSun(ctx, cx + sunDx, cy + sunDy, sadness);
 
     for (const cloud of failedClouds) {
       if (!cloud.alive) continue;
