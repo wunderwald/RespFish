@@ -37,3 +37,14 @@ Requires the `.venv` from the repo root: `pip install pylsl websockets`.
 ## Config
 
 All tunables are in `config.py`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `WS_PORT` | `8765` | WebSocket port for the resp bridge |
+| `GAZE_WS_PORT` | `8766` | WebSocket port for the gaze bridge |
+| `MARKER_WS_PORT` | `9001` | WebSocket port for the marker receiver |
+| `MARKER_STREAM_NAME` | `RespFishMarkers` | Name of the LSL marker outlet |
+| `DISCOVERY_WAIT` | `1.0` | Seconds per `resolve_streams` call |
+| `DISCOVERY_INTERVAL` | `2.0` | Extra sleep between discovery rounds |
+| `PULL_TIMEOUT` | `2.0` | Seconds to wait for a single LSL sample |
+| `SAMPLE_RATE_LOG_INTERVAL` | `None` | Log sample rate every N seconds; `None` to suppress |

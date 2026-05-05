@@ -9,9 +9,12 @@ resp/ → LSL → lsl_bridge/ → WebSocket → app/
 ## Run
 
 ```bash
-# Pick a signal source
+# Pick a resp signal source
 cd resp && python simulate_lsl.py --bpm 14   # synthetic
 cd resp && python mic_breath.py              # microphone
+
+# Optionally simulate gaze (for testing without an eye-tracker)
+cd gaze && python simulate_gaze.py
 
 # Launch the app (starts the bridge automatically)
 cd app && npm start
@@ -51,9 +54,11 @@ Written to `app/subjectData/<SUBJECT_CODE>/`:
 
 The HUD contains a **gaze** stream selector, identical to the breath stream selector. It connects to the LSL bridge on port 8766 (configured via `GAZE_STREAM_URL` in `config.js`) and lists all available LSL streams. Select the eye-tracker stream before pressing Start — the dropdown locks once calibration begins. If no gaze stream is selected or no bridge is reachable, gaze data is simply omitted.
 
-The bridge expects a multi-channel LSL stream; gaze coordinates are read from channels 0 (X) and 1 (Y), both normalized `[0, 1]`.
+The bridge expects a multi-channel LSL stream; gaze coordinates are read from channels 0 (X) and 1 (Y), both normalized `[0, 1]`. `gaze/simulate_gaze.py` provides a synthetic stream for testing.
 
 When a gaze stream is active, `frameData_N.csv` gains two columns: `gazeX` and `gazeY`. Frames where no data has arrived yet record empty values.
+
+Set `DEBUG_GAZE: true` in `config.js` to overlay a dot at the current gaze position on the scene canvas.
 
 `trialData.csv` always includes `stimX0, stimY0, stimX1, stimY1` — the normalized bounding rectangle of the half-screen in which the cloud stimulus appeared — for postprocessing gaze within the stimulus region.
 
