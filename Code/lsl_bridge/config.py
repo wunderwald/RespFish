@@ -1,5 +1,6 @@
 WS_HOST = "localhost"
 WS_PORT = 8765
+GAZE_WS_PORT = 8766
 MARKER_WS_PORT = 9001
 MARKER_STREAM_NAME = "RespFishMarkers"
 

@@ -1,6 +1,6 @@
 from marker_bridge import marker_ws_handler
 from signal_bridge import BridgeState, stream_discoverer, lsl_reader, ws_handler
-from config import WS_HOST, WS_PORT, MARKER_WS_PORT, MARKER_STREAM_NAME
+from config import WS_HOST, WS_PORT, GAZE_WS_PORT, MARKER_WS_PORT, MARKER_STREAM_NAME
 from pylsl import StreamInfo, StreamOutlet
 import websockets
 import asyncio
@@ -26,6 +26,11 @@ async def main() -> None:
     asyncio.create_task(stream_discoverer(state))
     asyncio.create_task(lsl_reader(state))
 
+    gaze_state = BridgeState()
+    gaze_state.stream_change_event = asyncio.Event()
+    asyncio.create_task(stream_discoverer(gaze_state))
+    asyncio.create_task(lsl_reader(gaze_state))
+
     marker_info = StreamInfo(
         MARKER_STREAM_NAME, "Markers", 1, 0, "string", "respfish_markers")
     marker_outlet = StreamOutlet(marker_info)
@@ -34,14 +39,19 @@ async def main() -> None:
     async def handler(websocket):
         await ws_handler(websocket, state)
 
+    async def gaze_handler(websocket):
+        await ws_handler(websocket, gaze_state)
+
     async def marker_handler(websocket):
         await marker_ws_handler(websocket, marker_outlet)
 
     log.info(f"Signal bridge: ws://{WS_HOST}:{WS_PORT}")
+    log.info(f"Gaze bridge:   ws://{WS_HOST}:{GAZE_WS_PORT}")
     log.info(f"Marker bridge: ws://{WS_HOST}:{MARKER_WS_PORT}")
     async with websockets.serve(handler, WS_HOST, WS_PORT):
-        async with websockets.serve(marker_handler, WS_HOST, MARKER_WS_PORT):
-            await asyncio.Future()  # run forever
+        async with websockets.serve(gaze_handler, WS_HOST, GAZE_WS_PORT):
+            async with websockets.serve(marker_handler, WS_HOST, MARKER_WS_PORT):
+                await asyncio.Future()  # run forever
 
 
 if __name__ == "__main__":

@@ -140,6 +140,7 @@ async def read_one_stream(
             await _broadcast(state, {
                 "type":      "sample",
                 "value":     value,
+                "channels":  [float(v) for v in sample],
                 "timestamp": timestamp,
             })
 
