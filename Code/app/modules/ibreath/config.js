@@ -36,15 +36,22 @@ export const CONFIG = {
 
   // Variations
   SYNC_DETECTION: true,    // show post-trial "was it in sync?" response screen
-  AUTO_ADVANCE:   false,   // skip the READY state — advance to next trial automatically
+  AUTO_ADVANCE: true,   // skip the READY state — advance to next trial automatically
+
+  // Flash image
+  FLASHING_IMAGE: true,         // show a flash image in 50% of trials
+  FLASH_IMAGE: 'lightning',  // image name — label for CSV and draw-routine selector
+  FLASH_DURATION: 250,          // ms the flash is visible
+  FLASH_TIME_MIN: 5,            // earliest flash onset (seconds into trial)
+  FLASH_TIME_MAX: 20,           // latest flash onset (seconds into trial)
 };
 
 export const STATE = {
-  IDLE:        'idle',
+  IDLE: 'idle',
   CALIBRATING: 'calibrating',
-  READY:       'ready',      // between trials — waiting for experimenter
-  TRIAL:       'trial',
-  RESPONSE:    'response',   // post-trial sync detection question (SYNC_DETECTION only)
-  ITI:         'iti',
-  DONE:        'done',
+  READY: 'ready',      // between trials — waiting for experimenter
+  TRIAL: 'trial',
+  RESPONSE: 'response',   // post-trial sync detection question (SYNC_DETECTION only)
+  ITI: 'iti',
+  DONE: 'done',
 };

@@ -22,12 +22,14 @@ export class IBreathCSV {
   #onWarn;
 
   static #FRAME_HEADER =
-    'trialIndex,timestamp,breathLevel_input,breathLevel_scaled,stimulusLevel\n';
+    'trialIndex,timestamp,breathLevel_input,breathLevel_scaled,stimulusLevel' +
+    (CONFIG.FLASHING_IMAGE ? ',flashActive' : '') + '\n';
 
   static #TRIAL_HEADER =
     'trialIndex,subject,synchronous,img,lr,slowfast,' +
     'ITI,startTime,endTime,aborted' +
-    (CONFIG.SYNC_DETECTION ? ',response' : '') + '\n';
+    (CONFIG.SYNC_DETECTION ? ',response' : '') +
+    (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
 
   constructor(subjectCode, onWarn) {
     this.#subjectCode = subjectCode;
@@ -72,7 +74,8 @@ export class IBreathCSV {
 
     const rows = frameRows.map(r =>
       `${trial.trialIndex},${r.t},` +
-      `${r.raw.toFixed(6)},${r.scaled.toFixed(6)},${r.stim.toFixed(6)}`
+      `${r.raw.toFixed(6)},${r.scaled.toFixed(6)},${r.stim.toFixed(6)}` +
+      (CONFIG.FLASHING_IMAGE ? `,${r.flash}` : '')
     ).join('\n') + '\n';
 
     const result = await window.api.appendCSV(this.#framePath(trial.trialIndex), rows);
@@ -97,7 +100,11 @@ export class IBreathCSV {
       `${trial.startTime ?? ''},` +
       `${trial.endTime ?? ''},` +
       `${trial.aborted}` +
-      (CONFIG.SYNC_DETECTION ? `,${trial.response ?? ''}` : '') + '\n';
+      (CONFIG.SYNC_DETECTION ? `,${trial.response ?? ''}` : '') +
+      (CONFIG.FLASHING_IMAGE
+        ? `,${trial.flashImage ?? ''},${trial.flashTime ?? ''},` +
+        `${trial.flashX ?? ''},${trial.flashY ?? ''},${trial.flashShown}`
+        : '') + '\n';
 
     const result = await window.api.appendCSV(
       `${CONFIG.DATA_DIR}/${this.#subjectCode}/trialData.csv`,

@@ -33,7 +33,7 @@ export class IBreathRenderer {
       case STATE.READY:
         return this.#drawReady(ctx, w, h);
       case STATE.TRIAL:
-        return this.#drawTrial(ctx, w, h, data.trial, data.stimLevel);
+        return this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive);
       case STATE.RESPONSE:
         return this.#drawResponse(ctx, w, h);
       case STATE.ITI:
@@ -86,7 +86,7 @@ export class IBreathRenderer {
       'rgba(255,255,255,0.35)', 18);
   }
 
-  #drawTrial(ctx, w, h, trial, stimLevel) {
+  #drawTrial(ctx, w, h, trial, stimLevel, flashActive) {
     const halfW = w / 2;
     const centreX = trial.lr
       ? halfW / 2            // centre of left half
@@ -98,6 +98,13 @@ export class IBreathRenderer {
     const size = minSize + stimLevel * (maxSize - minSize);
 
     this.#drawCloud(ctx, centreX, centreY, size, 1);
+
+    if (flashActive) {
+      const margin = 0.1;
+      const fx = (margin + trial.flashX * (1 - 2 * margin)) * w;
+      const fy = (margin + trial.flashY * (1 - 2 * margin)) * h;
+      this.#drawFlash(ctx, fx, fy, trial.flashImage);
+    }
 
     // Subtle dividing line between the two halves
     ctx.beginPath();
@@ -133,6 +140,31 @@ export class IBreathRenderer {
   }
 
   // ── Canvas helpers ─────────────────────────────────────────────────────
+
+  // Dispatcher — add cases here when new flash images are introduced.
+  #drawFlash(ctx, x, y, image) {
+    if (image === 'lightning') this.#drawLightning(ctx, x, y);
+  }
+
+  #drawLightning(ctx, x, y) {
+    const s = 72;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 240, 80, 1)';
+    ctx.shadowColor = 'rgba(255, 220, 50, 0.9)';
+    ctx.shadowBlur = 30;
+
+    // Classic 6-point bolt polygon
+    ctx.beginPath();
+    ctx.moveTo(x + s * 0.10, y - s * 0.50);  // top
+    ctx.lineTo(x - s * 0.22, y + s * 0.08);  // upper-left
+    ctx.lineTo(x + s * 0.04, y + s * 0.08);  // inner knee
+    ctx.lineTo(x - s * 0.10, y + s * 0.50);  // bottom
+    ctx.lineTo(x + s * 0.22, y - s * 0.08);  // lower-right
+    ctx.lineTo(x - s * 0.04, y - s * 0.08);  // inner knee
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
 
   // Procedural cloud — five overlapping circles with a white-to-light-blue
   // radial gradient. Ported from game.js #drawCloud.

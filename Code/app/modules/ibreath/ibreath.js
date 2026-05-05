@@ -62,10 +62,14 @@ export default class IBreath {
 
   // ── ITI ────────────────────────────────────────────────────────────────
   #itiStartTime = null;
-  #itiDuration  = 0;
+  #itiDuration = 0;
 
   // ── response (SYNC_DETECTION) ──────────────────────────────────────────
   #pendingTrial = null;   // trial awaiting subject response before CSV write
+
+  // ── flash (FLASHING_IMAGE) ─────────────────────────────────────────────
+  #flashShown = false;
+  #flashStartTime = null;
 
   // ── sub-modules ────────────────────────────────────────────────────────
   #hud = null;   // DOM refs from buildHUD()
@@ -196,6 +200,8 @@ export default class IBreath {
     this.#syncStimulusSignal = [];
     this.#frameRows = [];
     this.#stimulusLevel = 0;
+    this.#flashShown = false;
+    this.#flashStartTime = null;
     this.#smoother.reset();
 
     // Pre-fill smoother with 64 samples (matching MATLAB pre-buffer)
@@ -217,7 +223,10 @@ export default class IBreath {
     this.#state = STATE.TRIAL;
     this.#hud.nextBtn.style.display = 'none';
     this.#hud.abortBtn.style.display = '';
-    this.#hud.stateEl.textContent = trial.synchronous ? 'sync trial' : 'async trial';
+    const flashNote = CONFIG.FLASHING_IMAGE
+      ? (trial.flashImage ? `  ·  flash @ ${trial.flashTime}s` : '  ·  no flash')
+      : '';
+    this.#hud.stateEl.textContent = (trial.synchronous ? 'sync trial' : 'async trial') + flashNote;
     this.#hud.trialEl.textContent = `${this.#trialIndex + 1} / ${this.#trials.length}`;
   }
 
@@ -248,6 +257,7 @@ export default class IBreath {
       this.#syncStimulusRange = [Math.min(...lvls), Math.max(...lvls)];
     }
 
+    trial.flashShown = this.#flashShown;
     this.#csv.flushFrameCSV(trial, this.#frameRows);
     this.#hud.abortBtn.style.display = 'none';
     this.#trialIndex++;
@@ -265,9 +275,9 @@ export default class IBreath {
   }
 
   #onResponse(sync) {
-    const trial     = this.#pendingTrial;
+    const trial = this.#pendingTrial;
     this.#pendingTrial = null;
-    trial.response  = sync;
+    trial.response = sync;
 
     this.#csv.appendTrialData(trial);
     this.#trialData.push({ ...trial });
@@ -279,9 +289,9 @@ export default class IBreath {
       this.#endExperiment();
       return;
     }
-    this.#itiStartTime            = performance.now();
-    this.#itiDuration             = trial.ITI;
-    this.#state                   = STATE.ITI;
+    this.#itiStartTime = performance.now();
+    this.#itiDuration = trial.ITI;
+    this.#state = STATE.ITI;
     this.#hud.stateEl.textContent = 'inter-trial interval…';
   }
 
@@ -333,17 +343,24 @@ export default class IBreath {
       }
       const stimLevel = Math.max(0, Math.min(1, this.#stimulusLevel));
 
+      if (CONFIG.FLASHING_IMAGE && trial.flashImage && !this.#flashShown && tSecs >= trial.flashTime) {
+        this.#flashShown = true;
+        this.#flashStartTime = now;
+      }
+      const flashActive = this.#flashShown && (now - this.#flashStartTime < CONFIG.FLASH_DURATION);
+
       this.#frameRows.push({
         t: new Date().toISOString(),
         raw: this.#lastRawSample,
         scaled: this.#lastScaledSample,
         stim: stimLevel,
+        flash: flashActive ? 1 : 0,
       });
 
       if (tSecs >= CONFIG.MAX_TRIAL_TIME) {
         this.#endTrial(false);
       } else {
-        trialDrawData = { trial, stimLevel };
+        trialDrawData = { trial, stimLevel, flashActive };
       }
     }
 
