@@ -151,20 +151,24 @@ export class TrainingGameRenderer {
 
   #drawGameOver(ctx, w, h, score) {
     const cx = w / 2, cy = h / 2;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.save();
+    ctx.shadowColor   = 'rgba(0,0,0,0.25)';
+    ctx.shadowBlur    = 8;
+    ctx.textAlign     = 'center';
+    ctx.textBaseline  = 'middle';
 
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = '200 16px Nunito, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.50)';
+    ctx.font      = '200 16px Nunito, sans-serif';
     ctx.fillText('SUCCESSFUL EXHALES', cx, cy - 52);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font = '300 72px Nunito, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.90)';
+    ctx.font      = '300 72px Nunito, sans-serif';
     ctx.fillText(score, cx, cy);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = '200 14px Nunito, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.font      = '200 14px Nunito, sans-serif';
     ctx.fillText('Press Play again to retry', cx, cy + 52);
+    ctx.restore();
   }
 
   #drawCountdown(ctx, w, h, elapsed) {
