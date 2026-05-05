@@ -1,0 +1,20 @@
+export const CONFIG = {
+  TARGET_BPM: 6,
+  GAME_DURATION_SECS: 60,
+  EXHALE_ONSET_THRESHOLD: 0.40,
+  BREATH_DEBOUNCE_MS: 1500,
+  EXHALE_SUCCESS_RATIO: 0.90,
+
+  SUN_RADIUS: 110,
+  CLOUD_SIZE: 95,
+  CLOUD_SLIDE_MS: 2200,
+  FAIL_ORBIT_R: 185,
+  FAIL_FADE_MS: 60000,
+};
+
+export const STATE = {
+  IDLE:      'idle',
+  COUNTDOWN: 'countdown',
+  PLAYING:   'playing',
+  GAME_OVER: 'game_over',
+};
