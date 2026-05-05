@@ -160,6 +160,7 @@ export class TrainingGame {
 
   // animation
   #lastFrameTime = null;
+  #lastDebugPush = 0;
 
   // IPC HUD state
   #hudStateText = 'waiting for stream…';
@@ -259,6 +260,7 @@ export class TrainingGame {
     this.#hudBtnText    = 'Play again';
     this.#hudBtnEnabled = true;
     this.#pushState();
+    window.api.frontend.sendState({ debugLog: null });
   }
 
   // ── Breath tracking ──────────────────────────────────────────────────────────
@@ -492,15 +494,16 @@ export class TrainingGame {
     }
     ctx.globalAlpha = 1;
 
-    // Debug breath-phase label
-    const phaseLabel = this.#phase === 'exhale' ? 'BREATHE OUT' : 'BREATHE IN';
-    const signalLabel = this.#inBreath ? 'exhaling' : 'inhaling';
-    const debug = `${phaseLabel}  |  signal: ${this.#lastNorm.toFixed(2)}  (${signalLabel})`;
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = '300 18px Nunito, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(debug, cx, h - 20);
+    // Push breath-phase log to experimenter window (throttled)
+    const now = performance.now();
+    if (now - this.#lastDebugPush > 150) {
+      this.#lastDebugPush = now;
+      const phaseLabel  = this.#phase === 'exhale' ? 'BREATHE OUT' : 'BREATHE IN';
+      const signalLabel = this.#inBreath ? 'exhaling' : 'inhaling';
+      window.api.frontend.sendState({
+        debugLog: `${phaseLabel}  ·  signal: ${this.#lastNorm.toFixed(2)}  (${signalLabel})`,
+      });
+    }
   }
 
   // ── Scene elements ────────────────────────────────────────────────────────────
