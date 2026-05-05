@@ -138,7 +138,7 @@ export default class IBreath {
     this.#streamReady = (type === 'connected');
     if (this.#state === STATE.IDLE) {
       this.#hud.stateEl.textContent = this.#streamReady
-        ? 'stream ready — enter subject code and press Start'
+        ? 'stream ready'
         : text;
       this.#hud.startBtn.disabled = !this.#streamReady;
     }
