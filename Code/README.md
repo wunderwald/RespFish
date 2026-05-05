@@ -6,6 +6,18 @@ Electron app for real-time respiration biofeedback experiments.
 resp/ → LSL → lsl_bridge/ → WebSocket → app/
 ```
 
+## Setup
+
+```bash
+# Python dependencies (one-time)
+python3 -m venv .venv
+source .venv/bin/activate
+pip install pylsl websockets sounddevice numpy
+
+# Node dependencies (one-time)
+cd app && npm install
+```
+
 ## Run
 
 ```bash
@@ -16,17 +28,14 @@ cd resp && python mic_breath.py              # microphone
 # Optionally simulate gaze (for testing without an eye-tracker)
 cd gaze && python simulate_gaze.py
 
-# Launch the app (starts the bridge automatically)
-cd app && npm start
+# Launch the app with a specific frontend (bridge starts automatically)
+cd app && npm run ibreath       # iBreath experiment (default)
+cd app && npm run visualizer    # real-time waveform
+cd app && npm run game          # breath-controlled game
+cd app && npm run gazetest      # gaze debug overlay
 ```
 
-## Switch frontend
-
-Change `FRONTEND` at the top of `app/renderer.js`:
-
-```js
-const FRONTEND = 'ibreath'; // 'visualizer' | 'game' | 'ibreath' | 'gazetest'
-```
+`npm start` (no frontend arg) also launches ibreath.
 
 ## Add a frontend
 
@@ -39,6 +48,9 @@ setStatus({ type, text }) // called on stream connection changes
 
 2. Create `app/styles/<name>.css`.
 3. Add the path to `FRONTEND_PATHS` in `app/renderer.js`.
+4. Add a script entry to `app/package.json`: `"<name>": "FRONTEND=<name> electron ."`.
+
+The new frontend is then launchable with `npm run <name>`.
 
 ## Add a signal source
 
@@ -50,9 +62,13 @@ Written to `app/subjectData/<SUBJECT_CODE>/`:
 - `trialData.csv` — one row per trial, including stimulus rectangle (`stimX0/Y0/X1/Y1`, normalized)
 - `frameData_N.csv` — per-frame breath, stimulus, and (if configured) gaze values for trial N
 
+## Experimenter window (iBreath)
+
+When `npm run ibreath` starts, a second **experimenter window** opens automatically. It contains the HUD controls (subject code, group, Start/Next/Abort buttons), both stream selectors, and the experiment clocks. The main window shows only the participant scene. Both windows can be moved to separate screens.
+
 ## Gaze input (iBreath)
 
-The HUD contains a **gaze** stream selector, identical to the breath stream selector. It connects to the LSL bridge on port 8766 (configured via `GAZE_STREAM_URL` in `config.js`) and lists all available LSL streams. Select the eye-tracker stream before pressing Start — the dropdown locks once calibration begins. If no gaze stream is selected or no bridge is reachable, gaze data is simply omitted.
+The experimenter window has a **gaze** stream selector (alongside the resp stream selector). It connects to the LSL bridge on port 8766 (configured via `GAZE_STREAM_URL` in `config.js`) and lists all available LSL streams. Select the eye-tracker stream before pressing Start — the dropdowns lock once calibration begins. If no gaze stream is selected or the bridge is unreachable, gaze data is simply omitted.
 
 The bridge expects a multi-channel LSL stream; gaze coordinates are read from channels 0 (X) and 1 (Y), both normalized `[0, 1]`. `gaze/simulate_gaze.py` provides a synthetic stream for testing.
 

@@ -4,7 +4,11 @@
   "description": "Respiration visualizer powered by LSL",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start":      "electron .",
+    "ibreath":    "FRONTEND=ibreath    electron .",
+    "visualizer": "FRONTEND=visualizer electron .",
+    "game":       "FRONTEND=game       electron .",
+    "gazetest":   "FRONTEND=gazetest   electron ."
   },
   "devDependencies": {
     "electron": "^35.0.0"

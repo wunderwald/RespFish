@@ -21,10 +21,10 @@ import { GazeManager } from "./modules/webgazer/gazeCalibration.js";
 
 // ── Active frontend ───────────────────────────────────────────────────────────
 //
-// Change this value to switch frontends.
-// 'visualizer' | 'game' | 'ibreath' | 'gazetest'
+// Set via the npm script: npm run ibreath | game | visualizer | gazetest
+// Falls back to 'ibreath' if no ?frontend= param is present.
 
-const FRONTEND = 'ibreath';
+const FRONTEND = new URLSearchParams(location.search).get('frontend') || 'ibreath';
 
 // ── Gaze tracking ─────────────────────────────────────────────────────────────
 //

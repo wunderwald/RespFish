@@ -178,7 +178,7 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadFile("index.html");
+  mainWindow.loadFile("index.html", { query: { frontend: process.env.FRONTEND || "ibreath" } });
   mainWindow.on("closed", () => {
     mainWindow = null;
     app.quit();
