@@ -111,14 +111,15 @@ export class TrainingGameRenderer {
 
   get canvas() { return this.#canvas; }
 
-  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
+  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, fadingCloud, failedClouds, particles, phase, inBreath, exhaleProgress, now }) {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
 
     let skyDarkness = 0;
     if (state === STATE.PLAYING) {
-      skyDarkness  = this.#cloudSadness(activeCloud, exhaleProgress) * 0.45;
+      const sadCloud = activeCloud ?? fadingCloud;
+      skyDarkness  = this.#cloudSadness(sadCloud, exhaleProgress) * 0.45;
       for (const cloud of failedClouds) skyDarkness += cloud.alpha * 0.18;
       skyDarkness  = Math.min(skyDarkness, 0.85);
     }
@@ -127,7 +128,7 @@ export class TrainingGameRenderer {
     switch (state) {
       case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
       case STATE.COUNTDOWN: return this.#drawCountdown(ctx, w, h, countdownElapsed);
-      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now });
+      case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, fadingCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now });
       case STATE.GAME_OVER: return this.#drawGameOver(ctx, w, h, score);
     }
   }
@@ -170,12 +171,14 @@ export class TrainingGameRenderer {
     const scale = 1 + (1 - easeOut(phase)) * 0.5;
 
     ctx.save();
+    ctx.shadowColor   = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur    = 16;
     ctx.translate(cx, cy);
     ctx.scale(scale, scale);
-    ctx.fillStyle = label === 'GO!' ? 'rgba(255,220,80,0.95)' : 'rgba(255,255,255,0.9)';
-    ctx.font = '300 80px Nunito, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.fillStyle     = label === 'GO!' ? 'rgba(255,220,80,0.95)' : 'rgba(255,255,255,0.92)';
+    ctx.font          = '300 80px Nunito, sans-serif';
+    ctx.textAlign     = 'center';
+    ctx.textBaseline  = 'middle';
     ctx.fillText(label, 0, 0);
     ctx.restore();
   }
@@ -185,16 +188,18 @@ export class TrainingGameRenderer {
     if (cloud._state === 'sliding_in')   return cloud._t;
     if (cloud._state === 'covering')     return 1 - exhaleProgress;
     if (cloud._state === 'success_fade') return cloud.alpha;
+    if (cloud._state === 'sliding_out')  return 1 - easeOut(cloud._t);
     return 0;
   }
 
-  #drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now }) {
+  #drawPlaying(ctx, w, h, { activeCloud, fadingCloud, failedClouds, particles, phase, inBreath, exhaleProgress, gameElapsed, score, now }) {
     const cx = w / 2;
     const cy = h / 2;
 
     const sunDx = Math.cos(now / 3200) * 4;
     const sunDy = Math.sin(now / 2200) * 5;
-    this.#drawSun(ctx, cx + sunDx, cy + sunDy, this.#cloudSadness(activeCloud, exhaleProgress));
+    const sadCloud = activeCloud ?? fadingCloud;
+    this.#drawSun(ctx, cx + sunDx, cy + sunDy, this.#cloudSadness(sadCloud, exhaleProgress));
 
     for (const cloud of failedClouds) {
       if (!cloud.alive) continue;
@@ -248,14 +253,18 @@ export class TrainingGameRenderer {
   }
 
   #drawScoreOverlay(ctx, score) {
-    ctx.textAlign    = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle    = 'rgba(80,60,20,0.75)';
-    ctx.font         = '300 48px Nunito, sans-serif';
+    ctx.save();
+    ctx.shadowColor   = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur    = 10;
+    ctx.textAlign     = 'left';
+    ctx.textBaseline  = 'top';
+    ctx.fillStyle     = 'rgba(255,255,255,0.88)';
+    ctx.font          = '300 48px Nunito, sans-serif';
     ctx.fillText(score, 22, 14);
-    ctx.fillStyle = 'rgba(80,60,20,0.40)';
-    ctx.font      = '200 13px Nunito, sans-serif';
+    ctx.fillStyle     = 'rgba(255,255,255,0.45)';
+    ctx.font          = '200 13px Nunito, sans-serif';
     ctx.fillText('score', 24, 64);
+    ctx.restore();
   }
 
   #drawTimerBar(ctx, w, h, gameElapsed, now) {
@@ -296,11 +305,15 @@ export class TrainingGameRenderer {
     const secs = Math.ceil(timeLeft);
     const mm   = String(Math.floor(secs / 60));
     const ss   = String(secs % 60).padStart(2, '0');
-    ctx.fillStyle    = 'rgba(80,60,20,0.45)';
-    ctx.font         = '300 12px Nunito, sans-serif';
-    ctx.textAlign    = 'right';
-    ctx.textBaseline = 'top';
+    ctx.save();
+    ctx.shadowColor   = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur    = 6;
+    ctx.fillStyle     = 'rgba(255,255,255,0.65)';
+    ctx.font          = '300 12px Nunito, sans-serif';
+    ctx.textAlign     = 'right';
+    ctx.textBaseline  = 'top';
     ctx.fillText(`${mm}:${ss}`, barRight, barY + barH + 5);
+    ctx.restore();
   }
 
   #drawSun(ctx, cx, cy, sadness = 0) {

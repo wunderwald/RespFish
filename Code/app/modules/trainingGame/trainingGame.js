@@ -131,6 +131,12 @@ export class TrainingGame {
       this.#beginPlaying();
     } else if (this.#state === STATE.PLAYING && now - this.#gameStartTime >= CONFIG.GAME_DURATION_SECS * 1000) {
       this.#endGame();
+    } else if (this.#state === STATE.PLAYING &&
+               this.#phase === 'inhale' &&
+               this.#phaseStartTime != null &&
+               now - this.#phaseStartTime >= this.#beatMs / 2) {
+      this.#exhaleTimeAbove = 0;
+      this.#onExhaleEnd(now);
     }
   }
 
@@ -174,6 +180,7 @@ export class TrainingGame {
       score:            this.#score,
       gameElapsed:      this.#gameStartTime != null ? (now - this.#gameStartTime) / 1000 : 0,
       activeCloud:      this.#activeCloud,
+      fadingCloud:      this.#failedClouds.at(-1)?._state === 'sliding_out' ? this.#failedClouds.at(-1) : null,
       failedClouds:     this.#failedClouds,
       particles:        this.#particles,
       phase:            this.#phase,
