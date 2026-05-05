@@ -88,6 +88,11 @@ contextBridge.exposeInMainWorld("api", {
 
   pickDir: () => ipcRenderer.invoke("pick-directory"),
 
+  // Launcher IPC — used only by the launcher window
+  launcher: {
+    select: (frontend) => ipcRenderer.send('launcher:select', frontend),
+  },
+
   // Frontend IPC — scene window pushes state, experimenter window sends actions
   frontend: {
     sendState:  (data) => ipcRenderer.send('frontend:state', data),

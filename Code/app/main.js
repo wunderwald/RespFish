@@ -3,9 +3,10 @@ const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
 
-let bridgeProcess = null;
-let mainWindow = null;
-let controlWindow = null;
+let bridgeProcess  = null;
+let mainWindow     = null;
+let controlWindow  = null;
+let launcherWindow = null;
 
 // ── Python bridge ────────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ ipcMain.handle("pick-directory", async (event) => {
 
 // ── Experimenter control window ───────────────────────────────────────────────
 
-function createControlWindow() {
+function createControlWindow(frontend) {
   controlWindow = new BrowserWindow({
     width: 1100,
     height: 260,
@@ -142,7 +143,7 @@ function createControlWindow() {
       nodeIntegration: false,
     },
   });
-  controlWindow.loadFile("experimenter.html", { query: { frontend: process.env.FRONTEND || "ibreath" } });
+  controlWindow.loadFile("experimenter.html", { query: { frontend } });
   controlWindow.on("closed", () => {
     controlWindow = null;
     app.quit();
@@ -183,9 +184,9 @@ ipcMain.on("gaze:sample", (_event, data) => {
   mainWindow?.webContents.send("gaze:sample", data);
 });
 
-// ── Window ───────────────────────────────────────────────────────────────────
+// ── Scene window ──────────────────────────────────────────────────────────────
 
-function createWindow() {
+function createWindow(frontend) {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 820,
@@ -199,12 +200,49 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-
-  mainWindow.loadFile("index.html", { query: { frontend: process.env.FRONTEND || "ibreath" } });
+  mainWindow.loadFile("index.html", { query: { frontend } });
   mainWindow.on("closed", () => {
     mainWindow = null;
     app.quit();
   });
+}
+
+// ── Launcher window ───────────────────────────────────────────────────────────
+
+function createLauncherWindow() {
+  launcherWindow = new BrowserWindow({
+    width: 560,
+    height: 400,
+    resizable: false,
+    title: "RespFish",
+    backgroundColor: "#0b1e30",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  launcherWindow.loadFile("launcher.html");
+  launcherWindow.setMenuBarVisibility(false);
+  launcherWindow.on("closed", () => {
+    launcherWindow = null;
+    // Only quit if no experiment windows were opened
+    if (!mainWindow && !controlWindow) app.quit();
+  });
+}
+
+function launchFrontend(frontend) {
+  // Close launcher without triggering its quit guard
+  if (launcherWindow) {
+    launcherWindow.removeAllListeners("closed");
+    launcherWindow.close();
+    launcherWindow = null;
+  }
+  // Bridge has been running since app start; short delay is enough
+  setTimeout(() => {
+    createWindow(frontend);
+    createControlWindow(frontend);
+  }, 200);
 }
 
 // ── Camera permission ─────────────────────────────────────────────────────────
@@ -235,12 +273,23 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.whenReady().then(() => {
   setupPermissions();
   startBridge();
-  // Brief delay so the bridge socket is ready before the renderer connects
-  setTimeout(createWindow, 600);
-  setTimeout(createControlWindow, 600);
+
+  const frontend = process.env.FRONTEND;
+  if (frontend) {
+    // Direct launch via `npm run ibreath` etc. — skip the launcher.
+    // Brief delay so the bridge socket is ready before the renderer connects.
+    setTimeout(() => {
+      createWindow(frontend);
+      createControlWindow(frontend);
+    }, 600);
+  } else {
+    // No frontend specified — show the launcher so the user can choose.
+    createLauncherWindow();
+    ipcMain.once("launcher:select", (_event, chosen) => launchFrontend(chosen));
+  }
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createLauncherWindow();
   });
 });
 

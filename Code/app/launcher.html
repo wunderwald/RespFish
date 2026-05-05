@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RespFish</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/launcher.css" />
+</head>
+<body>
+  <header>
+    <h1>RespFish</h1>
+    <p class="subtitle">Select an experiment to begin</p>
+  </header>
+
+  <main>
+    <button class="card" data-frontend="ibreath">
+      <span class="card-title">iBreath</span>
+      <span class="card-desc">Interoception experiment — calibrated breath-controlled cloud stimulus</span>
+    </button>
+    <button class="card" data-frontend="bioGame">
+      <span class="card-title">bioGame</span>
+      <span class="card-desc">Biofeedback game — guide the puffer fish to collect starfish</span>
+    </button>
+  </main>
+
+  <footer>
+    <button class="secondary-link" data-frontend="trainingGame">Training game</button>
+    <span class="sep">·</span>
+    <button class="secondary-link" data-frontend="visualizer">Signal visualizer</button>
+  </footer>
+
+  <script src="launcher.js" type="module"></script>
+</body>
+</html>
