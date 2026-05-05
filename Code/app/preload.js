@@ -85,4 +85,14 @@ contextBridge.exposeInMainWorld("api", {
     // Scene window: request main to open the experimenter window
     openControl: ()       => ipcRenderer.send('hud:open-control'),
   },
+
+  // Stream IPC — experimenter window sends data, scene window receives it
+  stream: {
+    sendSample:     (data) => ipcRenderer.send('stream:sample', data),
+    sendStatus:     (data) => ipcRenderer.send('stream:status', data),
+    sendGazeSample: (data) => ipcRenderer.send('gaze:sample',   data),
+    onSample:       (cb)   => ipcRenderer.on('stream:sample', (_e, d) => cb(d)),
+    onStatus:       (cb)   => ipcRenderer.on('stream:status', (_e, d) => cb(d)),
+    onGazeSample:   (cb)   => ipcRenderer.on('gaze:sample',   (_e, d) => cb(d)),
+  },
 });

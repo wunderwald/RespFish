@@ -17,8 +17,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { StreamManager } from "./modules/stream/stream.js";
-import { GazeManager   } from "./modules/webgazer/gazeCalibration.js";
+import { GazeManager } from "./modules/webgazer/gazeCalibration.js";
 
 // ── Active frontend ───────────────────────────────────────────────────────────
 //
@@ -38,10 +37,8 @@ const GAZE_ENABLED = false;
 
 // ── Mount points (defined in index.html) ─────────────────────────────────────
 
-const streamContainer     = document.getElementById("stream-bar");
-const gazeStreamContainer = document.getElementById("gaze-bar");
-const statsContainer      = document.getElementById("stats");
-const sceneContainer      = document.getElementById("scene");
+const statsContainer = document.getElementById("stats");
+const sceneContainer = document.getElementById("scene");
 
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 
@@ -79,12 +76,12 @@ async function init() {
     const { RemoteHud } = await import('./modules/ibreath/remoteHud.js');
     hudFactory = (callbacks) => new RemoteHud(callbacks);
   }
-  const frontend = new FrontendClass({ statsContainer, sceneContainer, gazeStreamContainer, hudFactory });
+  const frontend = new FrontendClass({ statsContainer, sceneContainer, hudFactory });
 
-  // 5. Instantiate the stream manager and wire its events to the frontend.
-  const stream = new StreamManager({ container: streamContainer, label: 'resp stream' });
-  stream.on("sample", ({ value }) => frontend.pushSample(value));
-  stream.on("status", (event)     => frontend.setStatus(event));
+  // 5. Receive stream data forwarded from the experimenter window via IPC.
+  window.api.stream.onSample(({ value }) => frontend.pushSample(value));
+  window.api.stream.onStatus((event)     => frontend.setStatus(event));
+  window.api.stream.onGazeSample(({ channels }) => frontend.pushGazeSample?.(channels));
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

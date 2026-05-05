@@ -29,7 +29,6 @@ import { LocalHud } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
 import { MarkerStream } from '../stream/markerStream.js';
-import { StreamManager } from '../stream/stream.js';
 
 export { CONFIG };
 
@@ -80,7 +79,6 @@ export default class IBreath {
   #flashActive = false;
 
   // ── gaze ───────────────────────────────────────────────────────────────
-  #gazeManager = null;
   #gazeX = null;
   #gazeY = null;
   #gazeEnabled = false;
@@ -91,7 +89,7 @@ export default class IBreath {
   #renderer = null;
   #csv = null;
 
-  constructor({ statsContainer, sceneContainer, gazeStreamContainer, hudFactory }) {
+  constructor({ statsContainer, sceneContainer, hudFactory }) {
     const callbacks = {
       onStart:    () => this.#beginCalibration(),
       onNext:     () => this.#advanceTrial(),
@@ -104,19 +102,6 @@ export default class IBreath {
 
     this.#renderer = new IBreathRenderer(sceneContainer);
 
-    this.#gazeManager = new StreamManager({
-      container: gazeStreamContainer,
-      wsUrl: CONFIG.GAZE_STREAM_URL,
-      label: 'gaze stream',
-    });
-    this.#gazeManager.on('sample', ({ channels }) => {
-      this.#gazeX = channels?.[0] ?? null;
-      this.#gazeY = channels?.[1] ?? null;
-    });
-    this.#gazeManager.on('status', ({ type }) => {
-      if (type === 'searching' || type === 'connected') this.#gazeEnabled = true;
-    });
-
     this.#markers = CONFIG.SEND_MARKERS
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
       : { send() {} };
@@ -126,6 +111,12 @@ export default class IBreath {
   }
 
   // ── Public interface ───────────────────────────────────────────────────
+
+  pushGazeSample(channels) {
+    this.#gazeX = channels?.[0] ?? null;
+    this.#gazeY = channels?.[1] ?? null;
+    this.#gazeEnabled = true;
+  }
 
   pushSample(rawValue) {
     this.#lastRawSample = rawValue;
@@ -186,7 +177,6 @@ export default class IBreath {
     this.#state = STATE.CALIBRATING;
     this.#hud.startEnabled = false;
     this.#hud.inputsLocked = true;
-    this.#gazeManager.disable();
     this.#hud.stateText = 'calibrating…';
 
     this.#csv = new IBreathCSV(this.#subjectCode, this.#questionType, this.#gazeEnabled, (msg) => this.#csvWarn(msg));

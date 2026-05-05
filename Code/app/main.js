@@ -117,11 +117,11 @@ ipcMain.handle("append-csv", (_event, filePath, content) => {
 function createControlWindow() {
   controlWindow = new BrowserWindow({
     width: 900,
-    height: 130,
+    height: 200,
     minWidth: 600,
-    minHeight: 80,
+    minHeight: 140,
     title: "iBreath — Experimenter",
-    backgroundColor: "#0f485f",
+    backgroundColor: "#000000",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -129,7 +129,10 @@ function createControlWindow() {
     },
   });
   controlWindow.loadFile("experimenter.html");
-  controlWindow.on("closed", () => (controlWindow = null));
+  controlWindow.on("closed", () => {
+    controlWindow = null;
+    app.quit();
+  });
 }
 
 // Relay: scene window → experimenter window
@@ -145,6 +148,17 @@ ipcMain.on("hud:action", (_event, data) => {
 ipcMain.on("hud:open-control", () => {
   if (!controlWindow) createControlWindow();
   else controlWindow.focus();
+});
+
+// Relay: experimenter window → scene window (resp stream data)
+ipcMain.on("stream:sample", (_event, data) => {
+  mainWindow?.webContents.send("stream:sample", data);
+});
+ipcMain.on("stream:status", (_event, data) => {
+  mainWindow?.webContents.send("stream:status", data);
+});
+ipcMain.on("gaze:sample", (_event, data) => {
+  mainWindow?.webContents.send("gaze:sample", data);
 });
 
 // ── Window ───────────────────────────────────────────────────────────────────
@@ -167,7 +181,7 @@ function createWindow() {
   mainWindow.loadFile("index.html");
   mainWindow.on("closed", () => {
     mainWindow = null;
-    controlWindow?.close();
+    app.quit();
   });
 }
 
@@ -209,7 +223,7 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   killBridge();
-  if (process.platform !== "darwin") app.quit();
+  app.quit();
 });
 
 app.on("before-quit", killBridge);
