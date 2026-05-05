@@ -28,7 +28,7 @@ import { buildHUD } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
 import { MarkerStream } from '../stream/markerStream.js';
-import { GazeReceiver } from './gazeReceiver.js';
+import { StreamManager } from '../stream/stream.js';
 
 export { CONFIG };
 
@@ -79,7 +79,10 @@ export default class IBreath {
   #flashActive = false;   // shared between update and draw loops
 
   // ── gaze ───────────────────────────────────────────────────────────────
-  #gaze = null;   // GazeReceiver, or null if not configured
+  #gazeManager = null;   // StreamManager for the gaze bridge
+  #gazeX = null;
+  #gazeY = null;
+  #gazeEnabled = false;  // locked at calibration start
 
   // ── sub-modules ────────────────────────────────────────────────────────
   #markers = null;
@@ -94,6 +97,19 @@ export default class IBreath {
       onAbort: () => this.#abortTrial(),
     });
     this.#renderer = new IBreathRenderer(sceneContainer);
+
+    this.#gazeManager = new StreamManager({
+      container: this.#hud.gazeStreamContainer,
+      wsUrl: CONFIG.GAZE_STREAM_URL,
+    });
+    this.#gazeManager.on('sample', ({ channels }) => {
+      this.#gazeX = channels?.[0] ?? null;
+      this.#gazeY = channels?.[1] ?? null;
+    });
+    this.#gazeManager.on('status', ({ type }) => {
+      if (type === 'searching' || type === 'connected') this.#gazeEnabled = true;
+    });
+
     this.#markers = CONFIG.SEND_MARKERS
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
       : { send() {} };
@@ -166,13 +182,10 @@ export default class IBreath {
     this.#hud.startBtn.disabled = true;
     this.#hud.subjectInput.disabled = true;
     this.#hud.questionTypeSelect.disabled = true;
-    this.#hud.gazeUrlInput.disabled = true;
-
-    const gazeUrl = this.#hud.gazeUrlInput.value.trim();
-    this.#gaze = gazeUrl ? new GazeReceiver(gazeUrl) : null;
+    this.#gazeManager.disable();
     this.#hud.stateEl.textContent = 'calibrating…';
 
-    this.#csv = new IBreathCSV(this.#subjectCode, this.#questionType, !!this.#gaze, (msg) => this.#csvWarn(msg));
+    this.#csv = new IBreathCSV(this.#subjectCode, this.#questionType, this.#gazeEnabled, (msg) => this.#csvWarn(msg));
     this.#csv.init();
     this.#markers.send('calibration_start');
   }
@@ -410,7 +423,7 @@ export default class IBreath {
         scaled: this.#lastScaledSample,
         stim: stimLevel,
         flash: this.#flashActive ? 1 : 0,
-        ...(this.#gaze ? { gazeX: this.#gaze.x ?? '', gazeY: this.#gaze.y ?? '' } : {}),
+        ...(this.#gazeEnabled ? { gazeX: this.#gazeX ?? '', gazeY: this.#gazeY ?? '' } : {}),
       });
 
       if (tSecs >= CONFIG.MAX_TRIAL_TIME) {
