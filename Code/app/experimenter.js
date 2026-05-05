@@ -1,6 +1,7 @@
 // Experimenter control window — stream selection + frontend-specific controls.
 import { StreamManager } from './modules/stream/stream.js';
 import { CONFIG }        from './modules/ibreath/config.js';
+import { CONFIG as BG }  from './modules/bioGame/bioGame_config.js';
 
 // ── Frontend detection ────────────────────────────────────────────────────────
 
@@ -23,7 +24,7 @@ respStream.on('status', (event) => {
 // ── Gaze stream (ibreath + gazetest only) ─────────────────────────────────────
 
 let gazeStream = null;
-if (['ibreath', 'gazetest', 'bioGame'].includes(frontend)) {
+if (['ibreath', 'gazetest'].includes(frontend)) {
   gazeStream = new StreamManager({
     container: document.getElementById('gaze-bar'),
     wsUrl: CONFIG.GAZE_STREAM_URL,
@@ -42,15 +43,15 @@ if (['ibreath', 'gazetest', 'bioGame'].includes(frontend)) {
 
 // ── Timer bar (ibreath only) ──────────────────────────────────────────────────
 
-if (!['ibreath'].includes(frontend)) {
+if (frontend !== 'ibreath') {
   document.getElementById('timer-bar').style.display = 'none';
 }
 
-// ── Settings bar (ibreath only) ───────────────────────────────────────────────
+// ── Settings bar (ibreath + bioGame) ─────────────────────────────────────────
 
 const settingsBar = document.getElementById('settings-bar');
 
-if (frontend !== 'ibreath') {
+if (!['ibreath', 'bioGame'].includes(frontend)) {
   settingsBar.style.display = 'none';
 }
 
@@ -58,7 +59,7 @@ if (frontend !== 'ibreath') {
 
 const logBar = document.getElementById('log-bar');
 
-if (!['trainingGame'].includes(frontend)) {
+if (frontend !== 'trainingGame') {
   logBar.style.display = 'none';
 }
 
@@ -268,22 +269,122 @@ if (frontend === 'ibreath') {
   });
 
 } else if (frontend === 'bioGame') {
-  // ── BioGame controls ─────────────────────────────────────────────────────────
+  // ── BioGame HUD ──────────────────────────────────────────────────────────────
 
   statsEl.innerHTML = `
-    <span id="bg-state">waiting for stream…</span>
-    <span id="ib-controls"><button id="bg-start-btn" disabled>Start</button></span>
+    <span>
+      <span class="label">status</span>
+      <span id="bg-status">waiting for stream…</span>
+    </span>
+    <span>
+      <span class="label">subject</span>
+      <input id="bg-subject" type="text" value="${BG.SUBJECT_CODE}"
+             placeholder="subject code" autocomplete="off" spellcheck="false" />
+    </span>
+    <span>
+      <span class="label">group</span>
+      <select id="bg-group" class="stream-select">
+        <option value="slow">Target (slow 6 BPM)</option>
+        <option value="natural">Control (natural)</option>
+      </select>
+    </span>
+    <span id="bg-natural-bpm-wrap">
+      <span class="label">natural BPM</span>
+      <input id="bg-natural-bpm" type="number" min="4" max="20" step="0.5"
+             value="${BG.NATURAL_BPM}" style="width:46px" />
+    </span>
+    <span>
+      <span class="label">score</span>
+      <span id="bg-score">—</span>
+    </span>
+    <span id="ib-controls">
+      <button id="bg-start-btn"  disabled>Start</button>
+      <button id="bg-next-btn"   style="display:none">Start Block 2</button>
+      <button id="bg-abort-btn"  style="display:none">Abort</button>
+    </span>
   `;
-  const bgStateEl  = document.getElementById('bg-state');
-  const bgStartBtn = document.getElementById('bg-start-btn');
 
-  bgStartBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'start' }));
+  // ── bioGame settings bar ──────────────────────────────────────────────────────
 
-  window.api.frontend.onState(({ stateText, btnEnabled, btnText }) => {
-    if (stateText  !== undefined) bgStateEl.textContent  = stateText;
-    if (btnEnabled !== undefined) bgStartBtn.disabled    = !btnEnabled;
-    if (btnText    !== undefined) bgStartBtn.textContent = btnText;
+  settingsBar.innerHTML = `
+    <span class="label">settings</span>
+    <label><input type="checkbox" id="bg-show-curve" ${BG.SHOW_CURVE ? 'checked' : ''}>
+      show target curve</label>
+    <span class="label">data dir</span>
+    <span id="bg-data-dir-text">${BG.DATA_DIR}</span>
+    <button id="bg-pick-dir">…</button>
+  `;
+
+  document.getElementById('bg-pick-dir').addEventListener('click', async () => {
+    const picked = await window.api.pickDir();
+    if (picked) document.getElementById('bg-data-dir-text').textContent = picked;
   });
+
+  const bgStatusEl   = document.getElementById('bg-status');
+  const bgSubjectEl  = document.getElementById('bg-subject');
+  const bgGroupEl    = document.getElementById('bg-group');
+  const bgNatBpmWrap = document.getElementById('bg-natural-bpm-wrap');
+  const bgNatBpmEl   = document.getElementById('bg-natural-bpm');
+  const bgScoreEl    = document.getElementById('bg-score');
+  const bgStartBtn   = document.getElementById('bg-start-btn');
+  const bgNextBtn    = document.getElementById('bg-next-btn');
+  const bgAbortBtn   = document.getElementById('bg-abort-btn');
+
+  // Show natural-BPM field only for the natural condition
+  bgNatBpmWrap.style.display = BG.GROUP === 'natural' ? '' : 'none';
+  bgGroupEl.addEventListener('change', () => {
+    bgNatBpmWrap.style.display = bgGroupEl.value === 'natural' ? '' : 'none';
+  });
+
+  // ── Receive state from scene window ─────────────────────────────────────────
+
+  window.api.frontend.onState(({ stateText, score, startEnabled, startText,
+                                  nextVisible, abortVisible, inputsLocked }) => {
+    if (stateText    !== undefined) bgStatusEl.textContent      = stateText;
+    if (score        != null)       bgScoreEl.textContent       = score;
+    if (startEnabled !== undefined) bgStartBtn.disabled         = !startEnabled;
+    if (startText    !== undefined) bgStartBtn.textContent      = startText;
+    if (nextVisible  !== undefined) bgNextBtn.style.display     = nextVisible  ? '' : 'none';
+    if (abortVisible !== undefined) bgAbortBtn.style.display    = abortVisible ? '' : 'none';
+    if (inputsLocked !== undefined && inputsLocked) {
+      bgSubjectEl.disabled = true;
+      bgGroupEl.disabled   = true;
+      bgNatBpmEl.disabled  = true;
+      respStream.disable();
+      for (const el of settingsBar.querySelectorAll('input, button, select')) {
+        el.disabled = true;
+      }
+    }
+  });
+
+  // ── Send actions to scene window ─────────────────────────────────────────────
+
+  bgStartBtn.addEventListener('click', () => {
+    window.api.frontend.sendAction({
+      type:        'start',
+      subjectCode: bgSubjectEl.value.trim() || 'TEST',
+      group:       bgGroupEl.value,
+      naturalBpm:  parseFloat(bgNatBpmEl.value) || BG.NATURAL_BPM,
+      showCurve:   document.getElementById('bg-show-curve').checked,
+      dataDir:     document.getElementById('bg-data-dir-text').textContent,
+    });
+  });
+  bgNextBtn.addEventListener('click',  () => window.api.frontend.sendAction({ type: 'next' }));
+  bgAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────────
+
+  window.addEventListener('keydown', (e) => {
+    if (document.activeElement === bgSubjectEl) return;
+    switch (e.code) {
+      case 'Space':  e.preventDefault(); window.api.frontend.sendAction({ type: 'next' });  break;
+      case 'Escape': window.api.frontend.sendAction({ type: 'abort' }); break;
+    }
+  });
+
+  // ── Request current state on load ─────────────────────────────────────────────
+
+  window.api.frontend.sendAction({ type: 'ready' });
 
 } else {
   statsEl.style.display = 'none';
