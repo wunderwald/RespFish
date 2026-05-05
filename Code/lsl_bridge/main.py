@@ -1,19 +1,28 @@
 """
-LSL → WebSocket Bridge
-======================
-Discovers all available LSL streams, lets clients select one, and
-broadcasts samples to all connected WebSocket clients.
+LSL ↔ WebSocket Bridge
+=======================
+Two servers in one process:
 
-Message types (JSON):
+  Signal bridge  (port 8765) — discovers LSL streams, lets clients select one,
+                               broadcasts samples as JSON to all WebSocket clients.
+
+  Marker bridge  (port 9001) — receives raw string markers from WebSocket clients
+                               and pushes them to an LSL string outlet
+                               ('RespFishMarkers').
+
+Signal bridge message types (JSON):
   Server → Client:
     { "type": "streams",      "streams": [{ name, channel_count, sample_rate, type, source_id }] }
     { "type": "sample",       "value": float, "timestamp": float }
     { "type": "connected",    "stream": { name, channel_count, sample_rate, type, source_id } }
     { "type": "disconnected", "reason": str }
     { "type": "searching",    "stream_name": str }
-
   Client → Server:
     { "type": "select_stream", "name": str }
+
+Marker bridge protocol:
+  Client → Server:  plain text string, e.g. "trial_start_t3"
+  (no response sent)
 
 Usage:
   python main.py
@@ -26,7 +35,7 @@ import asyncio
 import json
 import logging
 import websockets
-from pylsl import StreamInlet, resolve_byprop, resolve_streams as lsl_resolve_streams
+from pylsl import StreamInlet, StreamInfo, StreamOutlet, resolve_byprop, resolve_streams as lsl_resolve_streams
 
 # #########
 # CONSTANTS
@@ -34,6 +43,8 @@ from pylsl import StreamInlet, resolve_byprop, resolve_streams as lsl_resolve_st
 
 WS_HOST            = "localhost"
 WS_PORT            = 8765
+MARKER_WS_PORT     = 9001
+MARKER_STREAM_NAME = "RespFishMarkers"
 DISCOVERY_WAIT     = 1.0   # seconds per resolve_streams call
 DISCOVERY_INTERVAL = 2.0   # extra sleep between discovery rounds
 PULL_TIMEOUT       = 2.0   # seconds to wait for a single sample
@@ -310,6 +321,31 @@ async def ws_handler(
         log.info(f"Client disconnected: {remote}  (total: {len(state.clients)})")
 
 
+# ##############
+# MARKER HANDLER
+# ##############
+
+async def marker_ws_handler(
+    websocket: websockets.WebSocketServerProtocol,  # type: ignore
+    outlet: StreamOutlet,
+) -> None:
+    """
+    Receives raw string markers from one WebSocket client and pushes each
+    to the LSL marker outlet immediately (no JSON — plain text strings).
+    """
+    remote = websocket.remote_address
+    log.info(f"Marker client connected: {remote}")
+    try:
+        async for raw in websocket:
+            marker = raw if isinstance(raw, str) else raw.decode()
+            outlet.push_sample([marker])
+            log.info(f"Marker → LSL: {marker!r}")
+    except websockets.exceptions.ConnectionClosed:
+        pass
+    finally:
+        log.info(f"Marker client disconnected: {remote}")
+
+
 # ####
 # MAIN
 # ####
@@ -321,12 +357,22 @@ async def main() -> None:
     asyncio.create_task(stream_discoverer(state))
     asyncio.create_task(lsl_reader(state))
 
+    # LSL marker outlet — irregular-rate string stream (0 = IRREGULAR_RATE)
+    marker_info   = StreamInfo(MARKER_STREAM_NAME, "Markers", 1, 0, "string", "respfish_markers")
+    marker_outlet = StreamOutlet(marker_info)
+    log.info(f"LSL marker outlet '{MARKER_STREAM_NAME}' ready")
+
     async def handler(websocket):
         await ws_handler(websocket, state)
 
-    log.info(f"WebSocket server listening on ws://{WS_HOST}:{WS_PORT}")
+    async def marker_handler(websocket):
+        await marker_ws_handler(websocket, marker_outlet)
+
+    log.info(f"Signal bridge: ws://{WS_HOST}:{WS_PORT}")
+    log.info(f"Marker bridge: ws://{WS_HOST}:{MARKER_WS_PORT}")
     async with websockets.serve(handler, WS_HOST, WS_PORT):
-        await asyncio.Future()  # run forever
+        async with websockets.serve(marker_handler, WS_HOST, MARKER_WS_PORT):
+            await asyncio.Future()  # run forever
 
 
 if __name__ == "__main__":
