@@ -1,6 +1,8 @@
 .venv
 
 app/subjectData
+app/bioGameData
+app/iBreathData
 
 !app/lib/webgazer.js
 
