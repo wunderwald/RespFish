@@ -36,7 +36,7 @@ export const CONFIG = {
 
   // Questions after trials
   SHOW_QUESTIONS: true,      // show a post-trial response question after each trial
-  QUESTION_TYPE: 'intero',  // 'intero' — "was it in sync with your breathing?" (target group) or 'extero' — "did you see a flashing image?"        (control group)
+  QUESTION_TYPE: 'extero',  // 'intero' — "was it in sync with your breathing?" (target group) or 'extero' — "did you see a flashing image?"        (control group)
   RESPONSE_TIMEOUT_SECS: 5,        // seconds before a non-response is recorded as 'timeout'
 
   // Flash image
