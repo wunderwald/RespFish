@@ -43,8 +43,9 @@ export class IBreathRenderer {
   }
 
   #drawGazeDot(ctx, w, h, gx, gy) {
-    const x = gx * w;
-    const y = gy * h;
+    const rect = this.#canvas.getBoundingClientRect();
+    const x = gx * window.innerWidth  - rect.left;
+    const y = gy * window.innerHeight - rect.top;
     const r = 10;
     ctx.save();
     ctx.beginPath();
