@@ -5,14 +5,14 @@
  * dropdown.  Everything else in the app subscribes to its events.
  *
  * Events emitted:
- *   'sample'   { value: number, timestamp: number }
+ *   'sample'   { value: number, channels: number[], timestamp: number }
  *   'status'   { type: 'connected'|'disconnected'|'searching', text: string,
  *                stream?: object }
  *   'streams'  stream[]   — full list whenever it changes
  *
  * Usage:
- *   const sm = new StreamManager({ container, wsUrl });
- *   sm.on('sample', ({ value }) => ...);
+ *   const sm = new StreamManager({ container, wsUrl, filter: 'resp' });
+ *   sm.on('sample', ({ value, channels }) => ...);
  *   sm.on('status', ({ type, text }) => ...);
  */
 
@@ -24,9 +24,12 @@ export class StreamManager {
   #currentStreams = [];
   #selectEl = null;
   #wsUrl;
+  #filter;
+  #userSelectedNone = false;  // true once user explicitly picks "— none —"
 
-  constructor({ container, wsUrl = "ws://localhost:8765", label = "stream" }) {
+  constructor({ container, wsUrl = "ws://localhost:8765", label = "stream", filter = null }) {
     this.#wsUrl = wsUrl;
+    this.#filter = filter;
     this.#buildUI(container, label);
     this.#connect();
   }
@@ -48,13 +51,20 @@ export class StreamManager {
     container.innerHTML = `
       <span class="label">${label}</span>
       <select class="stream-select">
-        <option value="" disabled selected>no streams found</option>
+        <option value="">— none —</option>
       </select>
     `;
     this.#selectEl = container.querySelector(".stream-select");
     this.#selectEl.addEventListener("change", () => {
       const name = this.#selectEl.value;
-      if (!name) return;
+      if (!name) {
+        this.#userSelectedNone = true;
+        this.#selectedStream = null;
+        this.#streamConnected = false;
+        this.#send({ type: "select_stream", name: null });
+        return;
+      }
+      this.#userSelectedNone = false;
       this.#selectedStream = name;
       this.#streamConnected = false;
       this.#rebuildDropdown();
@@ -66,6 +76,12 @@ export class StreamManager {
     const sel = this.#selectEl;
     const isOffline = this.#selectedStream && !this.#streamConnected;
     sel.innerHTML = "";
+
+    // "— none —" is always the first option
+    const noneOpt = document.createElement("option");
+    noneOpt.value = "";
+    noneOpt.textContent = "— none —";
+    sel.appendChild(noneOpt);
 
     if (isOffline) {
       const opt = document.createElement("option");
@@ -83,24 +99,20 @@ export class StreamManager {
       sel.appendChild(opt);
     }
 
-    if (sel.options.length === 0) {
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.disabled = true;
-      opt.textContent = "no streams found";
-      sel.appendChild(opt);
-      sel.value = "";
-      return;
-    }
-
     if (this.#selectedStream) {
       sel.value = this.#selectedStream;
-    } else if (this.#currentStreams.length > 0) {
-      const first = this.#currentStreams[0].name;
-      sel.value = first;
-      this.#selectedStream = first;
-      this.#send({ type: "select_stream", name: first });
+    } else if (!this.#userSelectedNone && this.#filter && this.#currentStreams.length > 0) {
+      const match = this.#currentStreams.find(s =>
+        s.name.toLowerCase().includes(this.#filter.toLowerCase())
+      );
+      if (match) {
+        sel.value = match.name;
+        this.#selectedStream = match.name;
+        this.#send({ type: "select_stream", name: match.name });
+      }
+      // else stays on "— none —"
     }
+    // else: stays on "— none —"
   }
 
   // WebSocket

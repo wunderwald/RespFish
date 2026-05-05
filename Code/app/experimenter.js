@@ -7,6 +7,7 @@ import { CONFIG }        from './modules/ibreath/config.js';
 const respStream = new StreamManager({
   container: document.getElementById('stream-bar'),
   label: 'resp stream',
+  filter: 'resp',
 });
 respStream.on('sample', ({ value, channels }) => {
   window.api.stream.sendSample({ value, channels });
@@ -19,16 +20,19 @@ const gazeStream = new StreamManager({
   container: document.getElementById('gaze-bar'),
   wsUrl: CONFIG.GAZE_STREAM_URL,
   label: 'gaze stream',
+  filter: 'gaze',
 });
 gazeStream.on('sample', ({ channels }) => {
   window.api.stream.sendGazeSample({ channels });
+});
+gazeStream.on('status', ({ type }) => {
+  if (type === 'disconnected') window.api.stream.sendGazeSample({ channels: null });
 });
 
 // ── HUD bar ───────────────────────────────────────────────────────────────────
 
 const container = document.getElementById('stats');
 container.innerHTML = `
-  <span id="ib-state-text">waiting for stream…</span>
   <span>
     <span class="label">trial</span>
     <span id="ib-trial">—</span>
@@ -45,13 +49,6 @@ container.innerHTML = `
       <option value="extero">Control (extero)</option>
     </select>
   </span>
-  <span id="ib-clock">
-    <span class="label">elapsed</span>
-    <span id="ib-elapsed">—</span>
-    <span class="clock-sep"> / </span>
-    <span class="label">left</span>
-    <span id="ib-remaining">—</span>
-  </span>
   <span id="ib-controls">
     <button id="ib-start-btn"  disabled>Start</button>
     <button id="ib-next-btn"   style="display:none">Next trial</button>
@@ -59,9 +56,9 @@ container.innerHTML = `
   </span>
 `;
 
-const stateEl            = document.getElementById('ib-state-text');
-const elapsedEl          = document.getElementById('ib-elapsed');
-const remainingEl        = document.getElementById('ib-remaining');
+const stateEl            = document.getElementById('ib-state-text');   // in #timer-bar
+const elapsedEl          = document.getElementById('ib-elapsed');       // in #timer-bar
+const remainingEl        = document.getElementById('ib-remaining');     // in #timer-bar
 const trialEl            = document.getElementById('ib-trial');
 const subjectInput       = document.getElementById('ib-subject');
 const questionTypeSelect = document.getElementById('ib-question-type');

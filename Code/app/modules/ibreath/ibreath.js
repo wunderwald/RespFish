@@ -113,8 +113,12 @@ export default class IBreath {
   // ── Public interface ───────────────────────────────────────────────────
 
   pushGazeSample(channels) {
-    this.#gazeX = channels?.[0] ?? null;
-    this.#gazeY = channels?.[1] ?? null;
+    if (!channels) {
+      this.#gazeEnabled = false;
+      return;
+    }
+    this.#gazeX = channels[0] ?? null;
+    this.#gazeY = channels[1] ?? null;
     this.#gazeEnabled = true;
   }
 
