@@ -36,6 +36,7 @@ export class BioGameRenderer {
     this.#loadFishImg();
     this.#buildBgTex();
     this.#initDigits();
+    this.#warmUpShadow();
   }
 
   // ── Public ────────────────────────────────────────────────────────────────
@@ -145,6 +146,25 @@ export class BioGameRenderer {
     }
 
     this.#bgTex = c;
+  }
+
+  // ── Shadow warm-up ────────────────────────────────────────────────────────
+
+  #warmUpShadow() {
+    // The first ctx.fill() with a given shadowBlur value triggers GPU shader
+    // compilation in Chromium, causing a one-frame stutter. Drawing off-screen
+    // here pre-compiles both radii used during gameplay (6 for particles, 8 for stars).
+    const ctx = this.#ctx;
+    ctx.save();
+    ctx.fillStyle = '#fff';
+    for (const blur of [6, 8]) {
+      ctx.shadowBlur  = blur;
+      ctx.shadowColor = '#fff';
+      ctx.beginPath();
+      ctx.arc(-1000, -1000, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   // ── Fish image ────────────────────────────────────────────────────────────
@@ -486,6 +506,7 @@ export class BioGameRenderer {
 
   #drawParticles(ctx, w, h, topPad, playH, particles) {
     ctx.save();
+    ctx.shadowBlur = 6;  // constant for all particles — set once outside loop
     for (const p of particles) {
       const sx = p.x * w;
       const sy = topPad + (1 - p.y) * playH;
@@ -493,7 +514,6 @@ export class BioGameRenderer {
       ctx.globalAlpha = Math.max(0, p.life);
       ctx.fillStyle   = p.color;
       ctx.shadowColor = p.color;
-      ctx.shadowBlur  = 6;
       ctx.beginPath();
       ctx.arc(sx, sy, r, 0, Math.PI * 2);
       ctx.fill();
