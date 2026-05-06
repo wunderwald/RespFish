@@ -1,0 +1,12 @@
+[project]
+name = "labchart-lsl-bridge"
+version = "0.1.0"
+description = "Stream live ADInstruments LabChart 8 data to Lab Streaming Layer (LSL)"
+requires-python = ">=3.8"
+dependencies = [
+    "pywin32>=306",
+    "pylsl>=1.16",
+]
+
+[project.scripts]
+labchart-to-lsl = "labchart_to_lsl:main"
