@@ -7,6 +7,7 @@
  *   class  GaussianSmoother        — real-time Gaussian low-pass filter
  *   class  FrequencyEstimator      — swappable breath frequency/amp/phase estimator
  *   class  AutocorrEstimator       — autocorrelation-based estimator (default impl)
+ *   class  PeakDetectionEstimator  — peak-detection fallback estimator (MATLAB-style)
  *   class  AsyncSignalGenerator    — sine + Perlin noise async stimulus
  *   function mapRange(v, from, to) — linear range mapping
  *   function perlin1d(len)         — 1-D Perlin-ish noise array
@@ -278,13 +279,7 @@ export class AutocorrEstimator extends FrequencyEstimator {
       }
     }
 
-    // Fallback: use a typical adult breathing period of 4 s
-    const DEFAULT_PERIOD = 4;
-    const periodSamples = bestLag > 0 ? bestLag : DEFAULT_PERIOD * sampleRate;
-    const periodSeconds = periodSamples / sampleRate;
-    const freq = (2 * Math.PI) / periodSeconds;
-
-    // ── 4. Amplitude ──────────────────────────────────────────────────────
+    // ── 4. Amplitude + phase (shared with fallback path) ─────────────────
     let sigMin = Infinity, sigMax = -Infinity;
     for (let i = 0; i < n; i++) {
       if (signal[i] < sigMin) sigMin = signal[i];
@@ -292,14 +287,113 @@ export class AutocorrEstimator extends FrequencyEstimator {
     }
     const amp = sigMax - sigMin > 0 ? sigMax - sigMin : 0.5;
 
+    // ── Fallback: trigger if no peak found OR peak is non-positive ───────
+    // bestVal <= 0 means the signal does not meaningfully repeat at that lag.
+    if (bestLag < 0 || bestVal <= 0) {
+      const fallback = new PeakDetectionEstimator({
+        minBreathPeriod: this.minBreathPeriod,
+        maxBreathPeriod: this.maxBreathPeriod,
+      });
+      const result = fallback.estimate(signal, sampleRate);
+      if (result) {
+        console.log('[AutocorrEstimator] autocorr peak not found — using peak-detection fallback');
+        return result;
+      }
+      console.warn('[AutocorrEstimator] both methods failed — using 4 s default');
+    }
+
+    const periodSeconds = (bestLag > 0 ? bestLag : 4 * sampleRate) / sampleRate;
+    const freq = (2 * Math.PI) / periodSeconds;
+
     // ── 5. Phase ──────────────────────────────────────────────────────────
-    // Find the first sample where the signal crosses amp/2 from below
-    // (the rising edge ≈ start of exhale).
     const half = sigMin + amp / 2;
     let phase = 0;
     for (let i = 0; i < n - 1; i++) {
       if (signal[i] < half && signal[i + 1] >= half) {
-        phase = (i / sampleRate) * freq;  // time offset converted to radians
+        phase = (i / sampleRate) * freq;
+        break;
+      }
+    }
+
+    return { freq, amp, phase };
+  }
+}
+
+
+// ── PeakDetectionEstimator ────────────────────────────────────────────────────
+
+/**
+ * Peak-detection + inter-peak averaging breath frequency estimator.
+ * Matches the approach used in the original MATLAB iBreath script.
+ *
+ * Algorithm:
+ *   1. Find all local maxima above the signal mean.
+ *   2. Compute inter-peak intervals.
+ *   3. Keep only intervals within [minBreathPeriod, maxBreathPeriod].
+ *   4. Average the valid intervals → period.
+ *   5. Amplitude = (max − min) of the signal.
+ *   6. Phase: first rising mid-point crossing.
+ *
+ * Returns null if fewer than two peaks are found or no interval falls within
+ * the plausible range, so callers can fall through to a further fallback.
+ */
+export class PeakDetectionEstimator extends FrequencyEstimator {
+  /**
+   * @param {object} [opts]
+   * @param {number} [opts.minBreathPeriod=2]   Minimum plausible breath period (s)
+   * @param {number} [opts.maxBreathPeriod=12]  Maximum plausible breath period (s)
+   */
+  constructor({ minBreathPeriod = 2, maxBreathPeriod = 12 } = {}) {
+    super();
+    this.minBreathPeriod = minBreathPeriod;
+    this.maxBreathPeriod = maxBreathPeriod;
+  }
+
+  estimate(signal, sampleRate) {
+    const n = signal.length;
+
+    // Signal stats
+    let sigMin = Infinity, sigMax = -Infinity, sigMean = 0;
+    for (let i = 0; i < n; i++) {
+      if (signal[i] < sigMin) sigMin = signal[i];
+      if (signal[i] > sigMax) sigMax = signal[i];
+      sigMean += signal[i];
+    }
+    sigMean /= n;
+    const amp = sigMax - sigMin > 0 ? sigMax - sigMin : 0.5;
+
+    // Find local maxima above the mean (peaks must exceed the midline to count)
+    const peaks = [];
+    for (let i = 1; i < n - 1; i++) {
+      if (signal[i] > signal[i - 1] &&
+          signal[i] > signal[i + 1] &&
+          signal[i] > sigMean) {
+        peaks.push(i);
+      }
+    }
+
+    if (peaks.length < 2) return null;
+
+    // Inter-peak intervals filtered to the plausible breath range
+    const minSamples = Math.floor(this.minBreathPeriod * sampleRate);
+    const maxSamples = Math.ceil(this.maxBreathPeriod * sampleRate);
+    const intervals = [];
+    for (let i = 1; i < peaks.length; i++) {
+      const gap = peaks[i] - peaks[i - 1];
+      if (gap >= minSamples && gap <= maxSamples) intervals.push(gap);
+    }
+
+    if (intervals.length === 0) return null;
+
+    const periodSeconds = (intervals.reduce((a, b) => a + b, 0) / intervals.length) / sampleRate;
+    const freq  = (2 * Math.PI) / periodSeconds;
+
+    // Phase: first rising crossing of the signal midpoint
+    const half = sigMin + amp / 2;
+    let phase = 0;
+    for (let i = 0; i < n - 1; i++) {
+      if (signal[i] < half && signal[i + 1] >= half) {
+        phase = (i / sampleRate) * freq;
         break;
       }
     }
