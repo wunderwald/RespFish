@@ -26,10 +26,10 @@ if (frontend !== 'baseline') {
   document.getElementById('stream-bar').style.display = 'none';
 }
 
-// ── Gaze stream (ibreath + gazetest only) ─────────────────────────────────────
+// ── Gaze stream (ibreath only) ────────────────────────────────────────────────
 
 let gazeStream = null;
-if (['ibreath', 'gazetest'].includes(frontend)) {
+if (frontend === 'ibreath') {
   gazeStream = new StreamManager({
     container: document.getElementById('gaze-bar'),
     wsUrl: CONFIG.GAZE_STREAM_URL,
@@ -248,33 +248,6 @@ if (frontend === 'ibreath') {
     if (statusText !== undefined) vTextEl.textContent = statusText;
     if (value      !== undefined && value !== null) vValEl.textContent = value;
     if (sps        !== undefined) vSpsEl.textContent  = sps;
-  });
-
-} else if (frontend === 'gazetest') {
-  // ── Gazetest stats ───────────────────────────────────────────────────────────
-
-  statsEl.innerHTML = `
-    <span><span class="label">gaze</span><span id="gt-gaze-status">—</span></span>
-    <span><span class="label">position</span><span id="gt-coords">—</span></span>
-    <span><span class="label">accuracy</span><span id="gt-accuracy">—</span></span>
-    <span><span class="label">samples/s</span><span id="gt-sps">—</span></span>
-    <span><span class="label">stream</span><span id="gt-stream">—</span></span>
-  `;
-  const gtGazeEl   = document.getElementById('gt-gaze-status');
-  const gtCoordsEl = document.getElementById('gt-coords');
-  const gtAccEl    = document.getElementById('gt-accuracy');
-  const gtSpsEl    = document.getElementById('gt-sps');
-  const gtStreamEl = document.getElementById('gt-stream');
-
-  window.api.frontend.onState(({ gazeActive, coords, accuracy, sps, streamStatus }) => {
-    if (gazeActive !== undefined) {
-      gtGazeEl.textContent = gazeActive ? 'active' : 'inactive';
-      gtGazeEl.style.color = gazeActive ? 'rgba(91,201,138,0.9)' : 'rgba(224,120,120,0.8)';
-    }
-    if (coords       !== undefined) gtCoordsEl.textContent = coords;
-    if (accuracy     !== undefined) gtAccEl.textContent    = accuracy;
-    if (sps          !== undefined) gtSpsEl.textContent    = sps;
-    if (streamStatus !== undefined) gtStreamEl.textContent = streamStatus;
   });
 
 } else if (frontend === 'bioGame') {

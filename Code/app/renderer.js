@@ -5,7 +5,7 @@
  *
  * ── Switching frontends ───────────────────────────────────────────────────
  * Change the FRONTEND constant below to swap the active frontend.
- * Valid values: 'visualizer' | 'trainingGame' | 'ibreath' | 'gazetest'
+ * Valid values: 'visualizer' | 'trainingGame' | 'ibreath' | 'bioGame' | 'baseline'
  *
  * Every frontend module must implement this interface:
  *   pushSample(value: number) → void
@@ -21,7 +21,7 @@ import { GazeManager } from "./modules/webgazer/gazeCalibration.js";
 
 // ── Active frontend ───────────────────────────────────────────────────────────
 //
-// Set via the npm script: npm run ibreath | trainingGame | visualizer | gazetest | bioGame
+// Set via the npm script: npm run ibreath | trainingGame | visualizer | bioGame | baseline
 // Falls back to 'ibreath' if no ?frontend= param is present.
 
 const FRONTEND = new URLSearchParams(location.search).get('frontend') || 'ibreath';
@@ -63,8 +63,7 @@ async function init() {
     visualizer: './modules/visualizer/visualizer.js',
     trainingGame: './modules/trainingGame/trainingGame.js',
     ibreath:    './modules/ibreath/ibreath.js',
-    gazetest:   './modules/webgazer/gazetest.js',
-    bioGame:    './modules/bioGame/bioGame.js',
+bioGame:    './modules/bioGame/bioGame.js',
     baseline:   './modules/baseline/baseline.js',
   };
   const { default: FrontendClass } = await import(FRONTEND_PATHS[FRONTEND]);

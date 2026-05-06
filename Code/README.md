@@ -42,7 +42,6 @@ cd app && npm run bioGame       # biofeedback breath game
 cd app && npm run trainingGame  # breath training game
 cd app && npm run baseline      # resting-state baseline
 cd app && npm run visualizer    # real-time waveform
-cd app && npm run gazetest      # gaze debug overlay
 ```
 
 ---
