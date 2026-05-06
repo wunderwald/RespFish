@@ -31,20 +31,18 @@ Two windows open:
 
 ## How it works
 
-### Breathing phase logic
+### Breathing phases (symmetric, both 5 s at default 6 BPM)
 
-The game uses **asymmetric phase timing**:
+`beatMs = (60 / TARGET_BPM) * 1000 = 10 000 ms`. Each phase lasts `beatMs / 2 = 5 s`.
 
-- **Inhale phase** — no fixed duration. The game waits indefinitely for the next exhale onset.
-- **Exhale phase** — fixed duration of `beatMs / 2` (5 s at the default 6 BPM target). Starts the moment an exhale onset is detected, ends on the clock.
-
-This design adapts to the child's natural inhale pace while training a consistent, sustained exhale.
+- **Inhale phase** — up to 5 s. If no exhale onset is detected before the window expires, the active cloud auto-fails and the next round starts.
+- **Exhale phase** — exactly 5 s. Starts the moment an exhale onset is detected, ends on the clock.
 
 ### Exhale detection
 
 An exhale onset is detected by a **rising edge**: the normalised signal crosses `EXHALE_ONSET_THRESHOLD` (0.40) from below.
 
-A **debounce** of 1500 ms prevents a single noisy breath from triggering multiple rounds.
+A **debounce** of 1500 ms prevents multiple triggers from a single noisy crossing.
 
 ### Success criterion
 
@@ -55,17 +53,15 @@ ratio = exhaleTimeAbove / (beatMs / 2)
 success = ratio >= EXHALE_SUCCESS_RATIO (0.90)
 ```
 
-The child must sustain exhalation for at least 90 % of the window. Short puffs that drop back below threshold mid-exhale will fail.
+The player must sustain exhalation for at least 90 % of the 5 s window.
 
 ### Cloud timing
 
-Clouds spawn at the **start of the inhale phase** and drift toward the sun over `CLOUD_SLIDE_MS` (2200 ms). The cloud is already near the sun by the time the next exhale begins, giving a clear visual cue of what is coming.
-
-A first cloud is spawned immediately when the game starts.
+When the inhale phase starts, a cloud spawns from a random screen edge `CLOUD_SPAWN_DELAY_MS` (2.5 s) later and slides toward the sun over `CLOUD_SLIDE_IN_MS` (2 s). The first cloud spawns immediately when the game starts.
 
 ### Failed clouds
 
-If a round fails, the cloud slides to an orbit position around the sun and fades out slowly over 60 s. Up to 12 orbit positions are used (evenly distributed), cycling if more clouds accumulate.
+If a round fails, the cloud slides to an orbit position around the sun over `CLOUD_SLIDE_MS` (2.2 s), then slowly fades over `FAIL_FADE_MS` (60 s). Up to 12 orbit positions are used, cycling if more clouds accumulate.
 
 ---
 
@@ -80,7 +76,9 @@ In [app/modules/trainingGame/trainingGame_config.js](./modules/trainingGame/trai
 | `EXHALE_ONSET_THRESHOLD` | `0.40` | Signal level to detect start of exhale |
 | `BREATH_DEBOUNCE_MS` | `1500` | Minimum ms between exhale detections |
 | `EXHALE_SUCCESS_RATIO` | `0.90` | Fraction of exhale window that must be above threshold |
-| `CLOUD_SLIDE_MS` | `2200` | Time for a cloud to travel to the sun (ms) |
+| `CLOUD_SLIDE_IN_MS` | `2000` | Cloud slide-in from screen edge on spawn (ms) |
+| `CLOUD_SPAWN_DELAY_MS` | `2500` | Delay from inhale start to cloud spawn (ms) |
+| `CLOUD_SLIDE_MS` | `2200` | Slide duration for a failed cloud to its orbit position (ms) |
 | `FAIL_FADE_MS` | `60000` | Time for a failed cloud to fade out (ms) |
 
 ---
