@@ -58,6 +58,10 @@ export default class BioGame {
   #blockStartTime   = null;   // performance.now() when block started
   #scoreBlock       = [0, 0]; // score for each block
 
+  // ── Trial markers (curve minima across both blocks) ───────────────────────
+  #trialIndex    = 0;     // increments from 1, never resets between blocks
+  #nextTrialTime = null;  // block-relative seconds of next curve minimum
+
   // ── Signal processing ─────────────────────────────────────────────────────
   #smoother         = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
   #lastRaw          = 0;
@@ -173,6 +177,8 @@ export default class BioGame {
     this.#blockIndex   = 0;
     this.#scoreBlock   = [0, 0];
 
+    this.#trialIndex = 0;
+
     this.#csv = new BioGameCSV(
       this.#subjectCode, this.#group, this.#dataDir,
       (msg) => this.#csvWarn(msg)
@@ -218,6 +224,9 @@ export default class BioGame {
       randBetween(CONFIG.STARFISH_SPAWN_MIN_MS, CONFIG.STARFISH_SPAWN_MAX_MS);
 
     this.#csv.initBlockCSV(this.#blockIndex);
+
+    // First minimum of the target curve is at 3/4 of one period after block start
+    this.#nextTrialTime = (60 / this.#activeBpm) * 0.75;
 
     this.#state = STATE.PLAYING;
     this.#markers.send(`block_start_${this.#blockIndex}`);
@@ -296,6 +305,7 @@ export default class BioGame {
       this.#updateStarfishes(now, dt);
       this.#updateParticles(dt);
       this.#updateFishBump(dt);
+      this.#checkTrialMarker((now - this.#blockStartTime) / 1000);
       this.#recordFrame(now);
     }
 
@@ -503,6 +513,17 @@ export default class BioGame {
       inputsLocked: this.#inputsLocked,
       ...overrides,
     });
+  }
+
+  // ── Trial marker (curve minimum detection) ───────────────────────────────
+
+  #checkTrialMarker(blockTimeSecs) {
+    if (this.#nextTrialTime === null) return;
+    const period = 60 / this.#activeBpm;
+    while (blockTimeSecs >= this.#nextTrialTime) {
+      this.#markers.send(`trial_${++this.#trialIndex}`);
+      this.#nextTrialTime += period;
+    }
   }
 
   // ── CSV error display ─────────────────────────────────────────────────────

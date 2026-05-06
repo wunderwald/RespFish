@@ -120,6 +120,7 @@ MARKER_STREAM_URL: 'ws://localhost:8765',
 | `block_start_0` / `block_start_1` | game begins |
 | `block_end_0` / `block_end_1` | game ends normally |
 | `block_abort_0` / `block_abort_1` | game aborted |
+| `trial_<N>` | target curve minimum — inhale onset; N increments from 1 across both blocks |
 | `star_collect_b<N>_s<score>` | starfish collected |
 | `star_miss_b<N>` | starfish missed |
 | `experiment_done` | both games complete |
