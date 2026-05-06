@@ -20,24 +20,28 @@ log = logging.getLogger("lsl_bridge")
 
 
 async def main() -> None:
-    state = BridgeState(label="resp")
-    state.stream_change_event = asyncio.Event()
-
-    asyncio.create_task(stream_discoverer(state))
-    asyncio.create_task(lsl_reader(state))
+    # Each BridgeState holds the current LSL stream + a shared data buffer.
+    # stream_discoverer watches for the LSL stream to appear/disappear;
+    # lsl_reader pulls samples from it and stores them in the state.
+    resp_state = BridgeState(label="resp")
+    resp_state.stream_change_event = asyncio.Event()
+    asyncio.create_task(stream_discoverer(resp_state))
+    asyncio.create_task(lsl_reader(resp_state))
 
     gaze_state = BridgeState(label="gaze")
     gaze_state.stream_change_event = asyncio.Event()
     asyncio.create_task(stream_discoverer(gaze_state))
     asyncio.create_task(lsl_reader(gaze_state))
 
+    # Marker outlet publishes string markers back onto LSL (write direction, not read)
     marker_info = StreamInfo(
         MARKER_STREAM_NAME, "Markers", 1, 0, "string", "respfish_markers")
     marker_outlet = StreamOutlet(marker_info)
     log.info(f"LSL marker outlet '{MARKER_STREAM_NAME}' ready")
 
-    async def handler(websocket):
-        await ws_handler(websocket, state)
+    # Thin closures that bind each WebSocket handler to its corresponding state/outlet
+    async def resp_handler(websocket):
+        await ws_handler(websocket, resp_state)
 
     async def gaze_handler(websocket):
         await ws_handler(websocket, gaze_state)
@@ -45,13 +49,21 @@ async def main() -> None:
     async def marker_handler(websocket):
         await marker_ws_handler(websocket, marker_outlet)
 
-    log.info(f"Signal bridge: ws://{WS_HOST}:{WS_PORT}")
+    log.info(f"Signal (resp) bridge: ws://{WS_HOST}:{WS_PORT}")
     log.info(f"Gaze bridge:   ws://{WS_HOST}:{GAZE_WS_PORT}")
     log.info(f"Marker bridge: ws://{WS_HOST}:{MARKER_WS_PORT}")
-    async with websockets.serve(handler, WS_HOST, WS_PORT):
-        async with websockets.serve(gaze_handler, WS_HOST, GAZE_WS_PORT):
-            async with websockets.serve(marker_handler, WS_HOST, MARKER_WS_PORT):
-                await asyncio.Future()  # run forever
+    
+    # Start all three WebSocket servers concurrently
+    servers = await asyncio.gather(
+        websockets.serve(resp_handler, WS_HOST, WS_PORT),
+        websockets.serve(gaze_handler, WS_HOST, GAZE_WS_PORT),
+        websockets.serve(marker_handler, WS_HOST, MARKER_WS_PORT),
+    )
+    try:
+        await asyncio.Future()
+    finally:
+        for server in servers:
+            server.close()
 
 
 if __name__ == "__main__":
