@@ -545,7 +545,6 @@ export class BioGameRenderer {
     ctx.shadowBlur   = 0;
 
     this.#drawCenter(ctx, w, cy + 65,  `Game 1: ${score1}  ·  Game 2: ${score2}`, 'rgba(255,255,255,0.42)', 16);
-    this.#drawCenter(ctx, w, cy + 100, 'Total starfish', 'rgba(255,255,255,0.28)', 14);
   }
 
   // ── Canvas helpers ────────────────────────────────────────────────────────
