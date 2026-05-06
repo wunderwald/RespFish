@@ -35,7 +35,23 @@ const { freq, amp, phase } = est.estimate(signalArray, sampleRate);
 // phase — phase offset in radians
 ```
 
-Falls back to a 4-second period if no autocorrelation peak is found within the plausible range. *THIS NEEDS TO CHANGE!*
+If no autocorrelation peak is found, or the best peak is non-positive (signal does not meaningfully repeat at that lag), it falls back to `PeakDetectionEstimator`. If that also fails, a 4 s default is used as a last resort.
+
+---
+
+## PeakDetectionEstimator
+
+Peak detection + inter-peak averaging estimator. MATLAB-style fallback used by `AutocorrEstimator` when autocorrelation fails; also available as a standalone estimator.
+
+```js
+import { PeakDetectionEstimator } from './modules/signal/signalUtils.js';
+
+const est = new PeakDetectionEstimator({ minBreathPeriod: 2, maxBreathPeriod: 12 });
+const result = est.estimate(signalArray, sampleRate);
+// result is { freq, amp, phase } or null if estimation failed
+```
+
+Finds local maxima above the signal mean, computes inter-peak intervals, discards intervals outside `[minBreathPeriod, maxBreathPeriod]`, and averages the rest. Returns `null` if fewer than two peaks are found or no interval survives the range filter — callers should handle `null` explicitly.
 
 ---
 
