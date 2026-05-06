@@ -51,21 +51,17 @@ Reconnects automatically every 2 seconds if the connection is lost. Queued marke
 
 ## LSL bridge
 
-The bridge ([lsl_bridge/](../lsl_bridge/)) is a Python script that:
+The bridge ([lsl_bridge/README.md](../../lsl_bridge/README.md)) is a Python process that:
 
-1. Discovers available LSL streams.
-2. Forwards the selected stream's samples to connected WebSocket clients as `{ type: 'sample', value, channels, timestamp }` JSON messages.
+1. Discovers available LSL streams and broadcasts the list to connected clients.
+2. Forwards samples from the selected stream as `{ type: 'sample', value, channels, timestamp }` JSON over WebSocket.
 3. Accepts `{ type: 'select_stream', name }` messages from clients to switch streams.
-4. Receives raw string messages on a second port (default 9001) and writes them as LSL marker events.
+4. Receives plain-text marker strings on a separate port and writes them to an LSL outlet (`RespFishMarkers`).
 
-Start it alongside a signal source:
+The bridge is started automatically by the Electron main process. To run it manually:
 
 ```bash
-# Terminal 1 — signal source
-cd resp && python simulate_lsl.py --bpm 14
-
-# Terminal 2 — bridge (started automatically by the Electron app via preload.js)
-cd lsl_bridge && python bridge.py
+cd lsl_bridge && python main.py
 ```
 
-The bridge is typically started automatically by the Electron main process. Check `app/main.js` for the launch command.
+See [lsl_bridge/README.md](../../lsl_bridge/README.md) for port assignments and configuration.
