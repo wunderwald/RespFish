@@ -31,18 +31,21 @@ Requirements
 Usage
 -----
 1. Open LabChart 8 and load/create a document with your PowerLab.
-2. Run:   python labchart_to_lsl.py
+2. Run:   python gui.py          (graphical mode — recommended)
+      or   python labchart_to_lsl.py --cli  (headless)
 3. Press Start in LabChart — the bridge detects it and begins streaming.
 4. Use LabRecorder, MNE-Python, or any LSL inlet to receive the data.
-5. Press Ctrl+C to stop.
+5. Press Ctrl+C to stop (CLI mode).
 """
 
 import argparse
+import queue
 import sys
 import time
 import logging
-from dataclasses import dataclass
-from typing import List
+import threading
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 # ---------------------------------------------------------------------------
 # Dependency check — give a clear message instead of a cryptic traceback
@@ -78,6 +81,14 @@ from pylsl import StreamInfo, StreamOutlet, local_clock  # noqa: E402
 # ---------------------------------------------------------------------------
 
 @dataclass
+class ChannelConfig:
+    """Configuration for a single forwarded channel."""
+    index: int       # 0-based LabChart channel index
+    lsl_name: str    # label written into LSL stream metadata
+    lsl_type: str = "Phys"
+
+
+@dataclass
 class Config:
     """All tuneable parameters in one place."""
 
@@ -92,9 +103,6 @@ class Config:
     #   Values below ~0.005 (5 ms) are not recommended (COM overhead).
 
     # Timestamp re-anchoring interval (seconds).
-    # The mapper periodically re-syncs the tick↔clock relationship to
-    # compensate for any long-term drift between the PowerLab crystal
-    # and the PC clock.
     reanchor_interval_sec: float = 5.0
 
     # How long to wait for LabChart to start sampling
@@ -102,6 +110,12 @@ class Config:
 
     # Logging
     log_level: str = "INFO"
+
+    # Channel selection — empty list means "all channels" (CLI default)
+    channels: List[ChannelConfig] = field(default_factory=list)
+
+    # GUI status updates — stream_loop posts dicts here when set
+    status_queue: Optional[queue.Queue] = field(default=None, compare=False)
 
 
 # ---------------------------------------------------------------------------
@@ -127,11 +141,10 @@ class TimestampMapper:
         self._dt: float = 1.0 / fs
         self._reanchor_sec: float = reanchor_sec
 
-        # Anchor: the LSL timestamp corresponding to anchor_tick
         self._anchor_tick: int = 0
         self._anchor_lsl: float = 0.0
 
-        self._last_anchor_wall: float = 0.0   # monotonic time of last anchor
+        self._last_anchor_wall: float = 0.0
         self._anchored: bool = False
 
     def reset(self, fs: float) -> None:
@@ -145,12 +158,6 @@ class TimestampMapper:
         return (time.monotonic() - self._last_anchor_wall) >= self._reanchor_sec
 
     def set_anchor(self, tick: int, lsl_time: float) -> None:
-        """
-        Establish (or refresh) the mapping:  tick ↔ lsl_time.
-
-        Call this with the *newest* tick in a freshly fetched batch and
-        an LSL clock reading taken just before the COM fetch.
-        """
         self._anchor_tick = tick
         self._anchor_lsl = lsl_time
         self._last_anchor_wall = time.monotonic()
@@ -214,13 +221,29 @@ class LabChartConnection:
             return f"Ch{channel_index + 1}"
 
     def get_sampling_rate(self, record: int) -> float:
-        """Return sampling rate (Hz) for the given record."""
+        """Return sampling rate (Hz) for the given record (all channels)."""
         secs_per_tick = self.doc.GetRecordSecsPerTick(record)
         if secs_per_tick <= 0:
             raise ValueError(
                 f"Invalid SecsPerTick ({secs_per_tick}) for record {record}"
             )
         return 1.0 / secs_per_tick
+
+    def get_channel_rate(self, channel: int, record: int) -> float:
+        """
+        Return sampling rate (Hz) for a specific channel.
+
+        Tries the per-channel COM call first (LabChart Pro); falls back to
+        the record-level rate for standard LabChart where all channels share
+        the same rate.
+        """
+        try:
+            secs = self.doc.GetChannelSecsPerTick(channel, record)
+            if secs and secs > 0:
+                return 1.0 / secs
+        except Exception:
+            pass
+        return self.get_sampling_rate(record)
 
     def get_record_length_ticks(self, record: int) -> int:
         """Number of samples recorded so far in the given record."""
@@ -251,11 +274,15 @@ def create_lsl_outlet(
     cfg: Config, lc: LabChartConnection, record: int
 ) -> StreamOutlet:
     """
-    Build an LSL StreamInfo + StreamOutlet matching the current LabChart
-    document layout.
+    Build an LSL StreamInfo + StreamOutlet for the configured channels.
+
+    Uses cfg.channels if set; otherwise streams all LabChart channels.
     """
-    n_ch = lc.n_channels
-    fs = lc.get_sampling_rate(record)
+    channels = cfg.channels or [
+        ChannelConfig(i, lc.get_channel_name(i)) for i in range(lc.n_channels)
+    ]
+    n_ch = len(channels)
+    fs = lc.get_channel_rate(channels[0].index, record)
 
     logging.info("Creating LSL outlet: %d channels @ %.1f Hz", n_ch, fs)
 
@@ -270,11 +297,11 @@ def create_lsl_outlet(
 
     # -- Channel metadata (XDF convention) ----------------------------------
     channels_xml = info.desc().append_child("channels")
-    for i in range(n_ch):
+    for ch_cfg in channels:
         ch = channels_xml.append_child("channel")
-        ch.append_child_value("label", lc.get_channel_name(i))
-        ch.append_child_value("unit", lc.get_units(i, record))
-        ch.append_child_value("type", cfg.stream_type)
+        ch.append_child_value("label", ch_cfg.lsl_name)
+        ch.append_child_value("unit", lc.get_units(ch_cfg.index, record))
+        ch.append_child_value("type", ch_cfg.lsl_type)
 
     # -- Acquisition metadata -----------------------------------------------
     acq = info.desc().append_child("acquisition")
@@ -282,8 +309,6 @@ def create_lsl_outlet(
     acq.append_child_value("software", "LabChart 8")
     acq.append_child_value("bridge", "labchart_to_lsl.py")
 
-    # chunk_size=0 tells LSL we push individual samples (not fixed chunks).
-    # max_buffered=360 keeps up to 6 minutes in the outlet buffer.
     outlet = StreamOutlet(info, chunk_size=0, max_buffered=360)
     logging.info(
         "LSL outlet live — visible on the network as '%s'", cfg.stream_name
@@ -317,7 +342,12 @@ def wait_for_sampling(lc: LabChartConnection, timeout: float):
 # Main streaming loop
 # ---------------------------------------------------------------------------
 
-def stream_loop(cfg: Config, lc: LabChartConnection, outlet: StreamOutlet):
+def stream_loop(
+    cfg: Config,
+    lc: LabChartConnection,
+    outlet: StreamOutlet,
+    stop_event: Optional[threading.Event] = None,
+):
     """
     Core loop.
 
@@ -325,10 +355,18 @@ def stream_loop(cfg: Config, lc: LabChartConnection, outlet: StreamOutlet):
     2. Ask LabChart how many new ticks are available.
     3. Fetch them in one bulk read per channel (fast — one COM call each).
     4. Compute per-sample timestamps and push the chunk to LSL.
+
+    Exits when LabChart stops sampling or stop_event is set.
+    Posts status dicts to cfg.status_queue when provided.
     """
     record = lc.current_record
     fs = lc.get_sampling_rate(record)
-    n_ch = lc.n_channels
+
+    channels = cfg.channels or [
+        ChannelConfig(i, lc.get_channel_name(i)) for i in range(lc.n_channels)
+    ]
+    ch_indices = [c.index for c in channels]
+    n_ch = len(ch_indices)
 
     ts = TimestampMapper(fs, reanchor_sec=cfg.reanchor_interval_sec)
 
@@ -343,10 +381,16 @@ def stream_loop(cfg: Config, lc: LabChartConnection, outlet: StreamOutlet):
     t_log = time.time()
 
     while True:
+        if stop_event is not None and stop_event.is_set():
+            logging.info("Streaming stopped by user.")
+            break
+
         try:
             # -- Still sampling? --------------------------------------------
             if not lc.is_sampling:
                 logging.warning("LabChart stopped sampling.")
+                if cfg.status_queue is not None:
+                    cfg.status_queue.put({"t": "sampling_stopped"})
                 break
 
             # -- Record changed? (user stopped + restarted) -----------------
@@ -361,8 +405,6 @@ def stream_loop(cfg: Config, lc: LabChartConnection, outlet: StreamOutlet):
                 cursor = 0
 
             # -- Read the LSL clock *before* querying LabChart --------------
-            #    This ensures our anchor timestamp is a conservative upper
-            #    bound (the newest sample was acquired slightly *before* now).
             fetch_clock = local_clock()
 
             # -- How many new samples? --------------------------------------
@@ -373,18 +415,16 @@ def stream_loop(cfg: Config, lc: LabChartConnection, outlet: StreamOutlet):
                 time.sleep(cfg.poll_interval_sec)
                 continue
 
-            # -- Bulk-fetch from each channel -------------------------------
+            # -- Bulk-fetch from each selected channel ----------------------
             channel_data: List[tuple] = []
-            for ch in range(n_ch):
-                raw = lc.get_channel_data(ch, record, cursor, new_ticks)
+            for idx in ch_indices:
+                raw = lc.get_channel_data(idx, record, cursor, new_ticks)
                 # COM returns a bare float when n_ticks == 1
                 if isinstance(raw, (int, float)):
                     raw = (raw,)
                 channel_data.append(raw)
 
             # -- (Re-)anchor the timestamp mapper ---------------------------
-            #    The *last* sample in this batch (tick = total_ticks - 1) is
-            #    the most recent; it was acquired approximately at fetch_clock.
             if ts.needs_anchor():
                 ts.set_anchor(total_ticks - 1, fetch_clock)
                 logging.debug(
@@ -393,7 +433,7 @@ def stream_loop(cfg: Config, lc: LabChartConnection, outlet: StreamOutlet):
 
             # -- Build chunk + per-sample timestamps, push in one call ------
             chunk = [
-                [float(channel_data[ch][s]) for ch in range(n_ch)]
+                [float(channel_data[c][s]) for c in range(n_ch)]
                 for s in range(new_ticks)
             ]
             stamps = [ts.stamp(cursor + s) for s in range(new_ticks)]
@@ -402,8 +442,8 @@ def stream_loop(cfg: Config, lc: LabChartConnection, outlet: StreamOutlet):
             cursor = total_ticks
             samples_pushed += new_ticks
 
-            # -- Periodic status log (every 5 s) ----------------------------
-            if time.time() - t_log >= 5.0:
+            # -- Periodic status update (every 1 s) -------------------------
+            if time.time() - t_log >= 1.0:
                 newest_stamp = ts.stamp(cursor - 1)
                 latency_ms = (local_clock() - newest_stamp) * 1000
                 logging.info(
@@ -411,6 +451,14 @@ def stream_loop(cfg: Config, lc: LabChartConnection, outlet: StreamOutlet):
                     "latency ≈ %.0f ms",
                     samples_pushed, new_ticks, fs, latency_ms,
                 )
+                if cfg.status_queue is not None:
+                    cfg.status_queue.put({
+                        "t": "stats",
+                        "samples": samples_pushed,
+                        "rate": fs,
+                        "n_ch": n_ch,
+                        "latency_ms": latency_ms,
+                    })
                 t_log = time.time()
 
         except KeyboardInterrupt:
@@ -430,6 +478,10 @@ def parse_args() -> Config:
     p = argparse.ArgumentParser(
         description="Stream live LabChart 8 data to LSL.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p.add_argument(
+        "--cli", action="store_true",
+        help="Run in headless CLI mode (default launches the GUI)",
     )
     p.add_argument(
         "--name", default=cfg.stream_name,
@@ -471,11 +523,8 @@ def parse_args() -> Config:
     return cfg
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-def main():
+def _run_cli():
+    """Headless mode — original behaviour."""
     cfg = parse_args()
     logging.basicConfig(
         level=getattr(logging, cfg.log_level),
@@ -483,7 +532,7 @@ def main():
         datefmt="%H:%M:%S",
     )
 
-    logging.info("=== LabChart → LSL Bridge ===")
+    logging.info("=== LabChart → LSL Bridge (CLI) ===")
     logging.info(
         "Config: name=%s  type=%s  poll=%.0f ms  reanchor=%.1f s",
         cfg.stream_name,
@@ -492,26 +541,19 @@ def main():
         cfg.reanchor_interval_sec,
     )
 
-    # -- Connect to LabChart ------------------------------------------------
     lc = LabChartConnection()
     lc.connect()
-
-    # -- Wait for sampling --------------------------------------------------
     wait_for_sampling(lc, cfg.wait_for_sampling_timeout)
 
-    # -- Create LSL outlet --------------------------------------------------
     record = lc.current_record
     outlet = create_lsl_outlet(cfg, lc, record)
 
-    # -- Stream! ------------------------------------------------------------
     try:
         while True:
             stream_loop(cfg, lc, outlet)
-            # Sampling stopped — wait for it to resume.
             logging.info("Waiting for LabChart to resume sampling…")
             wait_for_sampling(lc, cfg.wait_for_sampling_timeout)
 
-            # Recreate outlet if sampling rate changed.
             new_record = lc.current_record
             new_fs = lc.get_sampling_rate(new_record)
             old_fs = lc.get_sampling_rate(record)
@@ -532,6 +574,14 @@ def main():
             logging.info("Stopped by user (Ctrl+C).")
     finally:
         logging.info("Bridge shut down. Goodbye!")
+
+
+def main():
+    if "--cli" in sys.argv:
+        _run_cli()
+    else:
+        from gui import App
+        App().mainloop()
 
 
 if __name__ == "__main__":

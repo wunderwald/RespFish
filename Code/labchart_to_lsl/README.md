@@ -44,18 +44,31 @@ pip install pywin32 pylsl
 ## Quick Start
 
 1. **Open LabChart 8** with your PowerLab connected.
-2. **Run the bridge:**
+2. **Launch the GUI:**
    ```bash
-   python labchart_to_lsl.py
+   python gui.py
    ```
-3. **Press Start** in LabChart — the bridge detects it and begins streaming.
-4. **Verify** on any machine on the same network:
+3. Click **Connect**, select the channels you want to forward, set LSL names, click **Start Streaming**.
+4. **Press Start** in LabChart — the bridge detects it and begins streaming.
+5. **Verify** on any machine on the same network:
    ```bash
    python verify_lsl_stream.py
    ```
-5. **Record with LabRecorder** or consume the stream with any LSL-compatible tool.
+6. **Record with LabRecorder** or consume the stream with any LSL-compatible tool.
 
-## Command-Line Options
+## GUI
+
+`gui.py` opens a channel selector and stream monitor:
+
+- **Channel table** — one row per LabChart channel with enable/disable checkbox, sampling rate, unit, and editable LSL name + type fields
+- **Rate mismatch warning** — shown automatically if enabled channels have different sampling rates (all channels in one LSL stream must share the same rate)
+- **Status bar** — live sample count and latency estimate while streaming
+
+## Headless / CLI mode
+
+```bash
+python labchart_to_lsl.py --cli [options]
+```
 
 ```
   --name NAME              LSL stream name (default: LabChart)
@@ -70,14 +83,11 @@ pip install pywin32 pylsl
 ### Examples
 
 ```bash
-# Stream ECG data with a custom name
-python labchart_to_lsl.py --name "PowerLab_ECG" --type "ECG"
-
 # Lower latency (~5 ms avg) at the cost of more CPU
-python labchart_to_lsl.py --poll-interval 0.01
+python labchart_to_lsl.py --cli --poll-interval 0.01
 
 # Debug mode
-python labchart_to_lsl.py --log-level DEBUG
+python labchart_to_lsl.py --cli --log-level DEBUG
 ```
 
 ## Troubleshooting
