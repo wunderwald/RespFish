@@ -1,123 +1,170 @@
 # signal — Signal Processing Utilities
 
-Utilitiy functions in [app/modules/signal/signalUtils.js](./modules/signal/signalUtils.js).
+Two modules:
+
+| Module | Purpose |
+|---|---|
+| [signalUtils.js](../modules/signal/signalUtils.js) | Real-time utilities: smoothing, sine synthesis, noise |
+| [breathRateEstimators.js](../modules/signal/breathRateEstimators.js) | Offline breath rate estimation from recordings |
 
 ---
 
-## GaussianSmoother
+## signalUtils.js
 
-Real-time Gaussian low-pass filter over a sliding window. Matches `applyGaussianLPF.m` + `smoothBreathRT.m` (from old MATLAB iBreath project).
+### GaussianSmoother
+
+Real-time Gaussian low-pass filter over a sliding window. Matches `applyGaussianLPF.m` + `smoothBreathRT.m`.
 
 ```js
 import { GaussianSmoother } from './modules/signal/signalUtils.js';
 
 const smoother = new GaussianSmoother(64);  // window size in samples
 smoother.push(rawSample);
-const smoothed = smoother.value;  // current weighted output
-smoother.reset();                 // clear buffer between trials
+const smoothed = smoother.value;
+smoother.reset();
 ```
-
-The kernel is a normalised Gaussian with σ = `windowSize / 6`. The buffer fills incrementally — the first few samples use a trimmed, re-normalised kernel so there is no step at startup.
 
 ---
 
-## AutocorrEstimator
+### AsyncSignalGenerator
 
-Autocorrelation-based breath frequency estimator. Used by `AsyncSignalGenerator` to fit a sine wave to the participant's calibration signal.
-
-```js
-import { AutocorrEstimator } from './modules/signal/signalUtils.js';
-
-const est = new AutocorrEstimator({ minBreathPeriod: 2, maxBreathPeriod: 12 });
-const { freq, amp, phase } = est.estimate(signalArray, sampleRate);
-// freq  — angular frequency in rad/s
-// amp   — peak-to-peak amplitude
-// phase — phase offset in radians
-```
-
-If no autocorrelation peak is found, or the best peak is non-positive (signal does not meaningfully repeat at that lag), it falls back to `PeakDetectionEstimator`. If that also fails, a 4 s default is used as a last resort.
-
----
-
-## PeakDetectionEstimator
-
-Peak detection + inter-peak averaging estimator. MATLAB-style fallback used by `AutocorrEstimator` when autocorrelation fails; also available as a standalone estimator.
+Generates the async stimulus signal: sine fitted to the participant's breath + 2 % Perlin noise blend.
 
 ```js
-import { PeakDetectionEstimator } from './modules/signal/signalUtils.js';
-
-const est = new PeakDetectionEstimator({ minBreathPeriod: 2, maxBreathPeriod: 12 });
-const result = est.estimate(signalArray, sampleRate);
-// result is { freq, amp, phase } or null if estimation failed
-```
-
-Finds local maxima above the signal mean, computes inter-peak intervals, discards intervals outside `[minBreathPeriod, maxBreathPeriod]`, and averages the rest. Returns `null` if fewer than two peaks are found or no interval survives the range filter — callers should handle `null` explicitly.
-
----
-
-## AsyncSignalGenerator
-
-Generates the asynchronous stimulus signal: a sine wave fitted to the participant's breath, with a small Perlin noise blend (2 %) and an optional speed shift.
-
-```js
-import { AsyncSignalGenerator, AutocorrEstimator } from './modules/signal/signalUtils.js';
+import { AsyncSignalGenerator } from './modules/signal/signalUtils.js';
+import { AutocorrEstimator }    from './modules/signal/breathRateEstimators.js';
 
 const gen = new AsyncSignalGenerator({ estimator: new AutocorrEstimator() });
-
-// After calibration phase
 gen.calibrate(signalArray, sampleRate, syncRange);  // syncRange = [min, max] or null
-
-// Set speed relative to participant's breath period
-gen.setSpeedFactor(1.1);  // > 1 = slower,  < 1 = faster
-
-// Sample during trial
-const level = gen.sample(tSeconds);  // returns ~[0, 1]
+gen.setSpeedFactor(1.1);   // > 1 = slower,  < 1 = faster
+const level = gen.sample(tSeconds);  // ~[0, 1]
 ```
-
-`calibrate()` fits the estimator and optionally maps output to `syncRange` so async and sync stimuli share the same visual amplitude.
 
 ---
 
-## mapRange
-
-Linear interpolation between two ranges. Direct port of `mapRange.m`.
+### mapRange / perlin1d
 
 ```js
-import { mapRange } from './modules/signal/signalUtils.js';
+import { mapRange, perlin1d } from './modules/signal/signalUtils.js';
 
-const out = mapRange(value, [inMin, inMax], [outMin, outMax]);
+mapRange(value, [inMin, inMax], [outMin, outMax]);  // linear range mapping
+perlin1d(150);  // Float32Array of smooth noise in [0, 1]
 ```
-
-Returns the midpoint of the output range when the input range has zero span.
 
 ---
 
-## perlin1d
+## breathRateEstimators.js
 
-Generates a smooth 1-D noise array of length `len`, values in `[0, 1]`. Uses layered octave noise with Catmull-Rom interpolation, matching the statistical character of the MATLAB `perlin2d.m` implementation.
+Contains all estimators. Two families:
+
+### FrequencyEstimator / AutocorrEstimator / PeakDetectionEstimator
+
+Sine-synthesis estimators used by `AsyncSignalGenerator`. Return `{ freq (rad/s), amp }`.
+
+- **`AutocorrEstimator`** — autocorrelation peak; falls back to `PeakDetectionEstimator`, then a 4 s hard default.
+- **`PeakDetectionEstimator`** — MATLAB-style inter-peak averaging; returns `null` on failure.
+- **`FrequencyEstimator`** — abstract base; subclass to plug a custom algorithm into `AsyncSignalGenerator`.
 
 ```js
-import { perlin1d } from './modules/signal/signalUtils.js';
+import { AutocorrEstimator, PeakDetectionEstimator, FrequencyEstimator }
+  from './modules/signal/breathRateEstimators.js';
 
-const noise = perlin1d(150);  // Float32Array
+const { freq, amp } = new AutocorrEstimator({ minBreathPeriod: 2, maxBreathPeriod: 12 })
+  .estimate(signalArray, sampleRate);
 ```
-
-Used internally by `AsyncSignalGenerator` to build a ping-pong noise loop.
 
 ---
 
-## FrequencyEstimator
+### Offline rate estimators
 
-Abstract base class for frequency estimators. Subclass and implement `estimate(signal, sampleRate)` to swap in a different algorithm.
+Return **Hz** (number) or `null` on failure.
+
+### cleanSignal
+
+Zero-phase first-order Butterworth bandpass filter (0.05–3 Hz default), following neurokit2's `rsp_clean()` approach. Applied with reflect edge padding to match scipy's `filtfilt` behaviour.
 
 ```js
-import { FrequencyEstimator } from './modules/signal/signalUtils.js';
+import { cleanSignal } from './modules/signal/breathRateEstimators.js';
 
-class MyEstimator extends FrequencyEstimator {
-  estimate(signal, sampleRate) {
-    // return { freq, amp, phase }
-  }
-}
+const cleaned = cleanSignal(signal, sampleRate);
+// optional: cleanSignal(signal, sampleRate, { lowCut: 0.05, highCut: 3.0 })
+```
 
-const gen = new AsyncSignalGenerator({ estimator: new MyEstimator() });
+All estimators apply this automatically when `clean: true` (default).
+
+---
+
+### AutocorrRateEstimator
+
+Finds the first prominent positive peak in the normalised autocorrelation. Supports optional sliding window (50 % overlap).
+
+```js
+new AutocorrRateEstimator({ minPeriod: 2, maxPeriod: 12, clean: true, windowSecs: 30 })
+  .estimate(signal, sampleRate)  // → Hz | null
+```
+
+---
+
+### PeakTroughEstimator
+
+Finds local minima below the signal mean (troughs), computes inter-trough intervals, filters to the physiological range, and averages. Based on neurokit2's `"trough"` method.
+
+```js
+new PeakTroughEstimator({ minPeriod: 2, maxPeriod: 12, clean: true })
+  .estimate(signal, sampleRate)  // → Hz | null
+```
+
+---
+
+### WelchEstimator
+
+Divides the signal into overlapping (50 %) Hann-windowed segments, accumulates Goertzel power at each candidate frequency, and returns the peak in the physiological range. Returns `null` if the signal is shorter than `minSignalSecs` (default 20 s).
+
+```js
+new WelchEstimator({
+  clean: true, windowSecs: null,
+  minFreq: 0.05, maxFreq: 1.0, freqStep: 0.01,
+  minSignalSecs: 20,
+}).estimate(signal, sampleRate)  // → Hz | null
+```
+
+---
+
+### XcorrEstimator
+
+Cross-correlates the signal with template sinusoids at candidate frequencies (equivalent to evaluating the DFT at those frequencies) and returns the strongest match. Based on neurokit2's `'xcorr'` method.
+
+```js
+new XcorrEstimator({
+  clean: true, windowSecs: null,
+  minFreq: 0.05, maxFreq: 1.0, freqStep: 0.005,
+}).estimate(signal, sampleRate)  // → Hz | null
+```
+
+---
+
+### estimateBreathRate
+
+Runs all four estimators and returns a dict. Each value is Hz | null.
+
+```js
+import { estimateBreathRate } from './modules/signal/breathRateEstimators.js';
+
+const { autocorr, peakTrough, welch, xcorr } = estimateBreathRate(signal, sampleRate);
+
+// Per-estimator options can be passed:
+estimateBreathRate(signal, sampleRate, {
+  welch: { windowSecs: 30 },
+  xcorr: { freqStep: 0.01 },
+});
+```
+
+---
+
+### Sliding window
+
+`AutocorrRateEstimator`, `WelchEstimator`, and `XcorrEstimator` support `windowSecs`. When set, the full signal is cleaned once, then split into overlapping 50 %-overlap windows of that length, each estimated independently. The returned value is the average of all non-null window results (null if none succeeded).
+
+```js
+const hz = new WelchEstimator({ windowSecs: 30 }).estimate(signal, sampleRate);
 ```

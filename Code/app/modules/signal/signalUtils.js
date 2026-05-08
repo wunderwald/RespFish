@@ -1,17 +1,16 @@
 /**
- * signalUtils.js — Signal processing utilities
- * =============================================
- * Pure, framework-free utilities used by ibreath.js (and any future frontend).
- *
+ * signalUtils.js — Real-time signal processing utilities
+ * =======================================================
  * Exports:
- *   class  GaussianSmoother        — real-time Gaussian low-pass filter
- *   class  FrequencyEstimator      — swappable breath frequency/amp/phase estimator
- *   class  AutocorrEstimator       — autocorrelation-based estimator (default impl)
- *   class  PeakDetectionEstimator  — peak-detection fallback estimator (MATLAB-style)
- *   class  AsyncSignalGenerator    — sine + Perlin noise async stimulus
- *   function mapRange(v, from, to) — linear range mapping
- *   function perlin1d(len)         — 1-D Perlin-ish noise array
+ *   class    GaussianSmoother     — real-time Gaussian low-pass filter
+ *   class    AsyncSignalGenerator — sine + Perlin noise async stimulus
+ *   function mapRange(v, from, to)
+ *   function perlin1d(len)
+ *
+ * All frequency/rate estimators live in breathRateEstimators.js.
  */
+
+import { AutocorrEstimator } from './breathRateEstimators.js';
 
 
 // ── mapRange ─────────────────────────────────────────────────────────────────
@@ -182,227 +181,6 @@ export class GaussianSmoother {
 }
 
 
-// ── FrequencyEstimator (abstract interface) ───────────────────────────────────
-
-/**
- * Base class / interface for breath frequency estimators.
- * Swap implementations by passing a different subclass to AsyncSignalGenerator.
- *
- * Subclasses must implement:
- *   estimate(signal: Float32Array, sampleRate: number)
- *     → { freq: number, amp: number, phase: number }
- *
- *   freq  — angular frequency in rad/s  (= 2π / period_seconds)
- *   amp   — peak-to-peak amplitude of the signal (same units as signal)
- *   phase — phase offset in radians, such that sin(freq·t − phase) ≈ signal
- */
-export class FrequencyEstimator {
-  /**
-   * @param {Float32Array} signal      Calibration signal samples
-   * @param {number}       sampleRate  Samples per second
-   * @returns {{ freq: number, amp: number, phase: number }}
-   */
-  // eslint-disable-next-line no-unused-vars
-  estimate(_signal, _sampleRate) {
-    throw new Error("FrequencyEstimator.estimate() must be implemented by subclass");
-  }
-}
-
-
-// ── AutocorrEstimator ─────────────────────────────────────────────────────────
-
-/**
- * Autocorrelation-based frequency estimator.
- *
- * Algorithm:
- *   1. Remove DC offset (subtract mean).
- *   2. Compute normalised autocorrelation.
- *   3. Find the first prominent peak after lag 0 — that lag is the period.
- *   4. Amplitude = (max − min) / 2 of the original signal.
- *   5. Phase: find the first zero-crossing from below (inhale onset) and
- *      compute its time offset → phase offset for the sine fit.
- *
- * Advantages over the MATLAB peak-detection approach:
- *   - Does not depend on a threshold parameter.
- *   - Works with asymmetric breath cycles (inhale ≠ exhale duration).
- *   - Robust to amplitude variations across breaths.
- *   - Degrades gracefully: falls back to sensible defaults if estimation fails.
- */
-export class AutocorrEstimator extends FrequencyEstimator {
-  /**
-   * @param {object} [opts]
-   * @param {number} [opts.minBreathPeriod=2]   Minimum plausible breath period (s)
-   * @param {number} [opts.maxBreathPeriod=12]  Maximum plausible breath period (s)
-   */
-  constructor({ minBreathPeriod = 2, maxBreathPeriod = 12 } = {}) {
-    super();
-    this.minBreathPeriod = minBreathPeriod;
-    this.maxBreathPeriod = maxBreathPeriod;
-  }
-
-  estimate(signal, sampleRate) {
-    const n = signal.length;
-
-    // ── 1. Remove DC offset ───────────────────────────────────────────────
-    let mean = 0;
-    for (let i = 0; i < n; i++) mean += signal[i];
-    mean /= n;
-    const centered = new Float32Array(n);
-    for (let i = 0; i < n; i++) centered[i] = signal[i] - mean;
-
-    // ── 2. Normalised autocorrelation ─────────────────────────────────────
-    // r[lag] = Σ centered[i] · centered[i + lag]  /  r[0]
-    const maxLag = Math.min(n - 1, Math.floor(this.maxBreathPeriod * sampleRate));
-    const minLag = Math.max(1, Math.floor(this.minBreathPeriod * sampleRate));
-
-    const acorr = new Float32Array(maxLag + 1);
-    for (let lag = 0; lag <= maxLag; lag++) {
-      let sum = 0;
-      for (let i = 0; i < n - lag; i++) {
-        sum += centered[i] * centered[i + lag];
-      }
-      acorr[lag] = sum;
-    }
-    const r0 = acorr[0] || 1;
-    for (let lag = 0; lag <= maxLag; lag++) acorr[lag] /= r0;
-
-    // ── 3. Find first prominent peak in acorr after minLag ────────────────
-    let bestLag = -1;
-    let bestVal = -Infinity;
-
-    for (let lag = minLag; lag < maxLag - 1; lag++) {
-      const isPeak = acorr[lag] > acorr[lag - 1] && acorr[lag] > acorr[lag + 1];
-      if (isPeak && acorr[lag] > bestVal) {
-        bestVal = acorr[lag];
-        bestLag = lag;
-        break;  // first prominent peak wins
-      }
-    }
-
-    // ── 4. Amplitude + phase (shared with fallback path) ─────────────────
-    let sigMin = Infinity, sigMax = -Infinity;
-    for (let i = 0; i < n; i++) {
-      if (signal[i] < sigMin) sigMin = signal[i];
-      if (signal[i] > sigMax) sigMax = signal[i];
-    }
-    const amp = sigMax - sigMin > 0 ? sigMax - sigMin : 0.5;
-
-    // ── Fallback: trigger if no peak found OR peak is non-positive ───────
-    // bestVal <= 0 means the signal does not meaningfully repeat at that lag.
-    if (bestLag < 0 || bestVal <= 0) {
-      const fallback = new PeakDetectionEstimator({
-        minBreathPeriod: this.minBreathPeriod,
-        maxBreathPeriod: this.maxBreathPeriod,
-      });
-      const result = fallback.estimate(signal, sampleRate);
-      if (result) {
-        console.log('[AutocorrEstimator] autocorr peak not found — using peak-detection fallback');
-        return result;
-      }
-      console.warn('[AutocorrEstimator] both methods failed — using 4 s default');
-    }
-
-    const periodSeconds = (bestLag > 0 ? bestLag : 4 * sampleRate) / sampleRate;
-    const freq = (2 * Math.PI) / periodSeconds;
-
-    // ── 5. Phase ──────────────────────────────────────────────────────────
-    const half = sigMin + amp / 2;
-    let phase = 0;
-    for (let i = 0; i < n - 1; i++) {
-      if (signal[i] < half && signal[i + 1] >= half) {
-        phase = (i / sampleRate) * freq;
-        break;
-      }
-    }
-
-    return { freq, amp, phase };
-  }
-}
-
-
-// ── PeakDetectionEstimator ────────────────────────────────────────────────────
-
-/**
- * Peak-detection + inter-peak averaging breath frequency estimator.
- * Matches the approach used in the original MATLAB iBreath script.
- *
- * Algorithm:
- *   1. Find all local maxima above the signal mean.
- *   2. Compute inter-peak intervals.
- *   3. Keep only intervals within [minBreathPeriod, maxBreathPeriod].
- *   4. Average the valid intervals → period.
- *   5. Amplitude = (max − min) of the signal.
- *   6. Phase: first rising mid-point crossing.
- *
- * Returns null if fewer than two peaks are found or no interval falls within
- * the plausible range, so callers can fall through to a further fallback.
- */
-export class PeakDetectionEstimator extends FrequencyEstimator {
-  /**
-   * @param {object} [opts]
-   * @param {number} [opts.minBreathPeriod=2]   Minimum plausible breath period (s)
-   * @param {number} [opts.maxBreathPeriod=12]  Maximum plausible breath period (s)
-   */
-  constructor({ minBreathPeriod = 2, maxBreathPeriod = 12 } = {}) {
-    super();
-    this.minBreathPeriod = minBreathPeriod;
-    this.maxBreathPeriod = maxBreathPeriod;
-  }
-
-  estimate(signal, sampleRate) {
-    const n = signal.length;
-
-    // Signal stats
-    let sigMin = Infinity, sigMax = -Infinity, sigMean = 0;
-    for (let i = 0; i < n; i++) {
-      if (signal[i] < sigMin) sigMin = signal[i];
-      if (signal[i] > sigMax) sigMax = signal[i];
-      sigMean += signal[i];
-    }
-    sigMean /= n;
-    const amp = sigMax - sigMin > 0 ? sigMax - sigMin : 0.5;
-
-    // Find local maxima above the mean (peaks must exceed the midline to count)
-    const peaks = [];
-    for (let i = 1; i < n - 1; i++) {
-      if (signal[i] > signal[i - 1] &&
-          signal[i] > signal[i + 1] &&
-          signal[i] > sigMean) {
-        peaks.push(i);
-      }
-    }
-
-    if (peaks.length < 2) return null;
-
-    // Inter-peak intervals filtered to the plausible breath range
-    const minSamples = Math.floor(this.minBreathPeriod * sampleRate);
-    const maxSamples = Math.ceil(this.maxBreathPeriod * sampleRate);
-    const intervals = [];
-    for (let i = 1; i < peaks.length; i++) {
-      const gap = peaks[i] - peaks[i - 1];
-      if (gap >= minSamples && gap <= maxSamples) intervals.push(gap);
-    }
-
-    if (intervals.length === 0) return null;
-
-    const periodSeconds = (intervals.reduce((a, b) => a + b, 0) / intervals.length) / sampleRate;
-    const freq  = (2 * Math.PI) / periodSeconds;
-
-    // Phase: first rising crossing of the signal midpoint
-    const half = sigMin + amp / 2;
-    let phase = 0;
-    for (let i = 0; i < n - 1; i++) {
-      if (signal[i] < half && signal[i + 1] >= half) {
-        phase = (i / sampleRate) * freq;
-        break;
-      }
-    }
-
-    return { freq, amp, phase };
-  }
-}
-
-
 // ── AsyncSignalGenerator ──────────────────────────────────────────────────────
 
 /**
@@ -425,7 +203,6 @@ export class AsyncSignalGenerator {
   #estimator;
   #freq = (2 * Math.PI) / 4;  // default: 4 s period
   #amp = 0.5;
-  #phase = 0;
   #speedFactor = 1.0;
   #noise = null;   // Float32Array, ping-pong loop
   #noiseIndex = 0;
@@ -453,11 +230,10 @@ export class AsyncSignalGenerator {
    */
   calibrate(signal, sampleRate, syncRange = null) {
     const arr = signal instanceof Float32Array ? signal : new Float32Array(signal);
-    const { freq, amp, phase } = this.#estimator.estimate(arr, sampleRate);
+    const { freq, amp } = this.#estimator.estimate(arr, sampleRate);
 
     this.#freq = isFinite(freq) && freq > 0 ? freq : (2 * Math.PI) / 4;
     this.#amp = isFinite(amp) && amp > 0 ? amp : 0.5;
-    this.#phase = isFinite(phase) ? phase : 0;
     this.#syncRange = syncRange;
     this.#calibrated = true;
     this.#buildNoise();
@@ -465,7 +241,7 @@ export class AsyncSignalGenerator {
     console.log(
       `[AsyncSignalGenerator] calibrated — ` +
       `period=${(2 * Math.PI / this.#freq).toFixed(2)}s  ` +
-      `amp=${this.#amp.toFixed(3)}  phase=${this.#phase.toFixed(3)}`
+      `amp=${this.#amp.toFixed(3)}`
     );
   }
 
@@ -486,9 +262,9 @@ export class AsyncSignalGenerator {
    * @returns {number}
    */
   sample(t) {
-    // asyncSignal.m: amp/2 * sin(freq * t / factor − phase) + amp/2
+    // asyncSignal.m: amp/2 * sin(freq * t / factor) + amp/2
     const sine = (this.#amp / 2) *
-      Math.sin((this.#freq * t) / this.#speedFactor - this.#phase) +
+      Math.sin((this.#freq * t) / this.#speedFactor) +
       (this.#amp / 2);
 
     // Add Perlin noise (ping-pong loop)

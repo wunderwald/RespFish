@@ -18,11 +18,8 @@
  *   csv.js         — file output
  */
 
-import {
-  GaussianSmoother,
-  AutocorrEstimator,
-  AsyncSignalGenerator,
-} from '../signal/signalUtils.js';
+import { GaussianSmoother, AsyncSignalGenerator } from '../signal/signalUtils.js';
+import { AutocorrEstimator } from '../signal/breathRateEstimators.js';
 import { CONFIG, STATE } from './config.js';
 import { makeTrialParams } from './trialParams.js';
 import { LocalHud } from './hud.js';
