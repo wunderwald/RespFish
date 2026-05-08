@@ -7,24 +7,19 @@ import { CONFIG as BG }  from './modules/bioGame/bioGame_config.js';
 
 const frontend = new URLSearchParams(location.search).get('frontend') || 'ibreath';
 
-// ── Resp stream (all frontends except baseline) ───────────────────────────────
+// ── Resp stream (all frontends) ───────────────────────────────────────────────
 
-let respStream = null;
-if (frontend !== 'baseline') {
-  respStream = new StreamManager({
-    container: document.getElementById('stream-bar'),
-    label: 'resp stream',
-    filter: 'resp',
-  });
-  respStream.on('sample', ({ value, channels }) => {
-    window.api.stream.sendSample({ value, channels });
-  });
-  respStream.on('status', (event) => {
-    window.api.stream.sendStatus(event);
-  });
-} else {
-  document.getElementById('stream-bar').style.display = 'none';
-}
+const respStream = new StreamManager({
+  container: document.getElementById('stream-bar'),
+  label: 'resp stream',
+  filter: 'resp',
+});
+respStream.on('sample', ({ value, channels }) => {
+  window.api.stream.sendSample({ value, channels });
+});
+respStream.on('status', (event) => {
+  window.api.stream.sendStatus(event);
+});
 
 // ── Gaze stream (ibreath only) ────────────────────────────────────────────────
 
@@ -376,24 +371,51 @@ if (frontend === 'ibreath') {
   // ── Baseline HUD ─────────────────────────────────────────────────────────────
 
   statsEl.innerHTML = `
-    <span id="bl-status">standby</span>
+    <span id="bl-status">waiting for stream…</span>
+    <span>
+      <span class="label">subject</span>
+      <input id="bl-subject" type="text" value="TEST"
+             placeholder="subject code" autocomplete="off" spellcheck="false" />
+    </span>
+    <span class="label">data dir</span>
+    <span id="bl-data-dir-text">baselineData</span>
+    <button id="bl-pick-dir">…</button>
     <span id="ib-controls">
-      <button id="bl-start-btn">Start</button>
+      <button id="bl-start-btn" disabled>Start</button>
       <button id="bl-abort-btn" style="display:none">Abort</button>
     </span>
   `;
 
-  const blStatusEl = document.getElementById('bl-status');
-  const blStartBtn = document.getElementById('bl-start-btn');
-  const blAbortBtn = document.getElementById('bl-abort-btn');
+  const blStatusEl   = document.getElementById('bl-status');
+  const blSubjectEl  = document.getElementById('bl-subject');
+  const blDirTextEl  = document.getElementById('bl-data-dir-text');
+  const blPickDirBtn = document.getElementById('bl-pick-dir');
+  const blStartBtn   = document.getElementById('bl-start-btn');
+  const blAbortBtn   = document.getElementById('bl-abort-btn');
 
-  window.api.frontend.onState(({ stateText, startEnabled, abortVisible }) => {
+  blPickDirBtn.addEventListener('click', async () => {
+    const picked = await window.api.pickDir();
+    if (picked) blDirTextEl.textContent = picked;
+  });
+
+  window.api.frontend.onState(({ stateText, startEnabled, abortVisible, inputsLocked }) => {
     if (stateText    !== undefined) blStatusEl.textContent   = stateText;
     if (startEnabled !== undefined) blStartBtn.disabled      = !startEnabled;
     if (abortVisible !== undefined) blAbortBtn.style.display = abortVisible ? '' : 'none';
+    if (inputsLocked) {
+      blSubjectEl.disabled  = true;
+      blPickDirBtn.disabled = true;
+      respStream.disable();
+    }
   });
 
-  blStartBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'start' }));
+  blStartBtn.addEventListener('click', () =>
+    window.api.frontend.sendAction({
+      type:        'start',
+      subjectCode: blSubjectEl.value.trim() || 'TEST',
+      dataDir:     blDirTextEl.textContent,
+    })
+  );
   blAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));
 
   window.addEventListener('keydown', (e) => {

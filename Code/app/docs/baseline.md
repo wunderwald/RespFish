@@ -1,6 +1,6 @@
 # Baseline
 
-A simple resting-state recording. The participant sees a neutral display for 5 minutes while LSL markers are sent at the start and end. No breath signal required.
+Resting-state recording. The participant sees a neutral display with a countdown for 5 minutes while the resp signal is recorded and LSL markers are sent at the start and end.
 
 ---
 
@@ -18,20 +18,34 @@ Or select **Baseline** from the start screen (`npm start`).
 
 | Control | What it does |
 |---|---|
-| **Start** | Begins the 5-minute recording and sends the `baseline_start` marker. |
+| **Resp stream** | Select the LSL resp stream. Required before pressing Start. |
+| **Subject** | Subject code used as the CSV filename prefix. Locked once recording begins. |
+| **Data dir** | Folder for CSV output. Click **…** to pick a different folder. Default: `baselineData/`. |
+| **Start** | Begins the recording. Requires a connected resp stream. Sends the `baseline_start` marker. |
 | **Abort** | Stops early and sends `baseline_abort`. Also triggered by `Escape`. |
-
-There are no stream selectors, baseline requires no LSL input.
 
 ---
 
 ## Session flow
 
 ```
-[Start] → 5-minute countdown → baseline_end marker → Done
+stream ready → [Start] → 5-minute countdown → baseline_end marker → Done
 ```
 
-The scene window shows a countdown timer. When a video is added, it will replace the countdown.
+The scene window shows a countdown timer.
+
+---
+
+## Data output
+
+Saved to `baselineData/<SUBJECT_CODE>_baseline.csv` (or your chosen data dir).
+
+| Column | Description |
+|---|---|
+| `timestamp` | ISO-8601 wall-clock time of the sample |
+| `value` | Raw LSL sample value |
+
+The file is written when the recording ends (normally or via Abort). Aborted sessions save whatever was recorded up to that point.
 
 ---
 
@@ -52,6 +66,6 @@ MARKER_STREAM_URL: 'ws://localhost:9001',
 
 ---
 
-## Adding the video
+## Adding a video
 
-Replace the countdown in `baseline.js` with a `<video>` element. The markers and state machine stay the same — only the scene rendering changes.
+Replace the countdown canvas in `baseline.js` with a `<video>` element. The markers, state machine, and CSV recording stay the same — only the scene rendering changes.

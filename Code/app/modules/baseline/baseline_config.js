@@ -1,5 +1,7 @@
 export const CONFIG = {
   DURATION_SECS:     300,   // 5 minutes
+  SUBJECT_CODE:      'TEST',
+  DATA_DIR:          'baselineData',
   SEND_MARKERS:      true,
   MARKER_STREAM_URL: 'ws://localhost:9001',
 };
