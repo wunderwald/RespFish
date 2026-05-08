@@ -3,11 +3,13 @@
 
 import { STATE, CONFIG } from './config.js';
 import { drawDisplay } from './animationDisplay.js';
+import { Caustics }    from './caustics.js';
 
 export class IBreathRenderer {
-  #canvas = null;
-  #ctx = null;
-  #images = {};   // key → HTMLImageElement
+  #canvas   = null;
+  #ctx      = null;
+  #images   = {};        // key → HTMLImageElement
+  #caustics = null;
 
   constructor(container) {
     container.innerHTML = '<canvas id="ib-canvas"></canvas>';
@@ -20,6 +22,7 @@ export class IBreathRenderer {
       img.src = src;
       this.#images[key] = img;
     }
+    this.#caustics = new Caustics();
   }
 
   // ── Public draw entry point ────────────────────────────────────────────
@@ -33,6 +36,7 @@ export class IBreathRenderer {
     const w = canvas.width;
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
+    this.#caustics.draw(ctx, w, h, now / 1000);
 
     switch (state) {
       case STATE.IDLE:        this.#drawIdle(ctx, w, h); break;
