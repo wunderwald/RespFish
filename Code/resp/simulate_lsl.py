@@ -26,7 +26,7 @@ Improvements over the original simulate_lsl.py
     - Normalised to [0.0, 1.0] matching the bridge's expected format.
 
 Usage:
-    python simulate_lsl.py [--bpm BPM] [--rate HZ] [--name NAME]
+    python simulate_lsl.py [--bpm BPM] [--rate HZ] [--name NAME] [--drift BPM]
 
 Dependencies:
     pip install pylsl
@@ -52,10 +52,18 @@ DEFAULT_BPM         = 12.0      # breaths per minute at rest
 INHALE_FRACTION   = 0.40   # fraction of breath cycle spent inhaling
 EXHALE_FRACTION   = 0.60   # fraction of breath cycle spent exhaling
 
-# Rate variability: BPM drifts by up to ±RATE_VARIABILITY_FRAC of the base BPM
-# modelled as a first-order AR(1) process updated once per cycle.
+# Rate variability: cycle-to-cycle BPM jitter, modelled as a first-order AR(1)
+# process updated once per cycle.
 RATE_VARIABILITY_FRAC = 0.15
-RATE_SMOOTHING        = 0.25   # how quickly the rate change takes effect [0,1]
+RATE_SMOOTHING        = 0.25   # how quickly the per-cycle jitter takes effect [0,1]
+
+# Long-timescale BPM drift (enabled via --drift).
+# The base BPM wanders as a smoothed random walk within ±drift_bpm of the
+# original value.  DRIFT_STEP_FRAC controls how far the walk target moves
+# each cycle; DRIFT_SMOOTHING controls how fast the actual base tracks the
+# target (small → very slow, smooth transitions).
+DRIFT_STEP_FRAC = 0.12   # target moves by up to this fraction of drift_bpm/cycle
+DRIFT_SMOOTHING = 0.04   # lag coefficient for smoothing the drift
 
 # Amplitude variability
 AMP_JITTER_FRAC       = 0.12   # ± fraction of nominal amplitude per cycle
@@ -104,10 +112,15 @@ def breath_sample(phase: float, amp: float) -> float:
 class BreathState:
     """Tracks slowly-varying biological parameters across breath cycles."""
 
-    def __init__(self, base_bpm: float):
+    def __init__(self, base_bpm: float, drift_bpm: float = 0.0):
+        self._original_bpm = base_bpm
+        self._drift_bpm    = drift_bpm
+        self._drift_offset = 0.0   # current drift of base_bpm from original
+        self._drift_target = 0.0   # random-walk target for the drift offset
+
         self.base_bpm     = base_bpm
         self.current_bpm  = base_bpm
-        self.current_amp  = 1.0     # nominal; jitter applied per cycle
+        self.current_amp  = 1.0
         self._bpm_target  = base_bpm
 
     def next_cycle(self) -> tuple[float, float]:
@@ -115,8 +128,17 @@ class BreathState:
         Advance to the next breath cycle.
         Returns (period_seconds, amplitude_fraction).
         """
-        # BPM random walk: pick a new target, smooth toward it
-        noise          = random.gauss(0, self.base_bpm * RATE_VARIABILITY_FRAC)
+        # Long-timescale drift: slowly wander base_bpm within ±_drift_bpm
+        if self._drift_bpm > 0:
+            step = random.gauss(0, self._drift_bpm * DRIFT_STEP_FRAC)
+            self._drift_target = max(-self._drift_bpm,
+                                     min(self._drift_bpm,
+                                         self._drift_target + step))
+            self._drift_offset += DRIFT_SMOOTHING * (self._drift_target - self._drift_offset)
+            self.base_bpm = self._original_bpm + self._drift_offset
+
+        # Cycle-to-cycle jitter: pick a new target around the (possibly drifted) base
+        noise            = random.gauss(0, self.base_bpm * RATE_VARIABILITY_FRAC)
         self._bpm_target = self.base_bpm + noise
         self._bpm_target = max(self.base_bpm * 0.5,
                                min(self.base_bpm * 1.5, self._bpm_target))
@@ -139,12 +161,15 @@ class BreathState:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Physiological LSL breath simulator")
-    p.add_argument("--bpm",  type=float, default=DEFAULT_BPM,
+    p.add_argument("--bpm",   type=float, default=DEFAULT_BPM,
                    help=f"Base breathing rate in BPM (default {DEFAULT_BPM})")
-    p.add_argument("--rate", type=int,   default=DEFAULT_SAMPLE_RATE,
+    p.add_argument("--rate",  type=int,   default=DEFAULT_SAMPLE_RATE,
                    help=f"Sample rate in Hz (default {DEFAULT_SAMPLE_RATE})")
-    p.add_argument("--name", type=str,   default=DEFAULT_STREAM_NAME,
+    p.add_argument("--name",  type=str,   default=DEFAULT_STREAM_NAME,
                    help=f"LSL stream name (default '{DEFAULT_STREAM_NAME}')")
+    p.add_argument("--drift", type=float, default=0.0,
+                   help="Enable long-timescale BPM drift: base rate wanders "
+                        "within ±DRIFT BPM of the target (default 0 = disabled)")
     return p.parse_args()
 
 
@@ -162,10 +187,11 @@ if __name__ == "__main__":
     outlet   = StreamOutlet(info)
     interval = 1.0 / args.rate
 
-    state = BreathState(base_bpm=args.bpm)
+    state = BreathState(base_bpm=args.bpm, drift_bpm=args.drift)
 
+    drift_str = f", drift=±{args.drift} BPM" if args.drift else ""
     print(f"[simulator] Streaming '{args.name}' at {args.rate} Hz, "
-          f"base BPM={args.bpm}")
+          f"base BPM={args.bpm}{drift_str}")
     print("[simulator] Press Ctrl+C to stop.\n")
 
     t_abs    = 0.0    # absolute time (seconds)
