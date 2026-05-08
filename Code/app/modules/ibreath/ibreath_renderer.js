@@ -106,7 +106,7 @@ export class IBreathRenderer {
   }
 
   #drawDisplayState(ctx, w, h, elapsed) {
-    drawDisplay(ctx, w, h, elapsed);
+    drawDisplay(ctx, w, h, elapsed, this.#images);
   }
 
   #drawReady(ctx, w, h) {
@@ -185,56 +185,32 @@ export class IBreathRenderer {
   }
 
   #drawPaused(ctx, w, h, now) {
-    const cx = w / 2, cy = h / 2;
-    const r  = Math.min(w, h) * 0.12;
+    const t    = now / 1000;
+    const cx   = w / 2, cy = h / 2;
+    const unit = Math.min(w, h);
 
-    // Soft warm glow behind sun
-    const grd = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r * 2.8);
-    grd.addColorStop(0, 'rgba(255, 215, 60, 0.14)');
-    grd.addColorStop(1, 'rgba(255, 180, 0, 0)');
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, w, h);
+    const swimHz  = 0.28;
+    const phase   = t * swimHz * Math.PI * 2;
 
-    // Slowly rotating rays
-    const numRays   = 8;
-    const rotSpeed  = now * 0.00015;
-    const rayInner  = r * 1.3;
-    const rayOuter  = r * 1.75;
+    // Lazy figure-8: x sweeps slowly, y wobbles at 2× frequency
+    const x = cx + Math.sin(phase) * w * 0.28;
+    const y = cy + Math.sin(phase * 2) * unit * 0.035;
+
+    const facingLeft = Math.cos(phase) < 0;
+    const wag        = Math.sin(phase * 2) * 0.10;
+    const fishSize   = unit * 0.11;
+
+    const img = this.#images['pinkfish'];
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 210, 60, 0.55)';
-    ctx.lineWidth   = r * 0.09;
-    ctx.lineCap     = 'round';
-    for (let i = 0; i < numRays; i++) {
-      const a = rotSpeed + (i / numRays) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * rayInner, cy + Math.sin(a) * rayInner);
-      ctx.lineTo(cx + Math.cos(a) * rayOuter, cy + Math.sin(a) * rayOuter);
-      ctx.stroke();
+    ctx.translate(x, y);
+    if (facingLeft) ctx.scale(-1, 1);
+    ctx.rotate(wag);
+    if (img?.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, -fishSize, -fishSize, fishSize * 2, fishSize * 2);
     }
     ctx.restore();
 
-    // Sun body
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 215, 55, 0.92)';
-    ctx.fill();
-
-    // Eyes
-    const eyeR = r * 0.1;
-    const eyeY = cy - r * 0.18;
-    ctx.fillStyle = 'rgba(80, 50, 0, 0.85)';
-    ctx.beginPath(); ctx.arc(cx - r * 0.3, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + r * 0.3, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
-
-    // Smile
-    ctx.beginPath();
-    ctx.arc(cx, cy + r * 0.08, r * 0.44, 0.25, Math.PI - 0.25);
-    ctx.strokeStyle = 'rgba(80, 50, 0, 0.85)';
-    ctx.lineWidth   = r * 0.1;
-    ctx.lineCap     = 'round';
-    ctx.stroke();
-
-    this.#centerText(ctx, cx, cy + r * 2.2, 'paused', 'rgba(255,255,255,0.28)', 16);
+    this.#centerText(ctx, cx, cy + unit * 0.22, 'paused', 'rgba(255,255,255,0.28)', 16);
   }
 
   #drawDone(ctx, w, h, trialCount, subjectCode) {
