@@ -41,10 +41,16 @@ if (frontend === 'ibreath') {
   document.getElementById('gaze-bar').style.display = 'none';
 }
 
-// ── Timer bar (ibreath only) ──────────────────────────────────────────────────
+// ── Timer bar (ibreath + baseline) ───────────────────────────────────────────
 
-if (frontend !== 'ibreath') {
+if (!['ibreath', 'baseline'].includes(frontend)) {
   document.getElementById('timer-bar').style.display = 'none';
+}
+
+function fmtTime(secs) {
+  if (secs == null) return '—';
+  secs = Math.max(0, Math.floor(secs));
+  return `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
 }
 
 // ── Settings bar (ibreath + bioGame) ─────────────────────────────────────────
@@ -120,12 +126,6 @@ if (frontend === 'ibreath') {
 
   let experimentStartedAt = null;
   let stateTimer          = null;   // { startedAt, duration } or null
-
-  function fmtTime(secs) {
-    if (secs == null) return '—';
-    secs = Math.max(0, Math.floor(secs));
-    return `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
-  }
 
   setInterval(() => {
     elapsedEl.textContent   = experimentStartedAt
@@ -370,8 +370,35 @@ if (frontend === 'ibreath') {
   const blStartBtn  = document.getElementById('bl-start-btn');
   const blAbortBtn  = document.getElementById('bl-abort-btn');
 
-  window.api.frontend.onState(({ stateText, startEnabled, abortVisible, inputsLocked }) => {
-    if (stateText    !== undefined) blStatusEl.textContent   = stateText;
+  const blTimerStateEl   = document.getElementById('ib-state-text');
+  const blElapsedEl      = document.getElementById('ib-elapsed');
+  const blRemainingEl    = document.getElementById('ib-remaining');
+
+  let blRecordingStartedAt = null;
+  let blDurationSecs       = null;
+
+  setInterval(() => {
+    if (!blRecordingStartedAt) return;
+    const elapsed = (Date.now() - blRecordingStartedAt) / 1000;
+    blElapsedEl.textContent   = fmtTime(elapsed);
+    blRemainingEl.textContent = blDurationSecs != null
+      ? fmtTime(blDurationSecs - elapsed)
+      : '—';
+  }, 250);
+
+  window.api.frontend.onState(({ stateText, startEnabled, abortVisible, inputsLocked,
+                                  recordingStartedAt, duration }) => {
+    if (recordingStartedAt !== undefined) blRecordingStartedAt = recordingStartedAt;
+    if (duration           !== undefined) blDurationSecs       = duration;
+    if (stateText !== undefined) {
+      blStatusEl.textContent    = stateText;
+      blTimerStateEl.textContent = stateText;
+      if (stateText === 'done' || stateText === 'aborted') {
+        blRecordingStartedAt  = null;
+        blElapsedEl.textContent   = '—';
+        blRemainingEl.textContent = '—';
+      }
+    }
     if (startEnabled !== undefined) blStartBtn.disabled      = !startEnabled;
     if (abortVisible !== undefined) blAbortBtn.style.display = abortVisible ? '' : 'none';
     if (inputsLocked) {

@@ -84,10 +84,12 @@ export default class Baseline {
     this.#state        = STATE.PLAYING;
     this.#markers.send('baseline_start');
     this.#pushState({
-      stateText:    'recording',
-      startEnabled: false,
-      abortVisible: true,
-      inputsLocked: true,
+      stateText:           'recording',
+      startEnabled:        false,
+      abortVisible:        true,
+      inputsLocked:        true,
+      recordingStartedAt:  Date.now(),
+      duration:            CONFIG.DURATION_SECS,
     });
   }
 
