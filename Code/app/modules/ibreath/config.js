@@ -31,8 +31,8 @@ export const CONFIG = {
   CLOUD_SIZE_MIN: 0.10,     // at stimulusLevel = 0
   CLOUD_SIZE_MAX: 0.45,     // at stimulusLevel = 1
 
-  // Data output base directory (relative to Electron app dir)
-  DATA_DIR: "iBreathData",
+  // Data output base directory (relative to Electron app dir) — do not change
+  DATA_DIR: "output_data/ibreath",
 
   // Questions after trials
   SHOW_QUESTIONS: true,      // show a post-trial response question after each trial

@@ -19,7 +19,6 @@ export default class Baseline {
 
   // Experimenter-supplied params (overridden on 'start' action)
   #subjectCode = CONFIG.SUBJECT_CODE;
-  #dataDir     = CONFIG.DATA_DIR;
 
   // Recorded samples: [isoTimestamp, value]
   #sampleBuffer = [];
@@ -61,11 +60,10 @@ export default class Baseline {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode, dataDir }) {
+  #onAction({ type, subjectCode }) {
     switch (type) {
       case 'start':
         if (subjectCode !== undefined) this.#subjectCode = subjectCode;
-        if (dataDir     !== undefined) this.#dataDir     = dataDir;
         if (this.#state === STATE.IDLE && this.#streamReady) this.#begin();
         break;
       case 'abort':
@@ -111,7 +109,7 @@ export default class Baseline {
 
   async #writeCSV() {
     if (!window.api || this.#sampleBuffer.length === 0) return;
-    const dir    = this.#dataDir;
+    const dir    = CONFIG.DATA_DIR;
     const result = await window.api.ensureDir(dir);
     if (!result.ok) {
       console.error('[Baseline] could not create data dir:', result.error);

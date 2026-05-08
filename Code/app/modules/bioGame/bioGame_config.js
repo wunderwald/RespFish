@@ -4,7 +4,7 @@ export const CONFIG = {
   GROUP:                 'slow',   // 'slow' | 'natural'
   NATURAL_BPM:           10,
   SHOW_CURVE:            false,
-  DATA_DIR:              'bioGameData',
+  DATA_DIR:              'output_data/bio_game', // do not change
   SEND_MARKERS:          true,
   MARKER_STREAM_URL:     'ws://localhost:8765',
 

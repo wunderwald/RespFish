@@ -1,6 +1,6 @@
 // CSV output for the bioGame experiment.
 //
-// Two file types written to dataDir/<subjectCode>/:
+// Two file types written to CONFIG.DATA_DIR/<subjectCode>/:
 //   eventData.csv          — one row per event (session info, state changes, collects, misses)
 //   frameData_block0.csv   — 20-fps frame rows for block 0
 //   frameData_block1.csv   — 20-fps frame rows for block 1
@@ -13,7 +13,6 @@ import { CONFIG } from './bioGame_config.js';
 export class BioGameCSV {
   #subjectCode;
   #group;
-  #dataDir;
   #onWarn;
 
   #frameBuffer       = [];
@@ -23,10 +22,9 @@ export class BioGameCSV {
                  'fishY,targetY,starfishCount\n';
   #eventHeader = 'timestamp,blockIndex,event,value1,value2\n';
 
-  constructor(subjectCode, group, dataDir, onWarn) {
+  constructor(subjectCode, group, onWarn) {
     this.#subjectCode = subjectCode;
     this.#group       = group;
-    this.#dataDir     = dataDir;
     this.#onWarn      = onWarn;
   }
 
@@ -35,7 +33,7 @@ export class BioGameCSV {
       console.warn('[CSV] window.api unavailable — file I/O disabled');
       return;
     }
-    const dir = `${this.#dataDir}/${this.#subjectCode}`;
+    const dir = `${CONFIG.DATA_DIR}/${this.#subjectCode}`;
     const dirResult = await window.api.ensureDir(dir);
     if (!dirResult.ok) { this.#warn(`Could not create data dir: ${dirResult.error}`); return; }
 
@@ -85,13 +83,13 @@ export class BioGameCSV {
     if (!window.api) return;
     const row = `${new Date().toISOString()},${blockIndex},${event},${value1},${value2}\n`;
     const res = await window.api.appendCSV(
-      `${this.#dataDir}/${this.#subjectCode}/eventData.csv`, row
+      `${CONFIG.DATA_DIR}/${this.#subjectCode}/eventData.csv`, row
     );
     if (!res.ok) this.#warn(`Could not write event '${event}': ${res.error}`);
   }
 
   #framePath(blockIndex) {
-    return `${this.#dataDir}/${this.#subjectCode}/frameData_block${blockIndex}.csv`;
+    return `${CONFIG.DATA_DIR}/${this.#subjectCode}/frameData_block${blockIndex}.csv`;
   }
 
   #warn(msg) {

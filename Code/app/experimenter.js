@@ -104,15 +104,7 @@ if (frontend === 'ibreath') {
     <span class="label">cal secs</span>
     <input id="s-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${CONFIG.CALIBRATION_SECS}" />
-    <span class="label">data dir</span>
-    <span id="s-data-dir-text">${CONFIG.DATA_DIR}</span>
-    <button id="s-pick-dir">…</button>
   `;
-
-  document.getElementById('s-pick-dir').addEventListener('click', async () => {
-    const picked = await window.api.pickDir();
-    if (picked) document.getElementById('s-data-dir-text').textContent = picked;
-  });
 
   const stateEl            = document.getElementById('ib-state-text');   // in #timer-bar
   const elapsedEl          = document.getElementById('ib-elapsed');       // in #timer-bar
@@ -180,7 +172,6 @@ if (frontend === 'ibreath') {
       debugGaze:       document.getElementById('s-debug-gaze').checked,
       autoAdvance:     document.getElementById('s-auto-advance').checked,
       flashingImage:   document.getElementById('s-flash-images').checked,
-      dataDir:         document.getElementById('s-data-dir-text').textContent,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
     });
   });
@@ -290,15 +281,7 @@ if (frontend === 'ibreath') {
     <span class="label">cal secs</span>
     <input id="bg-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${BG.CALIBRATION_SECS}" />
-    <span class="label">data dir</span>
-    <span id="bg-data-dir-text">${BG.DATA_DIR}</span>
-    <button id="bg-pick-dir">…</button>
   `;
-
-  document.getElementById('bg-pick-dir').addEventListener('click', async () => {
-    const picked = await window.api.pickDir();
-    if (picked) document.getElementById('bg-data-dir-text').textContent = picked;
-  });
 
   const bgStatusEl   = document.getElementById('bg-status');
   const bgSubjectEl  = document.getElementById('bg-subject');
@@ -346,7 +329,6 @@ if (frontend === 'ibreath') {
       group:           bgGroupEl.value,
       naturalBpm:      parseFloat(bgNatBpmEl.value) || BG.NATURAL_BPM,
       showCurve:       document.getElementById('bg-show-curve').checked,
-      dataDir:         document.getElementById('bg-data-dir-text').textContent,
       calibrationSecs: parseInt(document.getElementById('bg-cal-secs').value) || BG.CALIBRATION_SECS,
     });
   });
@@ -377,34 +359,23 @@ if (frontend === 'ibreath') {
       <input id="bl-subject" type="text" value="TEST"
              placeholder="subject code" autocomplete="off" spellcheck="false" />
     </span>
-    <span class="label">data dir</span>
-    <span id="bl-data-dir-text">baselineData</span>
-    <button id="bl-pick-dir">…</button>
     <span id="ib-controls">
       <button id="bl-start-btn" disabled>Start</button>
       <button id="bl-abort-btn" style="display:none">Abort</button>
     </span>
   `;
 
-  const blStatusEl   = document.getElementById('bl-status');
-  const blSubjectEl  = document.getElementById('bl-subject');
-  const blDirTextEl  = document.getElementById('bl-data-dir-text');
-  const blPickDirBtn = document.getElementById('bl-pick-dir');
-  const blStartBtn   = document.getElementById('bl-start-btn');
-  const blAbortBtn   = document.getElementById('bl-abort-btn');
-
-  blPickDirBtn.addEventListener('click', async () => {
-    const picked = await window.api.pickDir();
-    if (picked) blDirTextEl.textContent = picked;
-  });
+  const blStatusEl  = document.getElementById('bl-status');
+  const blSubjectEl = document.getElementById('bl-subject');
+  const blStartBtn  = document.getElementById('bl-start-btn');
+  const blAbortBtn  = document.getElementById('bl-abort-btn');
 
   window.api.frontend.onState(({ stateText, startEnabled, abortVisible, inputsLocked }) => {
     if (stateText    !== undefined) blStatusEl.textContent   = stateText;
     if (startEnabled !== undefined) blStartBtn.disabled      = !startEnabled;
     if (abortVisible !== undefined) blAbortBtn.style.display = abortVisible ? '' : 'none';
     if (inputsLocked) {
-      blSubjectEl.disabled  = true;
-      blPickDirBtn.disabled = true;
+      blSubjectEl.disabled = true;
       respStream.disable();
     }
   });
@@ -413,7 +384,6 @@ if (frontend === 'ibreath') {
     window.api.frontend.sendAction({
       type:        'start',
       subjectCode: blSubjectEl.value.trim() || 'TEST',
-      dataDir:     blDirTextEl.textContent,
     })
   );
   blAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));

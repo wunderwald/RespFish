@@ -50,7 +50,6 @@ export default class BioGame {
   #group            = CONFIG.GROUP;
   #naturalBpm       = CONFIG.NATURAL_BPM;
   #showCurve        = CONFIG.SHOW_CURVE;
-  #dataDir          = CONFIG.DATA_DIR;
   #calibrationSecs  = CONFIG.CALIBRATION_SECS;
 
   // ── Block management ──────────────────────────────────────────────────────
@@ -140,14 +139,13 @@ export default class BioGame {
 
   // ── Action handler (from experimenter window) ─────────────────────────────
 
-  #onAction({ type, subjectCode, group, naturalBpm, showCurve, dataDir, calibrationSecs }) {
+  #onAction({ type, subjectCode, group, naturalBpm, showCurve, calibrationSecs }) {
     switch (type) {
       case 'start':
         if (subjectCode     !== undefined) this.#subjectCode     = subjectCode;
         if (group           !== undefined) this.#group           = group;
         if (naturalBpm      !== undefined) this.#naturalBpm      = naturalBpm;
         if (showCurve       !== undefined) this.#showCurve       = showCurve;
-        if (dataDir         !== undefined) this.#dataDir         = dataDir;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
         if (this.#state === STATE.IDLE && this.#streamReady) this.#beginCalibration();
         break;
@@ -180,7 +178,7 @@ export default class BioGame {
     this.#trialIndex = 0;
 
     this.#csv = new BioGameCSV(
-      this.#subjectCode, this.#group, this.#dataDir,
+      this.#subjectCode, this.#group,
       (msg) => this.#csvWarn(msg)
     );
     this.#csv.init();
