@@ -34,6 +34,7 @@ export class IBreathRenderer {
       case STATE.TRIAL:       this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive); break;
       case STATE.RESPONSE:    this.#drawResponse(ctx, w, h, now, data.responseStartTime, data.questionType); break;
       case STATE.ITI:         this.#drawITI(ctx, w, h, now, data.itiStartTime, data.itiDuration); break;
+      case STATE.PAUSED:      this.#drawPaused(ctx, w, h, now); break;
       case STATE.DONE:        this.#drawDone(ctx, w, h, data.trialCount, data.subjectCode); break;
     }
 
@@ -173,6 +174,59 @@ export class IBreathRenderer {
     const secs = (remaining / 1000).toFixed(1);
     this.#centerText(ctx, w / 2, h / 2,
       `Next trial in ${secs}s`, 'rgba(255,255,255,0.2)', 16);
+  }
+
+  #drawPaused(ctx, w, h, now) {
+    const cx = w / 2, cy = h / 2;
+    const r  = Math.min(w, h) * 0.12;
+
+    // Soft warm glow behind sun
+    const grd = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r * 2.8);
+    grd.addColorStop(0, 'rgba(255, 215, 60, 0.14)');
+    grd.addColorStop(1, 'rgba(255, 180, 0, 0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, w, h);
+
+    // Slowly rotating rays
+    const numRays   = 8;
+    const rotSpeed  = now * 0.00015;
+    const rayInner  = r * 1.3;
+    const rayOuter  = r * 1.75;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 210, 60, 0.55)';
+    ctx.lineWidth   = r * 0.09;
+    ctx.lineCap     = 'round';
+    for (let i = 0; i < numRays; i++) {
+      const a = rotSpeed + (i / numRays) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * rayInner, cy + Math.sin(a) * rayInner);
+      ctx.lineTo(cx + Math.cos(a) * rayOuter, cy + Math.sin(a) * rayOuter);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Sun body
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 215, 55, 0.92)';
+    ctx.fill();
+
+    // Eyes
+    const eyeR = r * 0.1;
+    const eyeY = cy - r * 0.18;
+    ctx.fillStyle = 'rgba(80, 50, 0, 0.85)';
+    ctx.beginPath(); ctx.arc(cx - r * 0.3, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + r * 0.3, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
+
+    // Smile
+    ctx.beginPath();
+    ctx.arc(cx, cy + r * 0.08, r * 0.44, 0.25, Math.PI - 0.25);
+    ctx.strokeStyle = 'rgba(80, 50, 0, 0.85)';
+    ctx.lineWidth   = r * 0.1;
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+
+    this.#centerText(ctx, cx, cy + r * 2.2, 'paused', 'rgba(255,255,255,0.28)', 16);
   }
 
   #drawDone(ctx, w, h, trialCount, subjectCode) {

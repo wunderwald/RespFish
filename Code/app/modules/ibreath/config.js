@@ -69,5 +69,6 @@ export const STATE = {
   TRIAL: 'trial',
   RESPONSE: 'response',   // post-trial question (SHOW_QUESTIONS only)
   ITI: 'iti',
+  PAUSED: 'paused',    // experimenter paused mid-experiment
   DONE: 'done',
 };

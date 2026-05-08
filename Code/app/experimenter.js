@@ -98,6 +98,7 @@ if (frontend === 'ibreath') {
       <button id="ib-next-btn"   style="display:none">Next trial</button>
       <button id="ib-abort-btn"  style="display:none">Abort trial</button>
       <button id="ib-pause-btn"  style="display:none">Pause</button>
+      <button id="ib-play-btn"   style="display:none">Play</button>
       <button id="ib-gaze-btn"   style="display:none" disabled>Recalibrate gaze</button>
     </span>
   `;
@@ -125,6 +126,7 @@ if (frontend === 'ibreath') {
   const nextBtn            = document.getElementById('ib-next-btn');
   const abortBtn           = document.getElementById('ib-abort-btn');
   const pauseBtn           = document.getElementById('ib-pause-btn');
+  const playBtn            = document.getElementById('ib-play-btn');
   const gazeBtn            = document.getElementById('ib-gaze-btn');
 
   // ── Clocks ──────────────────────────────────────────────────────────────────
@@ -144,7 +146,7 @@ if (frontend === 'ibreath') {
   // ── Receive state from scene window ─────────────────────────────────────────
 
   window.api.hud.onState(({ stateText, stateColor, trialText,
-                             startEnabled, nextVisible, abortVisible, pauseVisible, inputsLocked,
+                             startEnabled, nextVisible, abortVisible, pauseVisible, playVisible, inputsLocked,
                              experimentStartedAt: esa, stateTimer: st, gazeActive }) => {
     if (esa !== undefined) experimentStartedAt = esa;
     if (st  !== undefined) stateTimer          = st;
@@ -155,6 +157,7 @@ if (frontend === 'ibreath') {
     if (nextVisible  !== undefined) nextBtn.style.display      = nextVisible  ? '' : 'none';
     if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
     if (pauseVisible !== undefined) pauseBtn.style.display     = pauseVisible ? '' : 'none';
+    if (playVisible  !== undefined) playBtn.style.display      = playVisible  ? '' : 'none';
     if (gazeActive   !== undefined) gazeBtn.style.display      = gazeActive   ? '' : 'none';
     if (inputsLocked !== undefined) {
       subjectInput.disabled       = inputsLocked;
@@ -186,6 +189,7 @@ if (frontend === 'ibreath') {
   nextBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'next' }));
   abortBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'abort' }));
   pauseBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'pause' }));
+  playBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'play' }));
   gazeBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'recalibrateGaze' }));
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────

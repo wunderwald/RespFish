@@ -64,7 +64,11 @@ export default class IBreath {
   #itiStartTime = null;
   #itiDuration = 0;
   #displayStartTime = null;
-  #skipITI = false;   // set by pause during ITI → jump straight to display on next advance
+
+  // ── pause ──────────────────────────────────────────────────────────────
+  #pausedFromState = null;
+  #pausedStateText = null;
+  #pausedAt = 0;
 
   // ── response (SHOW_QUESTIONS) ──────────────────────────────────────────
   #pendingTrial      = null;
@@ -94,6 +98,7 @@ export default class IBreath {
       onAbort:           () => this.#abortTrial(),
       onResponse:        (v) => this.#onResponse(v),
       onPause:           () => this.#onPause(),
+      onPlay:            () => this.#onPlay(),
       onRecalibrateGaze: () => {},   // placeholder
     };
     this.#hud = hudFactory
@@ -370,11 +375,79 @@ export default class IBreath {
   }
 
   #onPause() {
-    switch (this.#state) {
-      case STATE.TRIAL:    this.#abortTrial(); break;
-      case STATE.DISPLAY:  this.#displayStartTime = performance.now(); break;  // rewind animation
-      case STATE.RESPONSE: this.#onResponse('timeout'); break;
-      case STATE.ITI:      this.#advanceTrial(); break;  // skip remaining ITI → jump to display
+    const pauseable = [STATE.DISPLAY, STATE.TRIAL, STATE.RESPONSE, STATE.ITI];
+    if (!pauseable.includes(this.#state)) return;
+
+    if (this.#state === STATE.TRIAL) {
+      // Abort and flush the running trial before pausing
+      this.#endTrial(true);
+      if (this.#state === STATE.DONE) return;  // last trial just finished — don't pause
+      // state is now ITI; resume will skip it and go straight to the next display
+      this.#pausedFromState = STATE.ITI;
+    } else {
+      this.#pausedFromState = this.#state;
+    }
+
+    this.#pausedStateText = this.#hud.stateText;
+    this.#pausedAt        = performance.now();
+    this.#state           = STATE.PAUSED;
+
+    this.#markers.send('experiment_pause');
+
+    this.#hud.abortVisible = false;
+    this.#hud.pauseVisible = false;
+    this.#hud.playVisible  = true;
+    this.#hud.stateTimer   = { startedAt: Date.now(), duration: null };
+    this.#hud.stateText    = 'paused';
+  }
+
+  #onPlay() {
+    if (this.#state !== STATE.PAUSED) return;
+    const from      = this.#pausedFromState;
+    const stateText = this.#pausedStateText;
+    this.#pausedFromState = null;
+    this.#pausedStateText = null;
+    this.#markers.send('experiment_resume');
+
+    switch (from) {
+      case STATE.DISPLAY:
+        // Rewind animation to the beginning
+        this.#displayStartTime = performance.now();
+        this.#state = STATE.DISPLAY;
+        this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.DISPLAY_SECS };
+        this.#hud.pauseVisible = true;
+        this.#hud.playVisible  = false;
+        this.#hud.stateText    = stateText;
+        break;
+
+      case STATE.TRIAL: {
+        // Extend the trial clock by however long we were paused
+        this.#trialStartTime += performance.now() - this.#pausedAt;
+        this.#state = STATE.TRIAL;
+        const remaining = CONFIG.MAX_TRIAL_TIME - (performance.now() - this.#trialStartTime) / 1000;
+        this.#hud.stateTimer   = { startedAt: Date.now(), duration: Math.max(0, remaining) };
+        this.#hud.abortVisible = true;
+        this.#hud.pauseVisible = true;
+        this.#hud.playVisible  = false;
+        this.#hud.stateText    = stateText;
+        break;
+      }
+
+      case STATE.RESPONSE:
+        // Restart the response timeout from zero
+        this.#responseStartTime = performance.now();
+        this.#state = STATE.RESPONSE;
+        this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.RESPONSE_TIMEOUT_SECS };
+        this.#hud.pauseVisible = true;
+        this.#hud.playVisible  = false;
+        this.#hud.stateText    = stateText;
+        break;
+
+      case STATE.ITI:
+        // Skip remaining ITI — advance straight to the display animation
+        this.#advanceTrial();   // sets pauseVisible, stateText, stateTimer
+        this.#hud.playVisible = false;
+        break;
     }
   }
 

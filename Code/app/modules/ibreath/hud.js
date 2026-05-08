@@ -8,9 +8,9 @@
  */
 export class LocalHud {
   #stateEl; #trialEl; #subjectInput; #questionTypeSelect;
-  #startBtn; #nextBtn; #abortBtn; #pauseBtn;
+  #startBtn; #nextBtn; #abortBtn; #pauseBtn; #playBtn;
 
-  constructor(container, subjectCode, { onStart, onNext, onAbort, onPause }) {
+  constructor(container, subjectCode, { onStart, onNext, onAbort, onPause, onPlay }) {
     container.innerHTML = `
       <span id="ib-state-text">waiting for stream…</span>
       <span>
@@ -34,6 +34,7 @@ export class LocalHud {
         <button id="ib-next-btn"   style="display:none">Next trial</button>
         <button id="ib-abort-btn"  style="display:none">Abort trial</button>
         <button id="ib-pause-btn"  style="display:none">Pause</button>
+        <button id="ib-play-btn"   style="display:none">Play</button>
       </span>
     `;
 
@@ -45,11 +46,13 @@ export class LocalHud {
     this.#nextBtn            = container.querySelector('#ib-next-btn');
     this.#abortBtn           = container.querySelector('#ib-abort-btn');
     this.#pauseBtn           = container.querySelector('#ib-pause-btn');
+    this.#playBtn            = container.querySelector('#ib-play-btn');
 
     this.#startBtn.addEventListener('click', onStart);
     this.#nextBtn.addEventListener('click',  onNext);
     this.#abortBtn.addEventListener('click', onAbort);
     this.#pauseBtn.addEventListener('click', onPause ?? (() => {}));
+    this.#playBtn.addEventListener('click',  onPlay  ?? (() => {}));
   }
 
   get stateText()      { return this.#stateEl.textContent; }
@@ -60,6 +63,7 @@ export class LocalHud {
   set nextVisible(v)   { this.#nextBtn.style.display  = v ? '' : 'none'; }
   set abortVisible(v)  { this.#abortBtn.style.display = v ? '' : 'none'; }
   set pauseVisible(v)  { this.#pauseBtn.style.display = v ? '' : 'none'; }
+  set playVisible(v)   { this.#playBtn.style.display  = v ? '' : 'none'; }
   set inputsLocked(v)  {
     this.#subjectInput.disabled       = v;
     this.#questionTypeSelect.disabled = v;
