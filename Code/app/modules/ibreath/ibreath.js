@@ -64,6 +64,7 @@ export default class IBreath {
   #itiStartTime = null;
   #itiDuration = 0;
   #displayStartTime = null;
+  #skipITI = false;   // set by pause during ITI → jump straight to display on next advance
 
   // ── response (SHOW_QUESTIONS) ──────────────────────────────────────────
   #pendingTrial      = null;
@@ -88,10 +89,12 @@ export default class IBreath {
 
   constructor({ statsContainer, sceneContainer, hudFactory }) {
     const callbacks = {
-      onStart:    (settings) => this.#beginCalibration(settings),
-      onNext:     () => this.#advanceTrial(),
-      onAbort:    () => this.#abortTrial(),
-      onResponse: (v) => this.#onResponse(v),
+      onStart:           (settings) => this.#beginCalibration(settings),
+      onNext:            () => this.#advanceTrial(),
+      onAbort:           () => this.#abortTrial(),
+      onResponse:        (v) => this.#onResponse(v),
+      onPause:           () => this.#onPause(),
+      onRecalibrateGaze: () => {},   // placeholder
     };
     this.#hud = hudFactory
       ? hudFactory(callbacks)
@@ -110,13 +113,15 @@ export default class IBreath {
   // ── Public interface ───────────────────────────────────────────────────
 
   pushGazeSample(channels) {
+    const wasEnabled = this.#gazeEnabled;
     if (!channels) {
       this.#gazeEnabled = false;
-      return;
+    } else {
+      this.#gazeX = channels[0] ?? null;
+      this.#gazeY = channels[1] ?? null;
+      this.#gazeEnabled = true;
     }
-    this.#gazeX = channels[0] ?? null;
-    this.#gazeY = channels[1] ?? null;
-    this.#gazeEnabled = true;
+    if (this.#gazeEnabled !== wasEnabled) this.#hud.gazeActive = this.#gazeEnabled;
   }
 
   pushSample(rawValue) {
@@ -164,11 +169,12 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, autoAdvance, flashingImage, calibrationSecs } = {}) {
+  #beginCalibration({ debugGaze, autoAdvance, flashingImage, calibrationSecs, showQuestions } = {}) {
     if (debugGaze       !== undefined) CONFIG.DEBUG_GAZE        = debugGaze;
     if (autoAdvance     !== undefined) CONFIG.AUTO_ADVANCE      = autoAdvance;
     if (flashingImage   !== undefined) CONFIG.FLASHING_IMAGE    = flashingImage;
     if (calibrationSecs !== undefined) CONFIG.CALIBRATION_SECS = calibrationSecs;
+    if (showQuestions   !== undefined) CONFIG.SHOW_QUESTIONS    = showQuestions;
 
     this.#subjectCode = this.#hud.subjectCode;
     this.#questionType = this.#hud.questionType;
@@ -182,10 +188,11 @@ export default class IBreath {
 
     this.#state = STATE.CALIBRATING;
     this.#hud.experimentStartedAt = Date.now();
-    this.#hud.stateTimer  = { startedAt: Date.now(), duration: CONFIG.CALIBRATION_SECS };
+    this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.CALIBRATION_SECS };
     this.#hud.startEnabled = false;
     this.#hud.inputsLocked = true;
-    this.#hud.stateText = 'calibrating…';
+    this.#hud.pauseVisible = false;
+    this.#hud.stateText    = 'calibrating…';
 
     this.#csv = new IBreathCSV(this.#subjectCode, this.#questionType, this.#gazeEnabled, (msg) => this.#csvWarn(msg));
     this.#csv.init();
@@ -206,9 +213,10 @@ export default class IBreath {
       this.#advanceTrial();
     } else {
       this.#state = STATE.READY;
-      this.#hud.stateTimer  = { startedAt: Date.now(), duration: null };
-      this.#hud.stateText   = 'ready — press Space or Next trial to begin';
-      this.#hud.nextVisible = true;
+      this.#hud.stateTimer   = { startedAt: Date.now(), duration: null };
+      this.#hud.pauseVisible = false;
+      this.#hud.stateText    = 'ready — press Space or Next trial to begin';
+      this.#hud.nextVisible  = true;
     }
   }
 
@@ -256,6 +264,7 @@ export default class IBreath {
 
     this.#hud.nextVisible  = false;
     this.#hud.abortVisible = false;
+    this.#hud.pauseVisible = true;
 
     if (CONFIG.ANIMATION_DISPLAY) {
       this.#displayStartTime = performance.now();
@@ -360,12 +369,22 @@ export default class IBreath {
     this.#endTrial(true);
   }
 
+  #onPause() {
+    switch (this.#state) {
+      case STATE.TRIAL:    this.#abortTrial(); break;
+      case STATE.DISPLAY:  this.#displayStartTime = performance.now(); break;  // rewind animation
+      case STATE.RESPONSE: this.#onResponse('timeout'); break;
+      case STATE.ITI:      this.#advanceTrial(); break;  // skip remaining ITI → jump to display
+    }
+  }
+
   #endExperiment() {
     this.#markers.send('experiment_done');
     this.#state = STATE.DONE;
     this.#hud.stateTimer   = { startedAt: Date.now(), duration: null };
     this.#hud.nextVisible  = false;
     this.#hud.abortVisible = false;
+    this.#hud.pauseVisible = false;
     this.#hud.stateText    = 'experiment complete';
     this.#hud.trialText    = `${this.#trials.length} / ${this.#trials.length}`;
   }

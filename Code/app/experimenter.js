@@ -97,6 +97,8 @@ if (frontend === 'ibreath') {
       <button id="ib-start-btn"  disabled>Start</button>
       <button id="ib-next-btn"   style="display:none">Next trial</button>
       <button id="ib-abort-btn"  style="display:none">Abort trial</button>
+      <button id="ib-pause-btn"  style="display:none">Pause</button>
+      <button id="ib-gaze-btn"   style="display:none" disabled>Recalibrate gaze</button>
     </span>
   `;
 
@@ -104,9 +106,10 @@ if (frontend === 'ibreath') {
 
   settingsBar.innerHTML = `
     <span class="label">settings</span>
-    <label><input type="checkbox" id="s-debug-gaze"   ${CONFIG.DEBUG_GAZE    ? 'checked' : ''}> show gaze position</label>
-    <label><input type="checkbox" id="s-auto-advance" ${CONFIG.AUTO_ADVANCE  ? 'checked' : ''}> auto-advance trials</label>
-    <label><input type="checkbox" id="s-flash-images" ${CONFIG.FLASHING_IMAGE ? 'checked' : ''}> include flash images</label>
+    <label><input type="checkbox" id="s-debug-gaze"      ${CONFIG.DEBUG_GAZE      ? 'checked' : ''}> show gaze position</label>
+    <label><input type="checkbox" id="s-auto-advance"    ${CONFIG.AUTO_ADVANCE    ? 'checked' : ''}> auto-advance trials</label>
+    <label><input type="checkbox" id="s-flash-images"    ${CONFIG.FLASHING_IMAGE  ? 'checked' : ''}> include flash images</label>
+    <label><input type="checkbox" id="s-show-questions"  ${CONFIG.SHOW_QUESTIONS  ? 'checked' : ''}> show questions</label>
     <span class="label">cal secs</span>
     <input id="s-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${CONFIG.CALIBRATION_SECS}" />
@@ -121,6 +124,8 @@ if (frontend === 'ibreath') {
   const startBtn           = document.getElementById('ib-start-btn');
   const nextBtn            = document.getElementById('ib-next-btn');
   const abortBtn           = document.getElementById('ib-abort-btn');
+  const pauseBtn           = document.getElementById('ib-pause-btn');
+  const gazeBtn            = document.getElementById('ib-gaze-btn');
 
   // ── Clocks ──────────────────────────────────────────────────────────────────
 
@@ -139,8 +144,8 @@ if (frontend === 'ibreath') {
   // ── Receive state from scene window ─────────────────────────────────────────
 
   window.api.hud.onState(({ stateText, stateColor, trialText,
-                             startEnabled, nextVisible, abortVisible, inputsLocked,
-                             experimentStartedAt: esa, stateTimer: st }) => {
+                             startEnabled, nextVisible, abortVisible, pauseVisible, inputsLocked,
+                             experimentStartedAt: esa, stateTimer: st, gazeActive }) => {
     if (esa !== undefined) experimentStartedAt = esa;
     if (st  !== undefined) stateTimer          = st;
     if (stateText    !== undefined) stateEl.textContent        = stateText;
@@ -149,6 +154,8 @@ if (frontend === 'ibreath') {
     if (startEnabled !== undefined) startBtn.disabled          = !startEnabled;
     if (nextVisible  !== undefined) nextBtn.style.display      = nextVisible  ? '' : 'none';
     if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
+    if (pauseVisible !== undefined) pauseBtn.style.display     = pauseVisible ? '' : 'none';
+    if (gazeActive   !== undefined) gazeBtn.style.display      = gazeActive   ? '' : 'none';
     if (inputsLocked !== undefined) {
       subjectInput.disabled       = inputsLocked;
       questionTypeSelect.disabled = inputsLocked;
@@ -172,11 +179,14 @@ if (frontend === 'ibreath') {
       debugGaze:       document.getElementById('s-debug-gaze').checked,
       autoAdvance:     document.getElementById('s-auto-advance').checked,
       flashingImage:   document.getElementById('s-flash-images').checked,
+      showQuestions:   document.getElementById('s-show-questions').checked,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
     });
   });
   nextBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'next' }));
   abortBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'abort' }));
+  pauseBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'pause' }));
+  gazeBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'recalibrateGaze' }));
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 

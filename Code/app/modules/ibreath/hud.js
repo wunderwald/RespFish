@@ -3,14 +3,14 @@
  * and exposes a clean property API so callers never touch the DOM directly.
  *
  * Setters:  stateText, stateColor, trialText,
- *           startEnabled, nextVisible, abortVisible, inputsLocked
+ *           startEnabled, nextVisible, abortVisible, pauseVisible, inputsLocked, gazeActive
  * Getters:  stateText, subjectCode, questionType
  */
 export class LocalHud {
   #stateEl; #trialEl; #subjectInput; #questionTypeSelect;
-  #startBtn; #nextBtn; #abortBtn;
+  #startBtn; #nextBtn; #abortBtn; #pauseBtn;
 
-  constructor(container, subjectCode, { onStart, onNext, onAbort }) {
+  constructor(container, subjectCode, { onStart, onNext, onAbort, onPause }) {
     container.innerHTML = `
       <span id="ib-state-text">waiting for stream…</span>
       <span>
@@ -33,20 +33,23 @@ export class LocalHud {
         <button id="ib-start-btn"  disabled>Start</button>
         <button id="ib-next-btn"   style="display:none">Next trial</button>
         <button id="ib-abort-btn"  style="display:none">Abort trial</button>
+        <button id="ib-pause-btn"  style="display:none">Pause</button>
       </span>
     `;
 
-    this.#stateEl           = container.querySelector('#ib-state-text');
-    this.#trialEl           = container.querySelector('#ib-trial');
-    this.#subjectInput      = container.querySelector('#ib-subject');
+    this.#stateEl            = container.querySelector('#ib-state-text');
+    this.#trialEl            = container.querySelector('#ib-trial');
+    this.#subjectInput       = container.querySelector('#ib-subject');
     this.#questionTypeSelect = container.querySelector('#ib-question-type');
-    this.#startBtn          = container.querySelector('#ib-start-btn');
-    this.#nextBtn           = container.querySelector('#ib-next-btn');
-    this.#abortBtn          = container.querySelector('#ib-abort-btn');
+    this.#startBtn           = container.querySelector('#ib-start-btn');
+    this.#nextBtn            = container.querySelector('#ib-next-btn');
+    this.#abortBtn           = container.querySelector('#ib-abort-btn');
+    this.#pauseBtn           = container.querySelector('#ib-pause-btn');
 
     this.#startBtn.addEventListener('click', onStart);
     this.#nextBtn.addEventListener('click',  onNext);
     this.#abortBtn.addEventListener('click', onAbort);
+    this.#pauseBtn.addEventListener('click', onPause ?? (() => {}));
   }
 
   get stateText()      { return this.#stateEl.textContent; }
@@ -56,12 +59,14 @@ export class LocalHud {
   set startEnabled(v)  { this.#startBtn.disabled = !v; }
   set nextVisible(v)   { this.#nextBtn.style.display  = v ? '' : 'none'; }
   set abortVisible(v)  { this.#abortBtn.style.display = v ? '' : 'none'; }
+  set pauseVisible(v)  { this.#pauseBtn.style.display = v ? '' : 'none'; }
   set inputsLocked(v)  {
     this.#subjectInput.disabled       = v;
     this.#questionTypeSelect.disabled = v;
   }
   set experimentStartedAt(_v) {}
   set stateTimer(_v) {}
+  set gazeActive(_v) {}   // no gaze button in local HUD
   get subjectCode()    { return this.#subjectInput.value.trim() || 'TEST'; }
   get questionType()   { return this.#questionTypeSelect.value; }
 }
