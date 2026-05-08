@@ -34,7 +34,9 @@ export class LoopPlayer {
     this.#buffer = buffer;
   }
 
-  start(destination, { gain = 1, fadeInSecs = 0 } = {}) {
+  // loopCount > 0: play exactly that many times then stop naturally (no fade).
+  // loopCount = 0 (default): loop indefinitely until stop() is called.
+  start(destination, { gain = 1, fadeInSecs = 0, loopCount = 0 } = {}) {
     if (!this.#buffer || !this.#ctx) return;
 
     this.#gainNode = this.#ctx.createGain();
@@ -52,6 +54,10 @@ export class LoopPlayer {
     this.#source.loop   = true;
     this.#source.connect(this.#gainNode);
     this.#source.start();
+
+    if (loopCount > 0) {
+      this.#source.stop(t + this.#buffer.duration * loopCount);
+    }
   }
 
   stop(fadeOutSecs = 0) {

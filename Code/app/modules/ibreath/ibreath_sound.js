@@ -108,12 +108,12 @@ export class IBreathSound {
     this.#jingle = new LoopPlayer(this.#engine.ctx, this.#buf.jingle);
     this.#jingle.start(this.#engine.destination, {
       gain:      CFG.JINGLE_VOLUME,
-      fadeInSecs: CFG.FADE_SECS,
+      loopCount: CFG.JINGLE_LOOPS,
     });
   }
 
   stopDisplay() {
-    this.#jingle?.stop(CFG.FADE_SECS);
+    this.#jingle?.stop(0);   // immediate stop — jingle either completed or was interrupted
     this.#jingle = null;
   }
 }

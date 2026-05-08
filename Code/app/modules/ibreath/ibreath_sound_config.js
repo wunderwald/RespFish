@@ -13,6 +13,7 @@ export const SOUND_CONFIG = {
   NOISE_VOLUME_MIN:  0.0,   // noise gain at stimulus level 0
   NOISE_VOLUME_MAX:  0.8,   // noise gain at stimulus level 1
   JINGLE_VOLUME:     0.6,
+  JINGLE_LOOPS:      4,     // number of times to play the jingle per display phase
 
   // ── Timing ──────────────────────────────────────────────────────────────
   FADE_SECS: 1.0,           // fade-in / fade-out duration
