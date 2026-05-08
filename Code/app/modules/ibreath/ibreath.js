@@ -20,6 +20,7 @@
 
 import { GaussianSmoother, AsyncSignalGenerator } from '../signal/signalUtils.js';
 import { AutocorrEstimator } from '../signal/breathRateEstimators.js';
+import { IBreathSound } from './ibreath_sound.js';
 import { CONFIG, STATE } from './config.js';
 import { makeTrialParams } from './trialParams.js';
 import { LocalHud } from './hud.js';
@@ -90,6 +91,7 @@ export default class IBreath {
   #hud = null;
   #renderer = null;
   #csv = null;
+  #sound = null;
 
   constructor({ statsContainer, sceneContainer, hudFactory }) {
     const callbacks = {
@@ -110,6 +112,8 @@ export default class IBreath {
     this.#markers = CONFIG.SEND_MARKERS
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
       : { send() {} };
+    this.#sound = new IBreathSound();
+    this.#sound.init().catch((e) => console.warn('[IBreath] sound init failed:', e));
     this.#bindKeys();
     setInterval(() => this.#update(), 16);
     requestAnimationFrame(() => this.#drawLoop());
@@ -274,6 +278,7 @@ export default class IBreath {
     if (CONFIG.ANIMATION_DISPLAY) {
       this.#displayStartTime = performance.now();
       this.#state = STATE.DISPLAY;
+      this.#sound.startDisplay();
       this.#hud.stateTimer = { startedAt: Date.now(), duration: CONFIG.DISPLAY_SECS };
       this.#markers.send(`display_start_t${trial.trialIndex}`);
     } else {
@@ -292,6 +297,8 @@ export default class IBreath {
     trial.startTime = new Date().toISOString();
     this.#csv.initFrameCSV(trial.trialIndex);
     this.#state = STATE.TRIAL;
+    this.#sound.stopDisplay();
+    this.#sound.startTrial();
     this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.MAX_TRIAL_TIME };
     this.#hud.abortVisible = true;
     this.#markers.send(`trial_start_t${trial.trialIndex}`);
@@ -325,6 +332,7 @@ export default class IBreath {
     }
 
     trial.flashShown = this.#flashShown;
+    this.#sound.stopTrial();
     this.#csv.flushFrameCSV(trial, this.#frameRows);
     this.#markers.send(aborted ? `trial_abort_t${trial.trialIndex}` : `trial_end_t${trial.trialIndex}`);
     this.#hud.abortVisible = false;
@@ -388,6 +396,8 @@ export default class IBreath {
       this.#pausedFromState = this.#state;
     }
 
+    if (this.#pausedFromState === STATE.DISPLAY) this.#sound.stopDisplay();
+
     this.#pausedStateText = this.#hud.stateText;
     this.#pausedAt        = performance.now();
     this.#state           = STATE.PAUSED;
@@ -411,8 +421,9 @@ export default class IBreath {
 
     switch (from) {
       case STATE.DISPLAY:
-        // Rewind animation to the beginning
+        // Rewind animation to the beginning and restart jingle
         this.#displayStartTime = performance.now();
+        this.#sound.startDisplay();
         this.#state = STATE.DISPLAY;
         this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.DISPLAY_SECS };
         this.#hud.pauseVisible = true;
@@ -506,6 +517,7 @@ export default class IBreath {
         this.#stimulusLevel = this.#asyncGen.sample(tSecs);
       }
       const stimLevel = Math.max(0, Math.min(1, this.#stimulusLevel));
+      this.#sound.setNoiseLevel(stimLevel);
 
       if (CONFIG.FLASHING_IMAGE && trial.flashImage && !this.#flashShown && tSecs >= trial.flashTime) {
         this.#flashShown = true;
