@@ -19,17 +19,17 @@ import { CONFIG } from './config.js';
 
 export class IBreathCSV {
   #subjectCode;
-  #questionType;
+  #group;
   #gazeEnabled;
   #onWarn;
   #frameHeader;
   #trialHeader;
 
-  constructor(subjectCode, questionType, gazeEnabled, onWarn) {
-    this.#subjectCode  = subjectCode;
-    this.#questionType = questionType;
-    this.#gazeEnabled  = gazeEnabled;
-    this.#onWarn       = onWarn;
+  constructor(subjectCode, group, gazeEnabled, onWarn) {
+    this.#subjectCode = subjectCode;
+    this.#group       = group;
+    this.#gazeEnabled = gazeEnabled;
+    this.#onWarn      = onWarn;
 
     this.#frameHeader =
       'trialIndex,timestamp,breathLevel_input,breathLevel_scaled,stimulusLevel' +
@@ -37,7 +37,7 @@ export class IBreathCSV {
       (gazeEnabled ? ',gazeX,gazeY' : '') + '\n';
 
     this.#trialHeader =
-      'trialIndex,subject,group,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,slowfast,' +
+      'trialIndex,subject,group,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,slowfast,' +
       'ITI,startTime,endTime,aborted' +
       (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
       (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
@@ -100,7 +100,8 @@ export class IBreathCSV {
     const row =
       `${trial.trialIndex},` +
       `${this.#subjectCode},` +
-      `${this.#questionType},` +
+      `${this.#group},` +
+      `${trial.questionType ?? ''},` +
       `${trial.synchronous},` +
       `${trial.img},` +
       `${trial.lr},` +

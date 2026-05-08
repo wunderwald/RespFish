@@ -23,14 +23,14 @@ export class RemoteHud {
     gazeActive:          false,
   };
   #subjectCode = 'TEST';
-  #questionType = 'intero';
+  #group = 'target';
 
   constructor({ onStart, onNext, onAbort, onResponse, onPause, onPlay, onRecalibrateGaze }) {
-    window.api.hud.onAction(({ type, subjectCode, questionType, value,
+    window.api.hud.onAction(({ type, subjectCode, group, value,
                                debugGaze, autoAdvance, flashingImage, calibrationSecs,
                                showQuestions }) => {
-      if (subjectCode  !== undefined) this.#subjectCode  = subjectCode;
-      if (questionType !== undefined) this.#questionType = questionType;
+      if (subjectCode !== undefined) this.#subjectCode = subjectCode;
+      if (group       !== undefined) this.#group       = group;
       switch (type) {
         case 'start':           onStart({ debugGaze, autoAdvance, flashingImage, calibrationSecs, showQuestions }); break;
         case 'next':            onNext(); break;
@@ -58,7 +58,7 @@ export class RemoteHud {
   set experimentStartedAt(v) { this.#snap.experimentStartedAt = v; this.#push(); }
   set stateTimer(v)          { this.#snap.stateTimer = v;          this.#push(); }
   get subjectCode()          { return this.#subjectCode; }
-  get questionType()         { return this.#questionType; }
+  get group()                { return this.#group; }
 
   #push() {
     window.api.hud.sendState({ ...this.#snap });

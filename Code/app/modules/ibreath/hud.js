@@ -25,8 +25,8 @@ export class LocalHud {
       <span>
         <span class="label">group</span>
         <select id="ib-question-type" class="stream-select">
-          <option value="intero">Target (intero)</option>
-          <option value="extero">Control (extero)</option>
+          <option value="target">Target</option>
+          <option value="control">Control</option>
         </select>
       </span>
       <span id="ib-controls">
@@ -72,5 +72,5 @@ export class LocalHud {
   set stateTimer(_v) {}
   set gazeActive(_v) {}   // no gaze button in local HUD
   get subjectCode()    { return this.#subjectInput.value.trim() || 'TEST'; }
-  get questionType()   { return this.#questionTypeSelect.value; }
+  get group()          { return this.#questionTypeSelect.value; }
 }

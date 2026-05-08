@@ -156,13 +156,25 @@ export class IBreathRenderer {
     const cx = w / 2, cy = h / 2;
     const r  = 40;
 
-    const question = questionType === 'intero'
-      ? 'Was the animation in sync with your breathing?'
-      : 'Did you see a flashing image?';
+    const QUESTIONS = {
+      sync:  'Was the fish in sync with your breathing?',
+      flash: 'Did you see the pink fish flashing?',
+      lr:    'Was the fish left or right?',
+      img:   'Did you see the pufferfish or the starfish?',
+    };
+    this.#centerText(ctx, cx, cy - 80, QUESTIONS[questionType] ?? QUESTIONS.sync,
+                     'rgba(255,255,255,0.85)', 22);
 
-    this.#centerText(ctx, cx, cy - 80, question, 'rgba(255,255,255,0.85)', 22);
+    // For 'flash': small pinkfish image between question and arc
+    if (questionType === 'flash') {
+      const img = this.#images['pinkfish'];
+      if (img?.complete && img.naturalWidth > 0) {
+        const s = 22;
+        ctx.drawImage(img, cx - s, cy - 56 - s, s * 2, s * 2);
+      }
+    }
 
-    // Countdown arc (same style as calibration)
+    // Countdown arc
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -178,7 +190,24 @@ export class IBreathRenderer {
 
     this.#centerText(ctx, cx, cy, String(remaining), 'rgba(255,255,255,0.7)', 36, '200');
 
-    this.#centerText(ctx, cx, cy + 80, '← yes          no →', 'rgba(255,255,255,0.4)', 16);
+    // Answer prompt — text or images depending on question type
+    if (questionType === 'img') {
+      const pf   = this.#images['pufferfish'];
+      const sf   = this.#images['starfish'];
+      const s    = 40;
+      const gap  = Math.min(w, h) * 0.22;
+      const imgY = cy + 90;
+      if (pf?.complete && pf.naturalWidth > 0)
+        ctx.drawImage(pf, cx - gap - s, imgY - s, s * 2, s * 2);
+      if (sf?.complete && sf.naturalWidth > 0)
+        ctx.drawImage(sf, cx + gap - s, imgY - s, s * 2, s * 2);
+      this.#centerText(ctx, cx - gap, imgY + s + 10, '←', 'rgba(255,255,255,0.4)', 18);
+      this.#centerText(ctx, cx + gap, imgY + s + 10, '→', 'rgba(255,255,255,0.4)', 18);
+    } else if (questionType === 'lr') {
+      this.#centerText(ctx, cx, cy + 80, '← left          right →', 'rgba(255,255,255,0.4)', 16);
+    } else {
+      this.#centerText(ctx, cx, cy + 80, '← yes          no →', 'rgba(255,255,255,0.4)', 16);
+    }
   }
 
   #drawITI(ctx, w, h, now, itiStartTime, itiDuration) {

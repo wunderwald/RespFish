@@ -99,8 +99,8 @@ if (frontend === 'ibreath') {
     <span>
       <span class="label">group</span>
       <select id="ib-question-type" class="stream-select">
-        <option value="intero">Target (intero)</option>
-        <option value="extero">Control (extero)</option>
+        <option value="target">Target</option>
+        <option value="control">Control</option>
       </select>
     </span>
     <span id="ib-controls">
@@ -188,7 +188,7 @@ if (frontend === 'ibreath') {
     window.api.hud.sendAction({
       type:            'start',
       subjectCode:     subjectInput.value.trim() || 'TEST',
-      questionType:    questionTypeSelect.value,
+      group:           questionTypeSelect.value,
       debugGaze:       document.getElementById('s-debug-gaze').checked,
       autoAdvance:     document.getElementById('s-auto-advance').checked,
       flashingImage:   document.getElementById('s-flash-images').checked,

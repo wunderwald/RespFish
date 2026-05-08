@@ -37,7 +37,7 @@ export default class IBreath {
 
   // ── experiment data ────────────────────────────────────────────────────
   #subjectCode = CONFIG.SUBJECT_CODE;
-  #questionType = 'intero';
+  #group = 'target';
   #trials = [];
   #trialIndex = 0;
   #trialData = [];
@@ -167,10 +167,10 @@ export default class IBreath {
           if (this.#state === STATE.TRIAL) this.#abortTrial();
           break;
         case 'ArrowLeft':
-          if (this.#state === STATE.RESPONSE) this.#onResponse(true);
+          if (this.#state === STATE.RESPONSE) this.#onResponse('left');
           break;
         case 'ArrowRight':
-          if (this.#state === STATE.RESPONSE) this.#onResponse(false);
+          if (this.#state === STATE.RESPONSE) this.#onResponse('right');
           break;
       }
     });
@@ -186,8 +186,8 @@ export default class IBreath {
     if (showQuestions   !== undefined) CONFIG.SHOW_QUESTIONS    = showQuestions;
 
     this.#subjectCode = this.#hud.subjectCode;
-    this.#questionType = this.#hud.questionType;
-    this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
+    this.#group       = this.#hud.group;
+    this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS, this.#group);
     this.#trialIndex = 0;
     this.#trialData = [];
     this.#calSamples = [];
@@ -203,7 +203,7 @@ export default class IBreath {
     this.#hud.pauseVisible = false;
     this.#hud.stateText    = 'calibrating…';
 
-    this.#csv = new IBreathCSV(this.#subjectCode, this.#questionType, this.#gazeEnabled, (msg) => this.#csvWarn(msg));
+    this.#csv = new IBreathCSV(this.#subjectCode, this.#group, this.#gazeEnabled, (msg) => this.#csvWarn(msg));
     this.#csv.init();
     this.#markers.send('calibration_start');
   }
@@ -352,14 +352,24 @@ export default class IBreath {
     }
   }
 
-  #onResponse(sync) {
+  #onResponse(side) {
     if (!this.#pendingTrial) return;
     const trial = this.#pendingTrial;
     this.#pendingTrial = null;
-    trial.response = sync;
 
-    const respMarker = sync === true ? 'yes' : sync === false ? 'no' : 'timeout';
-    this.#markers.send(`response_${respMarker}_t${trial.trialIndex}`);
+    let response;
+    if (side === 'timeout') {
+      response = 'timeout';
+    } else if (trial.questionType === 'lr') {
+      response = side === 'left' ? 'left' : 'right';
+    } else if (trial.questionType === 'img') {
+      response = side === 'left' ? 'pufferfish' : 'starfish';
+    } else {
+      response = side === 'left' ? 'yes' : 'no';
+    }
+    trial.response = response;
+
+    this.#markers.send(`response_${response}_t${trial.trialIndex}`);
     this.#csv.appendTrialData(trial);
     this.#trialData.push({ ...trial });
     this.#startITIorEnd(trial);
@@ -563,7 +573,7 @@ export default class IBreath {
         itiDuration:       this.#itiDuration,
         displayElapsed:    this.#displayStartTime != null ? (now - this.#displayStartTime) / 1000 : 0,
         responseStartTime: this.#responseStartTime,
-        questionType:      this.#questionType,
+        questionType:      this.#pendingTrial?.questionType ?? '',
         trialCount:        this.#trialData.length,
         subjectCode:       this.#subjectCode,
         gazeX:             this.#gazeX,
