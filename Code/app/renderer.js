@@ -82,6 +82,9 @@ bioGame:    './modules/bioGame/bioGame.js',
   window.api.stream.onSample(({ value }) => frontend.pushSample(value));
   window.api.stream.onStatus((event)     => frontend.setStatus(event));
   window.api.stream.onGazeSample(({ channels }) => frontend.pushGazeSample?.(channels));
+  // Ask the experimenter to replay its last known stream status — we may have
+  // missed the original event while this dynamic import was in flight.
+  window.api.stream.requestStatus();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

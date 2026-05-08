@@ -103,11 +103,15 @@ contextBridge.exposeInMainWorld("api", {
 
   // Stream IPC — experimenter window sends data, scene window receives it
   stream: {
-    sendSample:     (data) => ipcRenderer.send('stream:sample', data),
-    sendStatus:     (data) => ipcRenderer.send('stream:status', data),
-    sendGazeSample: (data) => ipcRenderer.send('gaze:sample',   data),
-    onSample:       (cb)   => ipcRenderer.on('stream:sample', (_e, d) => cb(d)),
-    onStatus:       (cb)   => ipcRenderer.on('stream:status', (_e, d) => cb(d)),
-    onGazeSample:   (cb)   => ipcRenderer.on('gaze:sample',   (_e, d) => cb(d)),
+    sendSample:      (data) => ipcRenderer.send('stream:sample',          data),
+    sendStatus:      (data) => ipcRenderer.send('stream:status',          data),
+    sendGazeSample:  (data) => ipcRenderer.send('gaze:sample',            data),
+    // Scene window calls this after registering onStatus to catch up on
+    // any status that fired before the handler was ready (race condition fix).
+    requestStatus:   ()     => ipcRenderer.send('stream:request-status'),
+    onSample:        (cb)   => ipcRenderer.on('stream:sample',          (_e, d) => cb(d)),
+    onStatus:        (cb)   => ipcRenderer.on('stream:status',          (_e, d) => cb(d)),
+    onGazeSample:    (cb)   => ipcRenderer.on('gaze:sample',            (_e, d) => cb(d)),
+    onRequestStatus: (cb)   => ipcRenderer.on('stream:request-status',  ()      => cb()),
   },
 });

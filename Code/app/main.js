@@ -183,6 +183,10 @@ ipcMain.on("stream:status", (_event, data) => {
 ipcMain.on("gaze:sample", (_event, data) => {
   mainWindow?.webContents.send("gaze:sample", data);
 });
+// Relay: scene window → experimenter window (status replay request)
+ipcMain.on("stream:request-status", () => {
+  controlWindow?.webContents.send("stream:request-status");
+});
 
 // ── Scene window ──────────────────────────────────────────────────────────────
 

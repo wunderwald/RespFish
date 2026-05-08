@@ -17,8 +17,18 @@ const respStream = new StreamManager({
 respStream.on('sample', ({ value, channels }) => {
   window.api.stream.sendSample({ value, channels });
 });
+
+let lastRespStatus = null;
 respStream.on('status', (event) => {
+  lastRespStatus = event;
   window.api.stream.sendStatus(event);
+});
+
+// Scene window registers its onStatus handler after a dynamic import; if the
+// stream already connected before that handler was ready the event is lost.
+// When the scene calls requestStatus(), replay the last known status.
+window.api.stream.onRequestStatus(() => {
+  if (lastRespStatus) window.api.stream.sendStatus(lastRespStatus);
 });
 
 // ── Gaze stream (ibreath only) ────────────────────────────────────────────────
