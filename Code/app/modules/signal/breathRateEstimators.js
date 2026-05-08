@@ -533,32 +533,44 @@ export class XcorrEstimator {
 // ── estimateBreathRate ────────────────────────────────────────────────────────
 
 /**
- * Run all four estimators and return their results as a dict.
- * Each value is Hz | null.  Estimators are scheduled via Promise.all so the
- * API is async-friendly (Web Worker migration is straightforward if needed).
+ * Run all estimators and return results as a flat dict (Hz | null per key).
+ *
+ * Non-windowed methods always run: autocorr, peakTrough, welch, xcorr.
+ * When windowed is true, autocorr, welch, and xcorr are also run with a
+ * sliding window (default 30 s, 50 % overlap) and added as
+ * autocorr_windowed, welch_windowed, xcorr_windowed.
  *
  * @param {ArrayLike<number>} signal
  * @param {number} sampleRate
  * @param {{
- *   autocorr?:   ConstructorParameters<typeof AutocorrRateEstimator>[0],
- *   peakTrough?: ConstructorParameters<typeof PeakTroughEstimator>[0],
- *   welch?:      ConstructorParameters<typeof WelchEstimator>[0],
- *   xcorr?:      ConstructorParameters<typeof XcorrEstimator>[0],
+ *   autocorr?:   object,   peakTrough?: object,
+ *   welch?:      object,   xcorr?:      object,
+ *   windowed?:   boolean,  windowSecs?: number,
  * }} [opts]
- * @returns {{ autocorr: number|null, peakTrough: number|null,
- *             welch: number|null, xcorr: number|null }}
+ * @returns {Record<string, number|null>}
  */
 export function estimateBreathRate(signal, sampleRate, {
   autocorr   = {},
   peakTrough = {},
   welch      = {},
   xcorr      = {},
+  windowed   = false,
+  windowSecs = 30,
 } = {}) {
   const s = _toF64(signal);
-  return {
+
+  const result = {
     autocorr:   new AutocorrRateEstimator(autocorr).estimate(s, sampleRate),
     peakTrough: new PeakTroughEstimator(peakTrough).estimate(s, sampleRate),
     welch:      new WelchEstimator(welch).estimate(s, sampleRate),
     xcorr:      new XcorrEstimator(xcorr).estimate(s, sampleRate),
   };
+
+  if (windowed) {
+    result.autocorr_windowed = new AutocorrRateEstimator({ ...autocorr, windowSecs }).estimate(s, sampleRate);
+    result.welch_windowed    = new WelchEstimator({ ...welch, windowSecs }).estimate(s, sampleRate);
+    result.xcorr_windowed    = new XcorrEstimator({ ...xcorr, windowSecs }).estimate(s, sampleRate);
+  }
+
+  return result;
 }

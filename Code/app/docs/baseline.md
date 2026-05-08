@@ -53,9 +53,11 @@ One row per method. Empty `hz`/`bpm` cells mean the estimator returned null (sig
 
 | Column | Description |
 |---|---|
-| `method` | Estimator name (`autocorr`, `peakTrough`, `welch`, `xcorr`) |
+| `method` | Estimator name (see below) |
 | `hz` | Estimated breathing rate in Hz |
 | `bpm` | Estimated breathing rate in breaths per minute |
+
+Methods: `autocorr`, `peakTrough`, `welch`, `xcorr` (full signal), plus `autocorr_windowed`, `welch_windowed`, `xcorr_windowed` (30 s sliding windows, 50 % overlap, averaged). `peakTrough` does not have a windowed variant.
 
 Sample rate for estimation is derived from the wall-clock timestamps in the raw CSV.
 

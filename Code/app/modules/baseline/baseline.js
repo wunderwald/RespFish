@@ -144,7 +144,7 @@ export default class Baseline {
     const durationSecs = (new Date(buf[n - 1][0]) - new Date(buf[0][0])) / 1000;
     const sampleRate   = durationSecs > 0 ? (n - 1) / durationSecs : n;
 
-    const estimates = estimateBreathRate(values, sampleRate);
+    const estimates = estimateBreathRate(values, sampleRate, { windowed: true });
 
     const path   = `${dir}/${this.#subjectCode}_baseline_estimates.csv`;
     const header = 'method,hz,bpm\n';
