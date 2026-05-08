@@ -10,7 +10,7 @@ export const CONFIG = {
   SMOOTH_WINDOW: 64,        // samples (matches smoothBreathRT.m windowSize)
 
   // Calibration
-  CALIBRATION_SECS: 10,     // seconds to record before first trial
+  CALIBRATION_SECS: 30,     // seconds to record before first trial
 
   // Trial timing
   MAX_NUM_TRIALS: 80,
