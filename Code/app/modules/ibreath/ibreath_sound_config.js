@@ -5,7 +5,7 @@
 export const SOUND_CONFIG = {
   // ── Files ───────────────────────────────────────────────────────────────
   AMBIENCE: 'sounds/ambience.wav',   // steady background loop during trial
-  NOISE:    'sounds/noise.wav',      // resp-driven loop during trial
+  NOISE:    'sounds/breath.wav',      // resp-driven loop during trial
   JINGLE:   'sounds/jingle.wav',     // loop played during pre-trial animation
 
   // ── Levels ──────────────────────────────────────────────────────────────
