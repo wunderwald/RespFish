@@ -8,8 +8,9 @@
  * State machine:  IDLE → PLAYING → DONE
  */
 
-import { MarkerStream } from '../stream/markerStream.js';
-import { CONFIG, STATE } from './baseline_config.js';
+import { MarkerStream }        from '../stream/markerStream.js';
+import { CONFIG, STATE }       from './baseline_config.js';
+import { estimateBreathRate }  from '../signal/breathRateEstimators.js';
 
 export default class Baseline {
   #state        = STATE.IDLE;
@@ -115,9 +116,10 @@ export default class Baseline {
       console.error('[Baseline] could not create data dir:', result.error);
       return;
     }
-    const path    = `${dir}/${this.#subjectCode}_baseline.csv`;
-    const header  = 'timestamp,value\n';
-    const rows    = this.#sampleBuffer
+
+    const path   = `${dir}/${this.#subjectCode}_baseline.csv`;
+    const header = 'timestamp,value\n';
+    const rows   = this.#sampleBuffer
       .map(([t, v]) => `${t},${v.toFixed(6)}`)
       .join('\n') + '\n';
     const write = await window.api.writeCSV(path, header + rows);
@@ -125,6 +127,40 @@ export default class Baseline {
       console.log(`[Baseline] saved ${this.#sampleBuffer.length} samples → ${path}`);
     } else {
       console.error('[Baseline] CSV write failed:', write.error);
+    }
+
+    await this.#writeEstimates(dir);
+  }
+
+  async #writeEstimates(dir) {
+    const buf = this.#sampleBuffer;
+    const n   = buf.length;
+    if (n < 2) return;
+
+    // Extract signal values and derive sample rate from wall-clock timestamps
+    const values = new Float64Array(n);
+    for (let i = 0; i < n; i++) values[i] = buf[i][1];
+
+    const durationSecs = (new Date(buf[n - 1][0]) - new Date(buf[0][0])) / 1000;
+    const sampleRate   = durationSecs > 0 ? (n - 1) / durationSecs : n;
+
+    const estimates = estimateBreathRate(values, sampleRate);
+
+    const path   = `${dir}/${this.#subjectCode}_baseline_estimates.csv`;
+    const header = 'method,hz,bpm\n';
+    const rows   = Object.entries(estimates)
+      .map(([method, hz]) => {
+        const hzStr  = hz !== null ? hz.toFixed(4)        : '';
+        const bpmStr = hz !== null ? (hz * 60).toFixed(2) : '';
+        return `${method},${hzStr},${bpmStr}`;
+      })
+      .join('\n') + '\n';
+
+    const write = await window.api.writeCSV(path, header + rows);
+    if (write.ok) {
+      console.log(`[Baseline] saved estimates → ${path}`);
+    } else {
+      console.error('[Baseline] estimates write failed:', write.error);
     }
   }
 

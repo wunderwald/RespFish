@@ -38,14 +38,26 @@ The scene window shows a countdown timer.
 
 ## Data output
 
-Saved to `baselineData/<SUBJECT_CODE>_baseline.csv` (or your chosen data dir).
+Two files are written to `output_data/baseline/` when the recording ends (normally or via Abort). Aborted sessions save whatever was recorded up to that point.
+
+**`<SUBJECT_CODE>_baseline.csv`** — raw signal
 
 | Column | Description |
 |---|---|
 | `timestamp` | ISO-8601 wall-clock time of the sample |
 | `value` | Raw LSL sample value |
 
-The file is written when the recording ends (normally or via Abort). Aborted sessions save whatever was recorded up to that point.
+**`<SUBJECT_CODE>_baseline_estimates.csv`** — breath rate estimates
+
+One row per method. Empty `hz`/`bpm` cells mean the estimator returned null (signal too short, or no clear periodicity found).
+
+| Column | Description |
+|---|---|
+| `method` | Estimator name (`autocorr`, `peakTrough`, `welch`, `xcorr`) |
+| `hz` | Estimated breathing rate in Hz |
+| `bpm` | Estimated breathing rate in breaths per minute |
+
+Sample rate for estimation is derived from the wall-clock timestamps in the raw CSV.
 
 ---
 
