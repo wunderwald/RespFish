@@ -7,11 +7,19 @@ import { drawDisplay } from './animationDisplay.js';
 export class IBreathRenderer {
   #canvas = null;
   #ctx = null;
+  #images = {};   // key → HTMLImageElement
 
   constructor(container) {
     container.innerHTML = '<canvas id="ib-canvas"></canvas>';
     this.#canvas = container.querySelector('#ib-canvas');
     this.#ctx = this.#canvas.getContext('2d');
+    for (const [key, src] of [['pufferfish', 'images/pufferfish.png'],
+                               ['starfish',   'images/starfish.png'],
+                               ['pinkfish',   'images/pinkfish.png']]) {
+      const img = new Image();
+      img.src = src;
+      this.#images[key] = img;
+    }
   }
 
   // ── Public draw entry point ────────────────────────────────────────────
@@ -118,7 +126,7 @@ export class IBreathRenderer {
     const maxSize = Math.min(halfW, h) * CONFIG.CLOUD_SIZE_MAX;
     const size = minSize + stimLevel * (maxSize - minSize);
 
-    this.#drawCloud(ctx, centreX, centreY, size, 1);
+    this.#drawStimImage(ctx, trial.img, centreX, centreY, size);
 
     if (flashActive) {
       const margin = 0.1;
@@ -238,29 +246,20 @@ export class IBreathRenderer {
 
   // ── Canvas helpers ─────────────────────────────────────────────────────
 
-  // Dispatcher — add cases here when new flash images are introduced.
-  #drawFlash(ctx, x, y, image) {
-    if (image === 'lightning') this.#drawLightning(ctx, x, y);
+  // Draw a stimulus image centred at (cx, cy) with half-size `size`.
+  // Falls back silently if the image hasn't loaded yet.
+  #drawStimImage(ctx, key, cx, cy, size) {
+    const img = this.#images[key];
+    if (!img?.complete || img.naturalWidth === 0) return;
+    ctx.drawImage(img, cx - size, cy - size, size * 2, size * 2);
   }
 
-  #drawLightning(ctx, x, y) {
+  // Draw a flash image centred at (x, y). Add cases here for new flash images.
+  #drawFlash(ctx, x, y, image) {
+    const img = this.#images[image];
+    if (!img?.complete || img.naturalWidth === 0) return;
     const s = 72;
-    ctx.save();
-    ctx.fillStyle = 'rgba(255, 240, 80, 1)';
-    ctx.shadowColor = 'rgba(255, 220, 50, 0.9)';
-    ctx.shadowBlur = 30;
-
-    // Classic 6-point bolt polygon
-    ctx.beginPath();
-    ctx.moveTo(x + s * 0.10, y - s * 0.50);  // top
-    ctx.lineTo(x - s * 0.22, y + s * 0.08);  // upper-left
-    ctx.lineTo(x + s * 0.04, y + s * 0.08);  // inner knee
-    ctx.lineTo(x - s * 0.10, y + s * 0.50);  // bottom
-    ctx.lineTo(x + s * 0.22, y - s * 0.08);  // lower-right
-    ctx.lineTo(x - s * 0.04, y - s * 0.08);  // inner knee
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+    ctx.drawImage(img, x - s, y - s, s * 2, s * 2);
   }
 
   // Procedural cloud — five overlapping circles with a white-to-light-blue

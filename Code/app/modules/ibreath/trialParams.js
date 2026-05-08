@@ -3,13 +3,12 @@
 import { CONFIG } from './config.js';
 
 export function makeTrialParams(numTrials) {
-  // Balanced pseudo-random boolean sequences in blocks of `blockSize`
-  function balancedSeq(length, blockSize) {
+  // Balanced pseudo-random boolean sequence.
+  // Each block of `blockSize` contains exactly `trueCount` true values (default 50%).
+  function balancedSeq(length, blockSize, trueCount = Math.floor(blockSize / 2)) {
     const out = [];
     while (out.length < length) {
-      const block = [];
-      for (let i = 0; i < blockSize; i++) block.push(i % 2 === 0);
-      // Fisher-Yates shuffle
+      const block = Array.from({ length: blockSize }, (_, i) => i < trueCount);
       for (let i = block.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [block[i], block[j]] = [block[j], block[i]];
@@ -19,12 +18,13 @@ export function makeTrialParams(numTrials) {
     return out.slice(0, length);
   }
 
-  const lrSeq = balancedSeq(numTrials, 4);   // left/right
-  const saSeq = balancedSeq(numTrials, 2);   // sync/async alternating
-  const numAsync = Math.floor(numTrials / 2);
-  const sfSeq = balancedSeq(numAsync, 4);    // slow/fast (async only)
-  const flashSeq = CONFIG.FLASHING_IMAGE
-    ? balancedSeq(numTrials, 2)                 // 50% of trials get a flash
+  const lrSeq       = balancedSeq(numTrials, 4);     // left / right
+  const saSeq       = balancedSeq(numTrials, 2);     // sync / async alternating
+  const numAsync    = Math.floor(numTrials / 2);
+  const sfSeq       = balancedSeq(numAsync,  4);     // slow / fast (async only)
+  const starfishSeq = balancedSeq(numTrials, 4, 1);  // 25% starfish, 75% pufferfish
+  const flashSeq    = CONFIG.FLASHING_IMAGE
+    ? balancedSeq(numTrials, 2)                      // 50% of trials get a flash
     : null;
 
   const trials = [];
@@ -38,24 +38,24 @@ export function makeTrialParams(numTrials) {
     const trial = {
       trialIndex: i + 1,
       synchronous: sync,
-      img: 'cloud',  // CSV field — no image file used
-      lr: lrSeq[i], // true = left, false = right
-      stimX0: lrSeq[i] ? 0 : 0.5,  // normalized bounding rect of the stimulus half
+      img: starfishSeq[i] ? 'starfish' : 'pufferfish',
+      lr: lrSeq[i],          // true = left, false = right
+      stimX0: lrSeq[i] ? 0 : 0.5,
       stimY0: 0,
       stimX1: lrSeq[i] ? 0.5 : 1,
       stimY1: 1,
-      ITI: iti,      // ms
-      slowfast: null,     // only set for async trials
-      flashImage: null,     // image name, or null if no flash this trial
-      flashTime: null,     // seconds into trial when flash fires
-      flashX: null,     // normalized [0, 1] horizontal position
-      flashY: null,     // normalized [0, 1] vertical position
-      startTime: null,
-      endTime: null,
+      ITI: iti,              // ms
+      slowfast:   null,      // only set for async trials
+      flashImage: null,      // image name, or null if no flash this trial
+      flashTime:  null,      // seconds into trial when flash fires
+      flashX:     null,      // normalised [0,1] horizontal position
+      flashY:     null,      // normalised [0,1] vertical position
+      startTime:  null,
+      endTime:    null,
     };
 
     if (!sync) {
-      trial.slowfast = sfSeq[asyncIdx % sfSeq.length]; // true = slow
+      trial.slowfast = sfSeq[asyncIdx % sfSeq.length];
       asyncIdx++;
     }
 

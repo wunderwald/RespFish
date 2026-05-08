@@ -40,7 +40,7 @@ export const CONFIG = {
 
   // Flash image
   FLASHING_IMAGE: true,         // show a flash image in 50% of trials
-  FLASH_IMAGE: 'lightning',  // image name — label for CSV and draw-routine selector
+  FLASH_IMAGE: 'pinkfish',   // image name — label for CSV and draw-routine selector
   FLASH_DURATION: 250,          // ms the flash is visible
   FLASH_TIME_MIN: 5,            // earliest flash onset (seconds into trial)
   FLASH_TIME_MAX: 20,           // latest flash onset (seconds into trial)
