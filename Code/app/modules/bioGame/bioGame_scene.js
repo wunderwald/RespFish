@@ -33,7 +33,7 @@ export const SCENES = {
   jungle: {
     id:        'jungle',
     label:     'Jungle',
-    avatarSrc: 'fish.png',
+    avatarSrc: 'fishy.png',
 
     bg: {
       gradTop: '#081208',
@@ -51,8 +51,8 @@ export const SCENES = {
     },
 
     sounds: {
-      ambience: 'sounds/jungle_ambience.wav',
-      noise:    'sounds/breath.wav',
+      ambience: 'sounds/rainforest.wav',
+      noise:    'sounds/wind.wav',
       collect:  ['sounds/collect1.wav', 'sounds/collect2.wav', 'sounds/collect3.wav', 'sounds/collect4.wav'],
       miss:     'sounds/miss.wav',
     },
