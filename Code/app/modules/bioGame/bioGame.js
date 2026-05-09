@@ -1,11 +1,6 @@
 /**
  * bioGame.js — Biofeedback breath-control game
  * =============================================
- * A puffer fish swims in an underwater world. The player controls vertical
- * position via their breath signal (exhale → fish up & grows; inhale → down &
- * shrinks). Starfishes appear along a sinusoidal target-breath curve; the
- * player must breathe in sync to collect them.
- *
  * State machine:  IDLE → CALIBRATING → READY → COUNTDOWN → PLAYING
  *                                                 ↑              ↓
  *                                          INTERMISSION ← (block 1 end)
@@ -23,6 +18,7 @@ import { CONFIG, STATE }    from './bioGame_config.js';
 import { BioGameRenderer }  from './bioGame_renderer.js';
 import { BioGameCSV }       from './bioGame_csv.js';
 import { BioGameSound }     from './bioGame_sound.js';
+import { resolveScene }     from './bioGame_scene.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,14 +33,17 @@ function targetCurveY(t, bpm) {
 // ── BioGame ───────────────────────────────────────────────────────────────────
 
 export default class BioGame {
+  // ── Scene ─────────────────────────────────────────────────────────────────
+  #scene = null;
+
   // ── State ─────────────────────────────────────────────────────────────────
   #state        = STATE.IDLE;
   #streamReady  = false;
   #inputsLocked = false;
 
-  // ── Particles + fish bump ─────────────────────────────────────────────────
-  #particles   = [];
-  #fishBumpT   = null;
+  // ── Particles + avatar bump ───────────────────────────────────────────────
+  #particles    = [];
+  #avatarBumpT  = null;
 
   // ── Experiment settings (overridden by experimenter on start) ─────────────
   #subjectCode      = CONFIG.SUBJECT_CODE;
@@ -55,47 +54,47 @@ export default class BioGame {
 
   // ── Block management ──────────────────────────────────────────────────────
   #blockIndex       = 0;
-  #blockStartTime   = null;   // performance.now() when block started
-  #scoreBlock       = [0, 0]; // score for each block
+  #blockStartTime   = null;
+  #scoreBlock       = [0, 0];
 
-  // ── Trial markers (curve minima across both blocks) ───────────────────────
-  #trialIndex    = 0;     // increments from 1, never resets between blocks
-  #nextTrialTime = null;  // block-relative seconds of next curve minimum
+  // ── Trial markers ─────────────────────────────────────────────────────────
+  #trialIndex    = 0;
+  #nextTrialTime = null;
 
   // ── Signal processing ─────────────────────────────────────────────────────
   #smoother         = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
   #lastRaw          = 0;
-  #calSamples       = [];     // smoothed values collected during calibration
+  #calSamples       = [];
   #calStartTime     = null;
-  #normRange        = [0, 1]; // [min, max] of calibrated smoothed signal
+  #normRange        = [0, 1];
 
-  // ── Fish state ────────────────────────────────────────────────────────────
-  #fishNormY     = 0.5;   // normalised fish Y (0 = bottom, 1 = top)
-  #prevFishNormY = 0.5;
-  #fishTilt      = 0;     // current tilt in radians
+  // ── Avatar state ──────────────────────────────────────────────────────────
+  #avatarNormY     = 0.5;
+  #prevAvatarNormY = 0.5;
+  #avatarTilt      = 0;
 
   // ── Stress mechanic ───────────────────────────────────────────────────────
-  #fishStressNorm = CONFIG.FISH_STRESS_INIT;   // 0–1; drives fish size
-  #speedNorm      = CONFIG.SCROLL_SPEED_INIT;  // 0–1; drives scroll speed
-  #missCount      = 0;
-  #gameOver       = false;
+  #avatarStressNorm = CONFIG.AVATAR_STRESS_INIT;
+  #speedNorm        = CONFIG.SCROLL_SPEED_INIT;
+  #missCount        = 0;
+  #gameOver         = false;
 
-  // ── Starfishes ────────────────────────────────────────────────────────────
-  #starfishes       = [];
-  #nextSpawnTime    = 0;  // performance.now() of next spawn
+  // ── Items ─────────────────────────────────────────────────────────────────
+  #items         = [];
+  #nextSpawnTime = 0;
 
   // ── Countdown ────────────────────────────────────────────────────────────
   #countdownStartTime = null;
 
   // ── Background scroll ────────────────────────────────────────────────────
-  #bgScrollX    = 0;      // total scroll in canvas-widths
+  #bgScrollX = 0;
 
   // ── Data / frame recording ───────────────────────────────────────────────
-  #csv              = null;
-  #lastFrameRecord  = 0;
+  #csv             = null;
+  #lastFrameRecord = 0;
 
   // ── Timing ────────────────────────────────────────────────────────────────
-  #lastRafTime  = null;
+  #lastRafTime = null;
 
   // ── Sub-modules ───────────────────────────────────────────────────────────
   #markers  = null;
@@ -113,10 +112,11 @@ export default class BioGame {
   }
 
   constructor({ sceneContainer }) {
-    this.#renderer = new BioGameRenderer(sceneContainer);
+    this.#scene   = resolveScene(CONFIG.SCENE);
+    this.#renderer = new BioGameRenderer(sceneContainer, this.#scene);
 
     this.#sound = new BioGameSound();
-    this.#sound.init().catch(e => console.warn('[BioGame] sound init failed:', e));
+    this.#sound.init(this.#scene.sounds).catch(e => console.warn('[BioGame] sound init failed:', e));
 
     this.#markers = CONFIG.SEND_MARKERS
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
@@ -124,10 +124,7 @@ export default class BioGame {
 
     window.api.frontend.onAction((action) => this.#onAction(action));
 
-    // State machine tick — runs even when window loses focus
     setInterval(() => this.#tick(), 100);
-
-    // Render loop
     requestAnimationFrame((t) => this.#rafLoop(t));
   }
 
@@ -152,7 +149,7 @@ export default class BioGame {
     }
   }
 
-  // ── Action handler (from experimenter window) ─────────────────────────────
+  // ── Action handler ────────────────────────────────────────────────────────
 
   #onAction({ type, subjectCode, group, naturalBpm, showCurve, calibrationSecs }) {
     switch (type) {
@@ -189,11 +186,10 @@ export default class BioGame {
     this.#inputsLocked = true;
     this.#blockIndex   = 0;
     this.#scoreBlock   = [0, 0];
-
-    this.#trialIndex = 0;
+    this.#trialIndex   = 0;
 
     this.#csv = new BioGameCSV(
-      this.#subjectCode, this.#group,
+      this.#subjectCode, this.#group, this.#scene.id,
       (msg) => this.#csvWarn(msg)
     );
     this.#csv.init();
@@ -214,7 +210,6 @@ export default class BioGame {
       return;
     }
 
-    // Same approach as iBreath: scale range by 0.8 to give headroom
     this.#normRange = [Math.min(...lvls) * 0.8, Math.max(...lvls) * 0.8];
     console.log(`[BioGame] norm range: [${this.#normRange[0].toFixed(3)}, ${this.#normRange[1].toFixed(3)}]`);
 
@@ -232,17 +227,15 @@ export default class BioGame {
   #startBlock() {
     this.#blockStartTime  = performance.now();
     this.#lastFrameRecord = performance.now();
-    this.#starfishes      = [];
+    this.#items           = [];
     this.#nextSpawnTime   = performance.now() +
-      randBetween(CONFIG.STARFISH_SPAWN_MIN_MS, CONFIG.STARFISH_SPAWN_MAX_MS);
-    this.#fishStressNorm  = CONFIG.FISH_STRESS_INIT;
-    this.#speedNorm       = CONFIG.SCROLL_SPEED_INIT;
-    this.#missCount       = 0;
-    this.#gameOver        = false;
+      randBetween(CONFIG.ITEM_SPAWN_MIN_MS, CONFIG.ITEM_SPAWN_MAX_MS);
+    this.#avatarStressNorm = CONFIG.AVATAR_STRESS_INIT;
+    this.#speedNorm        = CONFIG.SCROLL_SPEED_INIT;
+    this.#missCount        = 0;
+    this.#gameOver         = false;
 
     this.#csv.initBlockCSV(this.#blockIndex);
-
-    // First minimum of the target curve is at 3/4 of one period after block start
     this.#nextTrialTime = (60 / this.#activeBpm) * 0.75;
 
     this.#sound.startBlock();
@@ -285,7 +278,7 @@ export default class BioGame {
     this.#pushState({ stateText: 'done', abortVisible: false, nextVisible: false, score: total });
   }
 
-  // ── Update loop (setInterval — continues when window is unfocused) ────────
+  // ── Update loop ───────────────────────────────────────────────────────────
 
   #tick() {
     const now = performance.now();
@@ -309,7 +302,7 @@ export default class BioGame {
     }
   }
 
-  // ── RAF loop — game updates + rendering ───────────────────────────────────
+  // ── RAF loop ──────────────────────────────────────────────────────────────
 
   #rafLoop(now) {
     const dt = this.#lastRafTime != null ? clamp((now - this.#lastRafTime) / 1000, 0, 0.05) : 0;
@@ -320,11 +313,11 @@ export default class BioGame {
     }
 
     if (this.#state === STATE.PLAYING) {
-      this.#sound.setNoiseLevel(this.#fishNormY);
+      this.#sound.setNoiseLevel(this.#avatarNormY);
       this.#bgScrollX += this.#scrollSpeed * CONFIG.BG_SCROLL_FACTOR * dt;
-      this.#updateStarfishes(now, dt);
+      this.#updateItems(now, dt);
       this.#updateParticles(dt);
-      this.#updateFishBump(dt);
+      this.#updateAvatarBump(dt);
       this.#checkTrialMarker((now - this.#blockStartTime) / 1000);
       this.#recordFrame(now);
     }
@@ -345,27 +338,24 @@ export default class BioGame {
     const range = rMax - rMin || 1e-6;
     const norm  = clamp((this.#smoother.value - rMin) / range, 0, 1);
 
-    this.#prevFishNormY = this.#fishNormY;
-    this.#fishNormY     = norm;
+    this.#prevAvatarNormY = this.#avatarNormY;
+    this.#avatarNormY     = norm;
 
-    // Smooth tilt: nose-up when moving up, nose-down when moving down
-    const vel = dt > 0 ? (norm - this.#prevFishNormY) / dt : 0;
+    const vel = dt > 0 ? (norm - this.#prevAvatarNormY) / dt : 0;
     const tgt = clamp(-vel * 1.8, -Math.PI / 6, Math.PI / 6);
-    this.#fishTilt = lerp(this.#fishTilt, tgt, 1 - Math.exp(-dt / 0.18));
+    this.#avatarTilt = lerp(this.#avatarTilt, tgt, 1 - Math.exp(-dt / 0.18));
   }
 
-  // ── Starfish spawning and movement ────────────────────────────────────────
+  // ── Item spawning and movement ────────────────────────────────────────────
 
-  #updateStarfishes(now, dt) {
+  #updateItems(now, dt) {
     const blockTime = (now - this.#blockStartTime) / 1000;
-    const bpm = this.#activeBpm;
-
+    const bpm   = this.#activeBpm;
     const speed = this.#scrollSpeed;
 
-    // Spawn
     if (now >= this.#nextSpawnTime) {
-      const tOffAtRightEdge = (1.0 - CONFIG.FISH_X_RATIO) / speed;
-      this.#starfishes.push({
+      const tOffAtRightEdge = (1.0 - CONFIG.AVATAR_X_RATIO) / speed;
+      this.#items.push({
         xRatio:    1.0,
         normY:     targetCurveY(blockTime + tOffAtRightEdge, bpm),
         checked:   false,
@@ -374,65 +364,60 @@ export default class BioGame {
         collectT:  null,
         missT:     null,
       });
-      this.#nextSpawnTime = now + randBetween(CONFIG.STARFISH_SPAWN_MIN_MS, CONFIG.STARFISH_SPAWN_MAX_MS);
+      this.#nextSpawnTime = now + randBetween(CONFIG.ITEM_SPAWN_MIN_MS, CONFIG.ITEM_SPAWN_MAX_MS);
     }
 
-    // Update each starfish
-    for (const star of this.#starfishes) {
-      star.xRatio -= speed * dt;
+    for (const item of this.#items) {
+      item.xRatio -= speed * dt;
 
-      // Keep star on the curve until it's been checked
-      if (!star.checked) {
-        const tOff = (star.xRatio - CONFIG.FISH_X_RATIO) / speed;
-        star.normY = targetCurveY(blockTime + tOff, bpm);
+      if (!item.checked) {
+        const tOff = (item.xRatio - CONFIG.AVATAR_X_RATIO) / speed;
+        item.normY = targetCurveY(blockTime + tOff, bpm);
 
-        // Collection check: when star crosses the fish's x
-        if (star.xRatio <= CONFIG.FISH_X_RATIO) {
-          star.checked = true;
-          if (Math.abs(star.normY - this.#fishNormY) < CONFIG.STARFISH_HIT_RADIUS) {
-            this.#collectStar(star, blockTime);
+        if (item.xRatio <= CONFIG.AVATAR_X_RATIO) {
+          item.checked = true;
+          if (Math.abs(item.normY - this.#avatarNormY) < CONFIG.ITEM_HIT_RADIUS) {
+            this.#collectItem(item, blockTime);
           } else {
-            this.#missStar(star, blockTime);
+            this.#missItem(item, blockTime);
           }
         }
       }
 
-      // Advance outcome animations
-      if (star.collected) star.collectT += dt;
-      if (star.missed)    star.missT    += dt;
+      if (item.collected) item.collectT += dt;
+      if (item.missed)    item.missT    += dt;
     }
 
-    // Prune — off-screen and finished animations
-    this.#starfishes = this.#starfishes.filter(s =>
+    this.#items = this.#items.filter(s =>
       s.xRatio > -0.15 &&
       ((!s.collected && !s.missed) || (s.collectT ?? s.missT) < 0.65)
     );
   }
 
-  #collectStar(star, blockTime) {
-    star.collected = true;
-    star.collectT  = 0;
+  #collectItem(item, blockTime) {
+    item.collected = true;
+    item.collectT  = 0;
     this.#scoreBlock[this.#blockIndex]++;
-    this.#fishStressNorm = clamp(this.#fishStressNorm + CONFIG.STRESS_GROW_STEP, 0, 1);
-    this.#speedNorm      = clamp(this.#speedNorm      + CONFIG.SPEED_GROW_STEP,  0, 1);
-    this.#markers.send(`star_collect_b${this.#blockIndex}_s${this.#scoreBlock[this.#blockIndex]}`);
-    this.#csv.appendEvent(this.#blockIndex, 'star_collect',
+    this.#avatarStressNorm = clamp(this.#avatarStressNorm + CONFIG.STRESS_GROW_STEP,  0, 1);
+    this.#speedNorm        = clamp(this.#speedNorm        + CONFIG.SPEED_GROW_STEP,   0, 1);
+    this.#markers.send(`item_collect_b${this.#blockIndex}_s${this.#scoreBlock[this.#blockIndex]}`);
+    this.#csv.appendEvent(this.#blockIndex, 'item_collect',
       this.#scoreBlock[this.#blockIndex], blockTime.toFixed(2));
-    this.#burstParticles(star.xRatio, star.normY);
-    this.#fishBumpT = 0;
+    this.#burstParticles(item.xRatio, item.normY);
+    this.#avatarBumpT = 0;
     this.#sound.playCollect();
     this.#pushState({ score: this.#scoreBlock[this.#blockIndex] });
   }
 
-  #missStar(star, blockTime) {
-    star.missed = true;
-    star.missT  = 0;
-    this.#fishStressNorm = clamp(this.#fishStressNorm - CONFIG.STRESS_SHRINK_STEP, 0, 1);
-    this.#speedNorm      = clamp(this.#speedNorm      - CONFIG.SPEED_SHRINK_STEP,  0, 1);
+  #missItem(item, blockTime) {
+    item.missed = true;
+    item.missT  = 0;
+    this.#avatarStressNorm = clamp(this.#avatarStressNorm - CONFIG.STRESS_SHRINK_STEP, 0, 1);
+    this.#speedNorm        = clamp(this.#speedNorm        - CONFIG.SPEED_SHRINK_STEP,  0, 1);
     this.#missCount++;
     this.#sound.playMiss();
-    this.#markers.send(`star_miss_b${this.#blockIndex}`);
-    this.#csv.appendEvent(this.#blockIndex, 'star_miss', '', blockTime.toFixed(2));
+    this.#markers.send(`item_miss_b${this.#blockIndex}`);
+    this.#csv.appendEvent(this.#blockIndex, 'item_miss', '', blockTime.toFixed(2));
     if (this.#missCount >= CONFIG.MISS_GAME_OVER) {
       this.#gameOver = true;
       this.#endBlock(false);
@@ -463,16 +448,16 @@ export default class BioGame {
     for (const p of this.#particles) {
       p.x    += p.vx * dt;
       p.y    += p.vy * dt;
-      p.vy   -= 0.25 * dt; // slight gravity
+      p.vy   -= 0.25 * dt;
       p.life -= dt * 2.2;
     }
     this.#particles = this.#particles.filter(p => p.life > 0);
   }
 
-  #updateFishBump(dt) {
-    if (this.#fishBumpT === null) return;
-    this.#fishBumpT += dt;
-    if (this.#fishBumpT > 0.3) this.#fishBumpT = null;
+  #updateAvatarBump(dt) {
+    if (this.#avatarBumpT === null) return;
+    this.#avatarBumpT += dt;
+    if (this.#avatarBumpT > 0.3) this.#avatarBumpT = null;
   }
 
   // ── Frame data recording ──────────────────────────────────────────────────
@@ -482,22 +467,22 @@ export default class BioGame {
     this.#lastFrameRecord = now;
 
     this.#csv.bufferFrame({
-      t:        new Date().toISOString(),
-      block:    this.#blockIndex,
-      raw:      this.#lastRaw,
-      smoothed: this.#smoother.value,
-      norm:     this.#fishNormY,
-      fishY:    this.#fishNormY,
-      targetY:  targetCurveY((now - this.#blockStartTime) / 1000, this.#activeBpm),
-      stars:    this.#starfishes.filter(s => !s.checked).length,
+      t:         new Date().toISOString(),
+      block:     this.#blockIndex,
+      raw:       this.#lastRaw,
+      smoothed:  this.#smoother.value,
+      norm:      this.#avatarNormY,
+      avatarY:   this.#avatarNormY,
+      targetY:   targetCurveY((now - this.#blockStartTime) / 1000, this.#activeBpm),
+      itemCount: this.#items.filter(s => !s.checked).length,
     });
   }
 
   // ── Render data builder ───────────────────────────────────────────────────
 
   #buildRenderData(now, dt) {
-    const blockTime = this.#blockStartTime != null ? (now - this.#blockStartTime) / 1000 : 0;
-    const calElapsed = this.#calStartTime != null ? (now - this.#calStartTime) / 1000 : 0;
+    const blockTime  = this.#blockStartTime != null ? (now - this.#blockStartTime) / 1000 : 0;
+    const calElapsed = this.#calStartTime   != null ? (now - this.#calStartTime)   / 1000 : 0;
 
     let countdownValue = 3, countdownProgress = 0;
     if (this.#countdownStartTime != null) {
@@ -514,11 +499,11 @@ export default class BioGame {
       bgScrollX:         this.#bgScrollX,
       blockTime,
       bpm:               this.#activeBpm,
-      fishNormY:         this.#fishNormY,
-      fishStressNorm:    this.#fishStressNorm,
-      fishTilt:          this.#fishTilt,
-      fishBumpT:         this.#fishBumpT,
-      starfishes:        this.#starfishes,
+      avatarNormY:       this.#avatarNormY,
+      avatarStressNorm:  this.#avatarStressNorm,
+      avatarTilt:        this.#avatarTilt,
+      avatarBumpT:       this.#avatarBumpT,
+      items:             this.#items,
       particles:         this.#particles,
       score:             this.#scoreBlock[this.#blockIndex],
       blockIndex:        this.#blockIndex,
@@ -551,7 +536,7 @@ export default class BioGame {
     });
   }
 
-  // ── Trial marker (curve minimum detection) ───────────────────────────────
+  // ── Trial marker ─────────────────────────────────────────────────────────
 
   #checkTrialMarker(blockTimeSecs) {
     if (this.#nextTrialTime === null) return;
