@@ -79,7 +79,7 @@ export class BioGameRenderer {
         break;
 
       case STATE.INTERMISSION:
-        this.#drawIntermission(ctx, w, h, renderData.scoreBlock1 ?? 0);
+        this.#drawIntermission(ctx, w, h, renderData.scoreBlock1 ?? 0, renderData.gameOver ?? false);
         break;
 
       case STATE.DONE:
@@ -536,14 +536,16 @@ export class BioGameRenderer {
     ctx.restore();
   }
 
-  #drawIntermission(ctx, w, h, score) {
+  #drawIntermission(ctx, w, h, score, gameOver = false) {
     // Backdrop overlay
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(0, 0, w, h);
 
     const cy = h / 2;
 
-    this.#drawCenter(ctx, w, cy - 80, 'Game 1 complete  ·  Good job!', 'rgba(255,255,255,0.85)', 30, '300');
+    const headline     = gameOver ? 'Game 1 over  ·  Too many misses!' : 'Game 1 complete  ·  Good job!';
+    const headlineColor = gameOver ? 'rgba(255,140,100,0.90)' : 'rgba(255,255,255,0.85)';
+    this.#drawCenter(ctx, w, cy - 80, headline, headlineColor, 30, '300');
 
     // Big score
     const scoreStr = `★  ${score}  ★`;

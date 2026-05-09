@@ -420,6 +420,7 @@ export default class BioGame {
       this.#scoreBlock[this.#blockIndex], blockTime.toFixed(2));
     this.#burstParticles(star.xRatio, star.normY);
     this.#fishBumpT = 0;
+    this.#sound.playCollect();
     this.#pushState({ score: this.#scoreBlock[this.#blockIndex] });
   }
 
@@ -429,6 +430,7 @@ export default class BioGame {
     this.#fishStressNorm = clamp(this.#fishStressNorm - CONFIG.STRESS_SHRINK_STEP, 0, 1);
     this.#speedNorm      = clamp(this.#speedNorm      - CONFIG.SPEED_SHRINK_STEP,  0, 1);
     this.#missCount++;
+    this.#sound.playMiss();
     this.#markers.send(`star_miss_b${this.#blockIndex}`);
     this.#csv.appendEvent(this.#blockIndex, 'star_miss', '', blockTime.toFixed(2));
     if (this.#missCount >= CONFIG.MISS_GAME_OVER) {

@@ -26,7 +26,7 @@ export const CONFIG = {
   FISH_SIZE_MAX:         0.17,  // height as fraction of canvas height (full exhale)
 
   // ── Stress mechanic ───────────────────────────────────────────────────────
-  FISH_STRESS_SIZE_MIN:  0.05,  // smallest fish height (all misses)
+  FISH_STRESS_SIZE_MIN:  0.03,  // smallest fish height (all misses)
   FISH_STRESS_SIZE_MAX:  0.26,  // largest fish height (all collects)
   FISH_STRESS_INIT:      0.5,   // starting stress norm (0–1)
   STRESS_GROW_STEP:      0.06,  // norm added per collect
