@@ -13,18 +13,20 @@ import { CONFIG } from './bioGame_config.js';
 export class BioGameCSV {
   #subjectCode;
   #group;
+  #scene;
   #onWarn;
 
   #frameBuffer       = [];
   #currentBlockIndex = 0;
 
   #frameHeader = 'timestamp,blockIndex,breathRaw,breathSmoothed,breathNorm,' +
-                 'fishY,targetY,starfishCount\n';
+                 'avatarY,targetY,itemCount\n';
   #eventHeader = 'timestamp,blockIndex,event,value1,value2\n';
 
-  constructor(subjectCode, group, onWarn) {
+  constructor(subjectCode, group, scene, onWarn) {
     this.#subjectCode = subjectCode;
     this.#group       = group;
+    this.#scene       = scene;
     this.#onWarn      = onWarn;
   }
 
