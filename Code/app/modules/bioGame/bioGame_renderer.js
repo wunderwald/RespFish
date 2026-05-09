@@ -83,7 +83,7 @@ export class BioGameRenderer {
         break;
 
       case STATE.DONE:
-        this.#drawDone(ctx, w, h, renderData.scoreBlock1 ?? 0, renderData.scoreBlock2 ?? 0);
+        this.#drawDone(ctx, w, h, renderData.scoreBlock1 ?? 0, renderData.scoreBlock2 ?? 0, renderData.gameOver ?? false);
         break;
     }
   }
@@ -247,12 +247,12 @@ export class BioGameRenderer {
 
   // ── Target curve ──────────────────────────────────────────────────────────
 
-  #drawCurve(ctx, w, h, topPad, playH, blockTime, bpm) {
+  #drawCurve(ctx, w, h, topPad, playH, blockTime, bpm, scrollSpeed) {
     const period = 60 / bpm;
     ctx.save();
     ctx.beginPath();
     for (let px = 0; px <= w; px += 4) {
-      const tOff = (px / w - CONFIG.FISH_X_RATIO) / CONFIG.STARFISH_SCROLL_SPEED;
+      const tOff = (px / w - CONFIG.FISH_X_RATIO) / scrollSpeed;
       const normY = 0.5 + 0.45 * Math.sin(2 * Math.PI * (blockTime + tOff) / period);
       const sy    = topPad + (1 - normY) * playH;
       px === 0 ? ctx.moveTo(px, sy) : ctx.lineTo(px, sy);
@@ -466,8 +466,9 @@ export class BioGameRenderer {
 
   #drawPlaying(ctx, w, h, data, dt) {
     const {
-      fishNormY, fishNormSize, fishTilt = 0, fishBumpT,
+      fishNormY, fishStressNorm = 0.5, fishTilt = 0, fishBumpT,
       starfishes, particles, score, blockTime, bpm, showCurve, group, now,
+      scrollSpeed, missCount = 0,
     } = data;
 
     // Playfield geometry (10% padding top & bottom)
@@ -477,7 +478,7 @@ export class BioGameRenderer {
 
     // Target curve (optional)
     if (showCurve) {
-      this.#drawCurve(ctx, w, h, topPad, playH, blockTime, bpm);
+      this.#drawCurve(ctx, w, h, topPad, playH, blockTime, bpm, scrollSpeed);
     }
 
     // Starfishes
@@ -488,10 +489,10 @@ export class BioGameRenderer {
       this.#drawParticles(ctx, w, h, topPad, playH, particles);
     }
 
-    // Fish (with collect-bump scale)
+    // Fish — size driven by stress norm
     const fishScreenX = CONFIG.FISH_X_RATIO * w;
     const fishScreenY = normToScreenY(fishNormY);
-    const baseH = (CONFIG.FISH_SIZE_MIN + fishNormSize * (CONFIG.FISH_SIZE_MAX - CONFIG.FISH_SIZE_MIN)) * h;
+    const baseH = lerp(CONFIG.FISH_STRESS_SIZE_MIN, CONFIG.FISH_STRESS_SIZE_MAX, fishStressNorm) * h;
     const bumpScale = fishBumpT != null
       ? 1 + 0.28 * Math.sin(Math.PI * fishBumpT / 0.3)
       : 1;
@@ -501,6 +502,20 @@ export class BioGameRenderer {
     if (group === 'slow') {
       this.#drawScoreDisplay(ctx, 18, 16, score, dt);
       this.#drawTimerBar(ctx, w, h, blockTime, now);
+    }
+
+    // Miss counter (bottom-right, subtle)
+    if (missCount > 0) {
+      const maxMiss = CONFIG.MISS_GAME_OVER;
+      const danger  = missCount / maxMiss;
+      const alpha   = 0.30 + 0.55 * danger;
+      const r = Math.round(lerp(200, 255, danger));
+      const g = Math.round(lerp(200, 80,  danger));
+      ctx.fillStyle    = `rgba(${r},${g},80,${alpha})`;
+      ctx.font         = '300 13px Nunito, sans-serif';
+      ctx.textAlign    = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`${missCount} / ${maxMiss} misses`, w - 18, h - 14);
     }
   }
 
@@ -546,14 +561,16 @@ export class BioGameRenderer {
     this.#drawCenter(ctx, w, cy + 110, 'Press Space', 'rgba(255,255,255,0.28)', 15);
   }
 
-  #drawDone(ctx, w, h, score1, score2) {
+  #drawDone(ctx, w, h, score1, score2, gameOver = false) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(0, 0, w, h);
 
     const cy    = h / 2;
     const total = score1 + score2;
 
-    this.#drawCenter(ctx, w, cy - 90, 'Experiment complete!', 'rgba(255,255,255,0.85)', 28, '300');
+    const headline = gameOver ? 'Game Over' : 'Experiment complete!';
+    const headlineColor = gameOver ? 'rgba(255,120,90,0.92)' : 'rgba(255,255,255,0.85)';
+    this.#drawCenter(ctx, w, cy - 90, headline, headlineColor, 28, '300');
 
     ctx.fillStyle    = '#ffd060';
     ctx.font         = '200 72px Nunito, sans-serif';

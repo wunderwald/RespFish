@@ -73,6 +73,12 @@ export default class BioGame {
   #prevFishNormY = 0.5;
   #fishTilt      = 0;     // current tilt in radians
 
+  // ── Stress mechanic ───────────────────────────────────────────────────────
+  #fishStressNorm = CONFIG.FISH_STRESS_INIT;   // 0–1; drives fish size
+  #speedNorm      = CONFIG.SCROLL_SPEED_INIT;  // 0–1; drives scroll speed
+  #missCount      = 0;
+  #gameOver       = false;
+
   // ── Starfishes ────────────────────────────────────────────────────────────
   #starfishes       = [];
   #nextSpawnTime    = 0;  // performance.now() of next spawn
@@ -98,6 +104,10 @@ export default class BioGame {
 
   get #activeBpm() {
     return this.#group === 'slow' ? CONFIG.SLOW_BPM : this.#naturalBpm;
+  }
+
+  get #scrollSpeed() {
+    return lerp(CONFIG.SCROLL_SPEED_MIN, CONFIG.SCROLL_SPEED_MAX, this.#speedNorm);
   }
 
   constructor({ sceneContainer }) {
@@ -220,6 +230,10 @@ export default class BioGame {
     this.#starfishes      = [];
     this.#nextSpawnTime   = performance.now() +
       randBetween(CONFIG.STARFISH_SPAWN_MIN_MS, CONFIG.STARFISH_SPAWN_MAX_MS);
+    this.#fishStressNorm  = CONFIG.FISH_STRESS_INIT;
+    this.#speedNorm       = CONFIG.SCROLL_SPEED_INIT;
+    this.#missCount       = 0;
+    this.#gameOver        = false;
 
     this.#csv.initBlockCSV(this.#blockIndex);
 
@@ -299,7 +313,7 @@ export default class BioGame {
     }
 
     if (this.#state === STATE.PLAYING) {
-      this.#bgScrollX += CONFIG.BG_SCROLL_SPEED * dt;
+      this.#bgScrollX += this.#scrollSpeed * CONFIG.BG_SCROLL_FACTOR * dt;
       this.#updateStarfishes(now, dt);
       this.#updateParticles(dt);
       this.#updateFishBump(dt);
@@ -338,9 +352,11 @@ export default class BioGame {
     const blockTime = (now - this.#blockStartTime) / 1000;
     const bpm = this.#activeBpm;
 
+    const speed = this.#scrollSpeed;
+
     // Spawn
     if (now >= this.#nextSpawnTime) {
-      const tOffAtRightEdge = (1.0 - CONFIG.FISH_X_RATIO) / CONFIG.STARFISH_SCROLL_SPEED;
+      const tOffAtRightEdge = (1.0 - CONFIG.FISH_X_RATIO) / speed;
       this.#starfishes.push({
         xRatio:    1.0,
         normY:     targetCurveY(blockTime + tOffAtRightEdge, bpm),
@@ -355,11 +371,11 @@ export default class BioGame {
 
     // Update each starfish
     for (const star of this.#starfishes) {
-      star.xRatio -= CONFIG.STARFISH_SCROLL_SPEED * dt;
+      star.xRatio -= speed * dt;
 
       // Keep star on the curve until it's been checked
       if (!star.checked) {
-        const tOff = (star.xRatio - CONFIG.FISH_X_RATIO) / CONFIG.STARFISH_SCROLL_SPEED;
+        const tOff = (star.xRatio - CONFIG.FISH_X_RATIO) / speed;
         star.normY = targetCurveY(blockTime + tOff, bpm);
 
         // Collection check: when star crosses the fish's x
@@ -389,6 +405,8 @@ export default class BioGame {
     star.collected = true;
     star.collectT  = 0;
     this.#scoreBlock[this.#blockIndex]++;
+    this.#fishStressNorm = clamp(this.#fishStressNorm + CONFIG.STRESS_GROW_STEP, 0, 1);
+    this.#speedNorm      = clamp(this.#speedNorm      + CONFIG.SPEED_GROW_STEP,  0, 1);
     this.#markers.send(`star_collect_b${this.#blockIndex}_s${this.#scoreBlock[this.#blockIndex]}`);
     this.#csv.appendEvent(this.#blockIndex, 'star_collect',
       this.#scoreBlock[this.#blockIndex], blockTime.toFixed(2));
@@ -400,8 +418,15 @@ export default class BioGame {
   #missStar(star, blockTime) {
     star.missed = true;
     star.missT  = 0;
+    this.#fishStressNorm = clamp(this.#fishStressNorm - CONFIG.STRESS_SHRINK_STEP, 0, 1);
+    this.#speedNorm      = clamp(this.#speedNorm      - CONFIG.SPEED_SHRINK_STEP,  0, 1);
+    this.#missCount++;
     this.#markers.send(`star_miss_b${this.#blockIndex}`);
     this.#csv.appendEvent(this.#blockIndex, 'star_miss', '', blockTime.toFixed(2));
+    if (this.#missCount >= CONFIG.MISS_GAME_OVER) {
+      this.#gameOver = true;
+      this.#endBlock(false);
+    }
   }
 
   // ── Particles ─────────────────────────────────────────────────────────────
@@ -480,7 +505,7 @@ export default class BioGame {
       blockTime,
       bpm:               this.#activeBpm,
       fishNormY:         this.#fishNormY,
-      fishNormSize:      this.#fishNormY,  // size tracks Y directly
+      fishStressNorm:    this.#fishStressNorm,
       fishTilt:          this.#fishTilt,
       fishBumpT:         this.#fishBumpT,
       starfishes:        this.#starfishes,
@@ -491,6 +516,9 @@ export default class BioGame {
       scoreBlock2:       this.#scoreBlock[1],
       group:             this.#group,
       showCurve:         this.#showCurve,
+      scrollSpeed:       this.#scrollSpeed,
+      missCount:         this.#missCount,
+      gameOver:          this.#gameOver,
       calProgress:       clamp(calElapsed / this.#calibrationSecs, 0, 1),
       calRemaining:      Math.max(0, Math.ceil(this.#calibrationSecs - calElapsed)),
       countdownValue,
