@@ -111,7 +111,7 @@ export class TrainingGameRenderer {
 
   get canvas() { return this.#canvas; }
 
-  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, heldSadness, now }) {
+  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, heldSadness, idleText, now }) {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
@@ -132,19 +132,19 @@ export class TrainingGameRenderer {
     this.#drawBackground(ctx, w, h, skyDarkness);
 
     switch (state) {
-      case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
+      case STATE.IDLE:      return this.#drawIdle(ctx, w, h, idleText);
       case STATE.COUNTDOWN: return this.#drawCountdown(ctx, w, h, countdownElapsed);
       case STATE.PLAYING:   return this.#drawPlaying(ctx, w, h, { activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, heldSadness, gameElapsed, score, now });
       case STATE.GAME_OVER: return this.#drawGameOver(ctx, w, h, score);
     }
   }
 
-  #drawIdle(ctx, w, h) {
+  #drawIdle(ctx, w, h, text = 'Press Start to play') {
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.font = '300 20px Nunito, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Select a stream and press Start', w / 2, h / 2);
+    ctx.fillText(text, w / 2, h / 2);
   }
 
   #drawGameOver(ctx, w, h, score) {
