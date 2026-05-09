@@ -22,6 +22,7 @@ import { MarkerStream }     from '../stream/markerStream.js';
 import { CONFIG, STATE }    from './bioGame_config.js';
 import { BioGameRenderer }  from './bioGame_renderer.js';
 import { BioGameCSV }       from './bioGame_csv.js';
+import { BioGameSound }     from './bioGame_sound.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,7 @@ export default class BioGame {
   // ── Sub-modules ───────────────────────────────────────────────────────────
   #markers  = null;
   #renderer = null;
+  #sound    = null;
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -112,6 +114,9 @@ export default class BioGame {
 
   constructor({ sceneContainer }) {
     this.#renderer = new BioGameRenderer(sceneContainer);
+
+    this.#sound = new BioGameSound();
+    this.#sound.init().catch(e => console.warn('[BioGame] sound init failed:', e));
 
     this.#markers = CONFIG.SEND_MARKERS
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
@@ -240,6 +245,7 @@ export default class BioGame {
     // First minimum of the target curve is at 3/4 of one period after block start
     this.#nextTrialTime = (60 / this.#activeBpm) * 0.75;
 
+    this.#sound.startBlock();
     this.#state = STATE.PLAYING;
     this.#markers.send(`block_start_${this.#blockIndex}`);
     this.#pushState({
@@ -249,6 +255,7 @@ export default class BioGame {
   }
 
   #endBlock(aborted = false) {
+    this.#sound.stopBlock();
     this.#csv.flushFrames(this.#blockIndex);
     this.#markers.send(aborted
       ? `block_abort_${this.#blockIndex}`
@@ -313,6 +320,7 @@ export default class BioGame {
     }
 
     if (this.#state === STATE.PLAYING) {
+      this.#sound.setNoiseLevel(this.#fishNormY);
       this.#bgScrollX += this.#scrollSpeed * CONFIG.BG_SCROLL_FACTOR * dt;
       this.#updateStarfishes(now, dt);
       this.#updateParticles(dt);
