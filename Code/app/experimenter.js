@@ -71,15 +71,9 @@ if (!['ibreath', 'bioGame'].includes(frontend)) {
   settingsBar.style.display = 'none';
 }
 
-// ── Log bar (trainingGame only) ───────────────────────────────────────────────
-
-const logBar = document.getElementById('log-bar');
-
-if (frontend !== 'trainingGame') {
-  logBar.style.display = 'none';
-}
-
 // ── Frontend-specific stats section ──────────────────────────────────────────
+
+document.getElementById('log-bar').style.display = 'none';
 
 const statsEl = document.getElementById('stats');
 
@@ -217,28 +211,6 @@ if (frontend === 'ibreath') {
   // ── Request current HUD state on load ────────────────────────────────────────
 
   window.api.hud.sendAction({ type: 'ready' });
-
-} else if (frontend === 'trainingGame') {
-  // ── Game controls ────────────────────────────────────────────────────────────
-
-  statsEl.innerHTML = `
-    <span id="fe-state">waiting for stream…</span>
-    <span><span class="label">score</span><span id="fe-score">—</span></span>
-    <span id="ib-controls"><button id="fe-start-btn" disabled>Start</button></span>
-  `;
-  const feStateEl  = document.getElementById('fe-state');
-  const feScoreEl  = document.getElementById('fe-score');
-  const feStartBtn = document.getElementById('fe-start-btn');
-
-  feStartBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'start' }));
-
-  window.api.frontend.onState(({ stateText, score, btnEnabled, btnText, debugLog }) => {
-    if (stateText  !== undefined) feStateEl.textContent  = stateText;
-    if (score      !== null && score !== undefined) feScoreEl.textContent = score;
-    if (btnEnabled !== undefined) feStartBtn.disabled    = !btnEnabled;
-    if (btnText    !== undefined) feStartBtn.textContent = btnText;
-    if (debugLog   !== undefined) logBar.textContent     = debugLog ?? '';
-  });
 
 } else if (frontend === 'visualizer') {
   // ── Visualizer status ────────────────────────────────────────────────────────

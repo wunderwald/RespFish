@@ -1,5 +1,5 @@
-import { CONFIG }      from '../modules/trainingGame/trainingGame_config.js';
-import { TrainingGame } from '../modules/trainingGame/trainingGame.js';
+import { CONFIG }      from './trainingGame/trainingGame_config.js';
+import { TrainingGame } from './trainingGame/trainingGame.js';
 import { MicInput }     from './micInput.js';
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
