@@ -114,6 +114,23 @@ ipcMain.handle("append-csv", (_event, filePath, content) => {
 });
 
 /**
+ * read-file
+ * Reads a UTF-8 file and returns its content.
+ * Returns { ok: true, content: string } or { ok: false, error: string }.
+ */
+ipcMain.handle("read-file", (_event, filePath) => {
+  try {
+    const resolved = path.isAbsolute(filePath)
+      ? filePath
+      : path.join(__dirname, filePath);
+    const content = require("fs").readFileSync(resolved, "utf8");
+    return { ok: true, content };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+/**
  * pick-directory
  * Opens a native folder-picker dialog.
  * Returns the selected path string, or null if cancelled.

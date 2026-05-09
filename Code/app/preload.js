@@ -86,7 +86,8 @@ contextBridge.exposeInMainWorld("api", {
     openControl: ()       => ipcRenderer.send('hud:open-control'),
   },
 
-  pickDir: () => ipcRenderer.invoke("pick-directory"),
+  pickDir:  () => ipcRenderer.invoke("pick-directory"),
+  readFile: (filePath) => ipcRenderer.invoke("read-file", filePath),
 
   // Launcher IPC — used only by the launcher window
   launcher: {

@@ -284,6 +284,7 @@ if (frontend === 'ibreath') {
       <span class="label">natural BPM</span>
       <input id="bg-natural-bpm" type="number" min="4" max="20" step="0.5"
              value="${BG.NATURAL_BPM}" style="width:46px" />
+      <span id="bg-bpm-source" style="font-size:11px;opacity:0.5">—</span>
     </span>
     <span>
       <span class="label">score</span>
@@ -312,6 +313,7 @@ if (frontend === 'ibreath') {
   const bgGroupEl    = document.getElementById('bg-group');
   const bgNatBpmWrap = document.getElementById('bg-natural-bpm-wrap');
   const bgNatBpmEl   = document.getElementById('bg-natural-bpm');
+  const bgBpmSrcEl   = document.getElementById('bg-bpm-source');
   const bgScoreEl    = document.getElementById('bg-score');
   const bgStartBtn   = document.getElementById('bg-start-btn');
   const bgNextBtn    = document.getElementById('bg-next-btn');
@@ -322,6 +324,49 @@ if (frontend === 'ibreath') {
   bgGroupEl.addEventListener('change', () => {
     bgNatBpmWrap.style.display = bgGroupEl.value === 'natural' ? '' : 'none';
   });
+
+  // ── Baseline BPM auto-load ────────────────────────────────────────────────────
+
+  async function tryLoadBaseline(subjectCode) {
+    const filePath = `output_data/baseline/${subjectCode}_baseline_estimates.csv`;
+    const result   = await window.api.readFile(filePath);
+
+    if (!result.ok) {
+      bgBpmSrcEl.textContent = 'enter manually';
+      bgBpmSrcEl.style.color = '';
+      return;
+    }
+
+    // Parse bpm column (index 2), filter to physiologic range
+    const lines  = result.content.trim().split('\n');
+    const values = [];
+    for (let i = 1; i < lines.length; i++) {
+      const bpm = parseFloat(lines[i].split(',')[2]);
+      if (!isNaN(bpm) && bpm >= 4 && bpm <= 25) values.push(bpm);
+    }
+
+    if (values.length === 0) {
+      bgBpmSrcEl.textContent = 'no valid BPM in file — enter manually';
+      bgBpmSrcEl.style.color = 'rgba(255,190,60,0.85)';
+      return;
+    }
+
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    bgNatBpmEl.value       = avg.toFixed(1);
+    bgBpmSrcEl.textContent = `auto (${values.length} estimates, avg ${avg.toFixed(1)} BPM)`;
+    bgBpmSrcEl.style.color = 'rgba(100,220,130,0.9)';
+  }
+
+  // Trigger on subject change (debounced) and immediately on init
+  let bpmLoadTimer = null;
+  bgSubjectEl.addEventListener('input', () => {
+    clearTimeout(bpmLoadTimer);
+    bpmLoadTimer = setTimeout(
+      () => tryLoadBaseline(bgSubjectEl.value.trim() || 'TEST'),
+      400
+    );
+  });
+  tryLoadBaseline(bgSubjectEl.value.trim() || 'TEST');
 
   // ── Receive state from scene window ─────────────────────────────────────────
 
