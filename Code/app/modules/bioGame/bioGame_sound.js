@@ -26,11 +26,13 @@ export class BioGameSound {
 
   async init() {
     await this.#engine.init();
-    const [ambience, noise] = await Promise.all([
+    const [ambience, noise, miss, ...collectBufs] = await Promise.all([
       this.#engine.loadBuffer(CFG.AMBIENCE),
       this.#engine.loadBuffer(CFG.NOISE),
+      this.#engine.loadBuffer(CFG.MISS),
+      ...CFG.COLLECT.map(url => this.#engine.loadBuffer(url)),
     ]);
-    this.#buf = { ambience, noise };
+    this.#buf = { ambience, noise, miss, collect: collectBufs };
   }
 
   // ── Block layer ───────────────────────────────────────────────────────────
@@ -61,6 +63,30 @@ export class BioGameSound {
     const target = CFG.NOISE_VOLUME_MIN +
       Math.max(0, Math.min(1, level)) * (CFG.NOISE_VOLUME_MAX - CFG.NOISE_VOLUME_MIN);
     this.#noise?.setGain(target, 0.05);
+  }
+
+  // ── One-shot events ───────────────────────────────────────────────────────
+
+  playCollect() {
+    const bufs = this.#buf.collect;
+    if (!bufs?.length) return;
+    const buf = bufs[Math.floor(Math.random() * bufs.length)];
+    this.#playOnce(buf, CFG.COLLECT_VOLUME);
+  }
+
+  playMiss() {
+    this.#playOnce(this.#buf.miss, CFG.MISS_VOLUME);
+  }
+
+  #playOnce(buffer, gain) {
+    if (!buffer || !this.#engine.ctx) return;
+    const src = this.#engine.ctx.createBufferSource();
+    src.buffer = buffer;
+    const g = this.#engine.createGain(gain);
+    src.connect(g);
+    g.connect(this.#engine.destination);
+    src.start();
+    src.onended = () => { src.disconnect(); g.disconnect(); };
   }
 
   stopBlock() {
