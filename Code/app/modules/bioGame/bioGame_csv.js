@@ -44,7 +44,7 @@ export class BioGameCSV {
     if (!res.ok) { this.#warn(`Could not init eventData.csv: ${res.error}`); return; }
 
     // Write session metadata as the first event row
-    const meta = `${new Date().toISOString()},0,session_start,${this.#group},\n`;
+    const meta = `${new Date().toISOString()},0,session_start,${this.#group},${this.#scene}\n`;
     const res2 = await window.api.appendCSV(evtPath, meta);
     if (!res2.ok) this.#warn(`Could not write session_start: ${res2.error}`);
     else console.log(`[CSV] initialised ${evtPath}`);
@@ -74,7 +74,7 @@ export class BioGameCSV {
 
     const csv = buf.map(r =>
       `${r.t},${r.block},${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
-      `${r.norm.toFixed(4)},${r.fishY.toFixed(4)},${r.targetY.toFixed(4)},${r.stars}`
+      `${r.norm.toFixed(4)},${r.avatarY.toFixed(4)},${r.targetY.toFixed(4)},${r.itemCount}`
     ).join('\n') + '\n';
 
     const res = await window.api.appendCSV(this.#framePath(blockIndex), csv);
