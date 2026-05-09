@@ -8,6 +8,7 @@
  *
  * blockFadeGain ramps 0→1 on startBlock and 1→0 on stopBlock.
  * noiseGain is updated in real-time via setNoiseLevel().
+ * File paths come from the scene definition passed to init().
  */
 
 import { SoundEngine } from '../sound/soundEngine.js';
@@ -16,7 +17,7 @@ import { SOUND_CONFIG as CFG } from './bioGame_sound_config.js';
 
 export class BioGameSound {
   #engine = new SoundEngine();
-  #buf    = {};   // { ambience, noise } → AudioBuffer | null
+  #buf    = {};   // { ambience, noise, miss, collect[] } → AudioBuffer | null
 
   #ambience       = null;   // LoopPlayer
   #noise          = null;   // LoopPlayer
@@ -24,13 +25,13 @@ export class BioGameSound {
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
-  async init() {
+  async init(sounds) {
     await this.#engine.init();
     const [ambience, noise, miss, ...collectBufs] = await Promise.all([
-      this.#engine.loadBuffer(CFG.AMBIENCE),
-      this.#engine.loadBuffer(CFG.NOISE),
-      this.#engine.loadBuffer(CFG.MISS),
-      ...CFG.COLLECT.map(url => this.#engine.loadBuffer(url)),
+      this.#engine.loadBuffer(sounds.ambience),
+      this.#engine.loadBuffer(sounds.noise),
+      this.#engine.loadBuffer(sounds.miss),
+      ...sounds.collect.map(url => this.#engine.loadBuffer(url)),
     ]);
     this.#buf = { ambience, noise, miss, collect: collectBufs };
   }
