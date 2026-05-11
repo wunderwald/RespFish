@@ -224,20 +224,31 @@ if (frontend === 'ibreath') {
   statsEl.innerHTML = `
     <span id="fe-state">waiting for stream…</span>
     <span><span class="label">score</span><span id="fe-score">—</span></span>
+    <span>
+      <span class="label">group</span>
+      <select id="fe-group" class="stream-select">
+        <option value="target">Target (slow breathing)</option>
+        <option value="control">Control (sharp exhale)</option>
+      </select>
+    </span>
     <span id="ib-controls"><button id="fe-start-btn" disabled>Start</button></span>
   `;
   const feStateEl  = document.getElementById('fe-state');
   const feScoreEl  = document.getElementById('fe-score');
+  const feGroupEl  = document.getElementById('fe-group');
   const feStartBtn = document.getElementById('fe-start-btn');
 
-  feStartBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'start' }));
+  feStartBtn.addEventListener('click', () =>
+    window.api.frontend.sendAction({ type: 'start', variant: feGroupEl.value })
+  );
 
-  window.api.frontend.onState(({ stateText, score, btnEnabled, btnText, debugLog }) => {
-    if (stateText  !== undefined) feStateEl.textContent  = stateText;
-    if (score      !== null && score !== undefined) feScoreEl.textContent = score;
-    if (btnEnabled !== undefined) feStartBtn.disabled    = !btnEnabled;
-    if (btnText    !== undefined) feStartBtn.textContent = btnText;
-    if (debugLog   !== undefined) logBar.textContent     = debugLog ?? '';
+  window.api.frontend.onState(({ stateText, score, btnEnabled, btnText, debugLog, inputsLocked }) => {
+    if (stateText    !== undefined) feStateEl.textContent  = stateText;
+    if (score        !== null && score !== undefined) feScoreEl.textContent = score;
+    if (btnEnabled   !== undefined) feStartBtn.disabled    = !btnEnabled;
+    if (btnText      !== undefined) feStartBtn.textContent = btnText;
+    if (debugLog     !== undefined) logBar.textContent     = debugLog ?? '';
+    if (inputsLocked)               feGroupEl.disabled     = true;
   });
 
 } else if (frontend === 'visualizer') {

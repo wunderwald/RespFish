@@ -111,7 +111,7 @@ export class TrainingGameRenderer {
 
   get canvas() { return this.#canvas; }
 
-  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, heldSadness, now }) {
+  draw({ state, countdownElapsed, score, gameElapsed, activeCloud, failedClouds, particles, phase, inBreath, exhaleProgress, heldSadness, now, variant = 'target' }) {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
@@ -129,7 +129,7 @@ export class TrainingGameRenderer {
       }
       skyDarkness = Math.min(skyDarkness, 0.85);
     }
-    this.#drawBackground(ctx, w, h, skyDarkness);
+    this.#drawBackground(ctx, w, h, skyDarkness, variant);
 
     switch (state) {
       case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
@@ -238,11 +238,17 @@ export class TrainingGameRenderer {
     this.#drawTimerBar(ctx, w, h, gameElapsed, now);
   }
 
-  #drawBackground(ctx, w, h, darkness = 0) {
+  #drawBackground(ctx, w, h, darkness = 0, variant = 'target') {
     const sky = ctx.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0,   '#8bbfe0');
-    sky.addColorStop(0.5, '#c2dff2');
-    sky.addColorStop(1,   '#daeefa');
+    if (variant === 'control') {
+      sky.addColorStop(0,   '#c07840');
+      sky.addColorStop(0.5, '#daa060');
+      sky.addColorStop(1,   '#f0c888');
+    } else {
+      sky.addColorStop(0,   '#8bbfe0');
+      sky.addColorStop(0.5, '#c2dff2');
+      sky.addColorStop(1,   '#daeefa');
+    }
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, w, h);
 
@@ -257,7 +263,9 @@ export class TrainingGameRenderer {
     }
 
     if (darkness > 0) {
-      ctx.fillStyle = `rgba(20,35,70,${darkness * 0.6})`;
+      ctx.fillStyle = variant === 'control'
+        ? `rgba(60,20,10,${darkness * 0.6})`
+        : `rgba(20,35,70,${darkness * 0.6})`;
       ctx.fillRect(0, 0, w, h);
     }
   }

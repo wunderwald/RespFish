@@ -22,6 +22,10 @@ export class TrainingGame {
   #beatMs = (60 / CONFIG.TARGET_BPM) * 1000;
   #gameStartTime = null;
 
+  // variant
+  #variant      = 'target'; // 'target' | 'control'
+  #exhaleWindow = null;      // ms; set in #beginPlaying based on variant
+
   // clouds & particles
   #activeCloud = null;
   #failedClouds = [];
@@ -46,8 +50,8 @@ export class TrainingGame {
   constructor({ statsContainer, sceneContainer }) {
     this.#renderer = new TrainingGameRenderer(sceneContainer);
 
-    window.api.frontend.onAction(({ type }) => {
-      if (type === 'start') this.#beginCountdown();
+    window.api.frontend.onAction(({ type, variant }) => {
+      if (type === 'start') this.#beginCountdown(variant ?? 'target');
     });
 
     this.#pushState();
@@ -85,12 +89,14 @@ export class TrainingGame {
 
   // ── State machine ──────────────────────────────────────────────────────────
 
-  #beginCountdown() {
+  #beginCountdown(variant = 'target') {
+    this.#variant = variant;
     this.#state = STATE.COUNTDOWN;
     this.#countdownStart = performance.now();
     this.#hudStateText  = 'get ready…';
     this.#hudBtnEnabled = false;
     this.#pushState();
+    window.api.frontend.sendState({ inputsLocked: true });
   }
 
   #beginPlaying() {
@@ -106,6 +112,9 @@ export class TrainingGame {
     this.#phaseStartTime = performance.now();
     this.#lastBreathMs = -Infinity;
     this.#gameStartTime = performance.now();
+    this.#exhaleWindow = this.#variant === 'control'
+      ? CONFIG.SHARP_EXHALE_MS
+      : this.#beatMs / 2;
 
     this.#hudStateText  = 'playing';
     this.#hudScore      = 0;
@@ -140,7 +149,7 @@ export class TrainingGame {
                this.#phase === 'inhale' &&
                this.#activeCloud !== null &&
                this.#phaseStartTime != null &&
-               now - this.#phaseStartTime >= this.#beatMs / 2) {
+               now - this.#phaseStartTime >= (this.#variant === 'control' ? CONFIG.SHARP_CLOUD_TIMEOUT_MS : this.#beatMs / 2)) {
       this.#exhaleTimeAbove = 0;
       this.#onExhaleEnd(now);
     }
@@ -191,8 +200,11 @@ export class TrainingGame {
       phase:            this.#phase,
       inBreath:         this.#inBreath,
       lastNorm:         this.#lastNorm,
-      exhaleProgress:   this.#phase === 'exhale' ? Math.min(1, this.#exhaleTimeAbove / (this.#beatMs / 2)) : 0,
+      exhaleProgress:   this.#phase === 'exhale' && this.#exhaleWindow
+        ? Math.min(1, this.#exhaleTimeAbove / this.#exhaleWindow)
+        : 0,
       heldSadness:      this.#heldSadness,
+      variant:          this.#variant,
       now,
     };
   }
@@ -200,7 +212,9 @@ export class TrainingGame {
   #pushDebugLog(now) {
     if (now - this.#lastDebugPush < 150) return;
     this.#lastDebugPush = now;
-    const phaseLabel  = this.#phase === 'exhale' ? 'BREATHE OUT' : 'BREATHE IN';
+    const phaseLabel  = this.#phase === 'exhale'
+      ? (this.#variant === 'control' ? 'PUFF!' : 'BREATHE OUT')
+      : (this.#variant === 'control' ? 'waiting…' : 'BREATHE IN');
     const signalLabel = this.#inBreath ? 'exhaling' : 'inhaling';
     window.api.frontend.sendState({
       debugLog: `${phaseLabel}  ·  signal: ${this.#lastNorm.toFixed(2)}  (${signalLabel})`,
@@ -220,7 +234,7 @@ export class TrainingGame {
       }
     } else {
       if (above) this.#exhaleTimeAbove += dt;
-      if (now - this.#phaseStartTime >= this.#beatMs / 2) {
+      if (now - this.#phaseStartTime >= this.#exhaleWindow) {
         this.#onExhaleEnd(now);
       }
     }
@@ -236,7 +250,7 @@ export class TrainingGame {
   }
 
   #onExhaleEnd(now) {
-    const exhalePhaseMs = this.#beatMs / 2;
+    const exhalePhaseMs = this.#exhaleWindow ?? this.#beatMs / 2;
     const ratio = this.#exhaleTimeAbove / exhalePhaseMs;
     const success = ratio >= CONFIG.EXHALE_SUCCESS_RATIO;
     let prevSadness = 0;
@@ -265,12 +279,15 @@ export class TrainingGame {
 
     this.#phase = 'inhale';
     this.#phaseStartTime = now;
+    const spawnDelay = this.#variant === 'control'
+      ? CONFIG.SHARP_SPAWN_MIN_MS + Math.random() * (CONFIG.SHARP_SPAWN_MAX_MS - CONFIG.SHARP_SPAWN_MIN_MS)
+      : CONFIG.CLOUD_SPAWN_DELAY_MS;
     this.#spawnTimeoutId = setTimeout(() => {
       if (this.#state !== STATE.PLAYING) return;
       this.#spawnCloud();
       if (this.#activeCloud) this.#activeCloud._prevSadness = this.#heldSadness;
       this.#heldSadness = 0;
-    }, CONFIG.CLOUD_SPAWN_DELAY_MS);
+    }, spawnDelay);
   }
 
   #burstParticles(x, y) {
