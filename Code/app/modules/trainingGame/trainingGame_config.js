@@ -7,8 +7,8 @@ export const CONFIG = {
 
   SUN_RADIUS: 150,
   CLOUD_SIZE: 130,
-  CLOUD_SPAWN_DELAY_MS: 2500,
-  CLOUD_SLIDE_IN_MS: 2000,
+  CLOUD_SPAWN_DELAY_MS: 800,
+  CLOUD_SLIDE_IN_MS: 600,
   CLOUD_SLIDE_MS: 2200,
   FAIL_ORBIT_R: 185,
   FAIL_FADE_MS: 60000,
@@ -16,8 +16,8 @@ export const CONFIG = {
   // ── Control variant (sharp exhale) ───────────────────────────────────────────
   SHARP_EXHALE_MS:        300,   // exhale must stay above threshold for this long
   SHARP_CLOUD_TIMEOUT_MS: 4000,  // max time in inhale before auto-miss
-  SHARP_SPAWN_MIN_MS:     2000,  // min delay between clouds
-  SHARP_SPAWN_MAX_MS:     5500,  // max delay between clouds
+  SHARP_SPAWN_MIN_MS:     1200,  // min delay between clouds
+  SHARP_SPAWN_MAX_MS:     3500,  // max delay between clouds
 };
 
 export const STATE = {

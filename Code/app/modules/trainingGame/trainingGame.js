@@ -229,7 +229,8 @@ export class TrainingGame {
     this.#lastNorm = norm;
 
     if (this.#phase === 'inhale') {
-      if (above && !this.#inBreath && now - this.#lastBreathMs > CONFIG.BREATH_DEBOUNCE_MS) {
+      const cloudCovering = this.#activeCloud?._state === 'covering';
+      if (above && !this.#inBreath && cloudCovering && now - this.#lastBreathMs > CONFIG.BREATH_DEBOUNCE_MS) {
         this.#onExhaleOnset(now);
       }
     } else {
