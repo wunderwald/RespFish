@@ -22,36 +22,6 @@ Calibration visuals are drawn on the experiment display via
 PsychopyCalibrationDisplay (or any CalibrationDisplay you provide).
 Pass the PsychoPy window to the bridge at construction time.
 Trigger recalibration at any point via bridge.request_calibrate().
-
-Usage
------
-    from psychopy import visual
-    from eyelink_to_lsl import EyeLinkLSLBridge
-
-    win = visual.Window(size=(1920, 1080), screen=1, fullscr=True, units="pix")
-
-    bridge = EyeLinkLSLBridge(
-        host_ip="100.1.1.1",
-        screen_w=1920,
-        screen_h=1080,
-        window=win,
-    )
-    bridge.connect()
-    bridge.calibrate()      # run initial calibration before experiment
-    bridge.start()          # begin recording + LSL stream (non-blocking)
-
-    # ...run your experiment...
-    # from any thread / WS handler:
-    bridge.request_calibrate()
-
-    bridge.stop()
-    bridge.disconnect()
-
-Dependencies
-------------
-    pylink   -- SR Research EyeLink Developer Kit (not the PyPI pylink package)
-    pylsl    -- pip install pylsl
-    psychopy -- pip install psychopy  (only needed for PsychopyCalibrationDisplay)
 """
 
 import logging
@@ -59,7 +29,7 @@ import threading
 import time
 from typing import Protocol, runtime_checkable
 
-import pylink
+import pylink # !!! SR Research EyeLink Developer Kit (NOT the PyPI pylink package)
 from pylsl import StreamInfo, StreamOutlet, local_clock
 
 log = logging.getLogger(__name__)

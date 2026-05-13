@@ -1,15 +1,15 @@
 # simulation
 
-Lightweight LSL signal sources for development and testing — no hardware required.
+Lightweight LSL signal sources for development and testing.
 
 | Script | Stream type | Description |
 |---|---|---|
-| `simulate_resp.py` | Respiration (1ch) | Physiological breath model with rate variability, amplitude jitter, and additive noise |
-| `simulate_gaze.py` | Gaze (2ch x/y) | Bandlimited random walk producing naturalistic scan-path trajectories |
+| `simulate_resp.py` | Respiration (1ch) | Physiological breath model with rate variability, amplitude jitter and additive noise |
+| `simulate_gaze.py` | Gaze (2ch x/y) | Bandlimited random walk producing random normalized screen coords |
 | `mic_breath.py` | Respiration (1ch) | Live mic input — extracts breath envelope and streams it to LSL |
 | `mouse_y_to_lsl.py` | Respiration (1ch) | Mouse Y position mapped to `[0, 1]` and streamed to LSL |
 
-All scripts require `pylsl` (`pip install pylsl`). Use the `.venv` at the repo root.
+All scripts require `pylsl` (`pip install pylsl`). 
 
 ## Usage
 

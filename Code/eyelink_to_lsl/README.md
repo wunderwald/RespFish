@@ -1,6 +1,6 @@
 # EyeLink → LSL Bridge
 
-Connects an SR Research EyeLink eye tracker to the LSL (Lab Streaming Layer) ecosystem. Gaze is published as normalised `[0.0, 1.0]` screen coordinates so any LSL consumer can work with it without knowing the display resolution.
+Connects an SR Research EyeLink eye tracker to LSL (Lab Streaming Layer). Gaze is published as normalised `[0.0, 1.0]` screen coordinates so any LSL consumer can work with it without knowing the display resolution.
 
 ---
 

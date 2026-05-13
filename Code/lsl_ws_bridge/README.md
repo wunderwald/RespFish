@@ -1,6 +1,6 @@
 # lsl_ws_bridge
 
-Python bridge between LSL and the RespFish Electron app. Started automatically by the app.
+Python bridge between LSL and the RespFish Electron app. Started automatically by the app module.
 
 ```
 LSL stream  →  signal_bridge  →  WebSocket :8765  →  app (breath signal)

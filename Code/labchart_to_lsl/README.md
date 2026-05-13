@@ -99,7 +99,3 @@ python labchart_to_lsl.py --cli --log-level DEBUG
 | `Waiting for sampling…` hangs | Press Start in LabChart |
 | Stream not found by receiver | Check firewall — LSL uses UDP multicast for discovery |
 | Latency too high | Decrease `--poll-interval` (e.g., `0.01` for ~5 ms avg) |
-
-## License
-
-MIT — use freely in your research.
