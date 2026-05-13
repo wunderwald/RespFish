@@ -2,7 +2,7 @@
 
 Electron app for real-time respiration biofeedback experiments.
 
-Receives a normalized breath signal `[0, 1]` over WebSocket from `lsl_bridge/` and renders one of several experiment frontends.
+Receives a normalized breath signal `[0, 1]` over WebSocket from `lsl_ws_bridge/` and renders one of several experiment frontends.
 
 ## Setup
 
