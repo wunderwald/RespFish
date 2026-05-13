@@ -14,7 +14,7 @@ class BridgeState:
 
     def __init__(self, label: str = "signal"):
         self.label = label
-        self.log = logging.getLogger(f"lsl_bridge.{label}")
+        self.log = logging.getLogger(f"lsl_to_websockets.{label}")
         self.clients: set = set()
         self.stream_info: dict | None = None
         self.connected: bool = False

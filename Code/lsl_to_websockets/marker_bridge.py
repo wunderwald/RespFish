@@ -3,7 +3,7 @@ import logging
 import websockets
 from pylsl import StreamOutlet
 
-log = logging.getLogger("lsl_bridge")
+log = logging.getLogger("lsl_to_websockets")
 
 
 async def marker_ws_handler(websocket, outlet: StreamOutlet) -> None:
