@@ -2,32 +2,11 @@
 
 Electron app for real-time respiration biofeedback experiments.
 
-```
-simulation/ ──► LSL ──► lsl_ws_bridge/ ──► WebSocket ──► app/
-eyelink_to_lsl/ ──────────────────────────────────────────► app/
-```
-
 ---
 
 ## System Architecture
 
 The experiment runs across two or three machines on the same network.
-
-```
-┌─────────────────────────────────────┐      Ethernet
-│  PC 1 — Experiment Host             │ ◄──────────────── PC 3 (EyeLink Host)
-│  ┌────────────┐  ┌────────────────┐ │
-│  │ Screen 1   │  │ Screen 2       │ │
-│  │ Exprmtr UI │  │ Experiment     │ │
-│  │ (app HUD)  │  │ Display        │ │
-│  └────────────┘  │ (EyeLink cam)  │ │
-│                  └────────────────┘ │
-└────────────────────▲────────────────┘
-                     │ LSL (network)
-              PC 2 — Physiology
-              (resp belt → LabChart
-               or mic → simulation/)
-```
 
 | Machine | Role | Key software |
 |---|---|---|
@@ -35,7 +14,7 @@ The experiment runs across two or three machines on the same network.
 | **PC 2** | Physiological data → LSL | `labchart_to_lsl/` (Windows) or `simulation/` scripts |
 | **PC 3** | EyeLink Host | SR Research EyeLink software |
 
-**PC 1 can serve as PC 2** when no dedicated physiology PC is needed (e.g., using `simulation/mic_breath.py`).
+**PC 1 can serve as PC 2**.
 
 Multiple machines can stream data to LSL simultaneously — only the stream selected in the experimenter UI is forwarded to the app.
 
