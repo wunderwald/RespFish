@@ -1,4 +1,4 @@
-# lsl_to_websockets
+# lsl_ws_bridge
 
 Python bridge between LSL and the RespFish Electron app. Started automatically by the app.
 
@@ -11,7 +11,7 @@ app         →  WebSocket :9001  →  marker_bridge  →  LSL outlet
 ## Run manually
 
 ```bash
-cd lsl_to_websockets
+cd lsl_ws_bridge
 python main.py
 ```
 

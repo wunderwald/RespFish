@@ -16,7 +16,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
-log = logging.getLogger("lsl_to_websockets")
+log = logging.getLogger("lsl_ws_bridge")
 
 
 async def main() -> None:
