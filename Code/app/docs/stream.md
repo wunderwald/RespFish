@@ -51,7 +51,7 @@ Reconnects automatically every 2 seconds if the connection is lost. Queued marke
 
 ## LSL bridge
 
-The bridge ([lsl_bridge/README.md](../../lsl_bridge/README.md)) is a Python process that:
+The bridge ([lsl_ws_bridge/README.md](../../lsl_ws_bridge/README.md)) is a Python process that:
 
 1. Discovers available LSL streams and broadcasts the list to connected clients.
 2. Forwards samples from the selected stream as `{ type: 'sample', value, channels, timestamp }` JSON over WebSocket.
@@ -61,7 +61,7 @@ The bridge ([lsl_bridge/README.md](../../lsl_bridge/README.md)) is a Python proc
 The bridge is started automatically by the Electron main process. To run it manually:
 
 ```bash
-cd lsl_bridge && python main.py
+cd lsl_ws_bridge && python main.py
 ```
 
-See [lsl_bridge/README.md](../../lsl_bridge/README.md) for port assignments and configuration.
+See [lsl_ws_bridge/README.md](../../lsl_ws_bridge/README.md) for port assignments and configuration.
