@@ -16,7 +16,7 @@ function startBridge() {
     __dirname, "..", ".venv", "bin",
     process.platform === "win32" ? "python.exe" : "python3"
   );
-  const bridgeScript = path.join(__dirname, "..", "lsl_bridge", "main.py");
+  const bridgeScript = path.join(__dirname, "..", "lsl_ws_bridge", "main.py");
 
   bridgeProcess = spawn(venvPython, [bridgeScript], {
     stdio: ["ignore", "pipe", "pipe"],
