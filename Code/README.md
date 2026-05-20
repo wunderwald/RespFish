@@ -16,7 +16,7 @@ The experiment runs across two or three machines on the same network.
 
 **PC 1 can serve as PC 2**.
 
-Multiple machines can stream data to LSL simultaneously — only the stream selected in the experimenter UI is forwarded to the app.
+Multiple machines can stream data to LSL simultaneously. Only the stream selected in the experimenter UI is forwarded to the app.
 
 ---
 
