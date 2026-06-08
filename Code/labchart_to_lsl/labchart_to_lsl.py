@@ -98,7 +98,7 @@ class Config:
     source_id: str = "labchart_bridge_001"
 
     # Polling behaviour
-    poll_interval_sec: float = 0.02    # 20 ms → ~50 Hz polling
+    poll_interval_sec: float = 0.01    # 10 ms → ~100 Hz polling
     # ↑ Reducing this lowers latency but increases CPU load.
     #   Values below ~0.005 (5 ms) are not recommended (COM overhead).
 
@@ -364,6 +364,13 @@ def wait_for_sampling(lc: LabChartConnection, timeout: float):
 # Main streaming loop
 # ---------------------------------------------------------------------------
 
+def _sleep_remainder(t_start: float, interval: float) -> None:
+    """Sleep for however long is left of `interval` since `t_start`."""
+    remaining = interval - (time.perf_counter() - t_start)
+    if remaining > 0:
+        time.sleep(remaining)
+
+
 def stream_loop(
     cfg: Config,
     lc: LabChartConnection,
@@ -402,97 +409,116 @@ def stream_loop(
     samples_pushed = 0
     t_log = time.time()
 
-    while True:
-        if stop_event is not None and stop_event.is_set():
-            logging.info("Streaming stopped by user.")
-            break
+    # Windows timer resolution: default is ~15.6 ms which makes time.sleep()
+    # far coarser than the requested poll interval.  1 ms resolution brings
+    # worst-case latency down to roughly poll_interval.
+    try:
+        import ctypes
+        ctypes.windll.winmm.timeBeginPeriod(1)
+        _mm_set = True
+    except Exception:
+        _mm_set = False
 
-        try:
-            # -- Still sampling? --------------------------------------------
-            if not lc.is_sampling:
-                logging.warning("LabChart stopped sampling.")
-                if cfg.status_queue is not None:
-                    cfg.status_queue.put({"t": "sampling_stopped"})
+    # Slow checks (is_sampling, record change) don't need to run every poll.
+    # Check roughly once per second to save COM round-trips.
+    _slow_every = max(1, int(1.0 / cfg.poll_interval_sec))
+    _slow_counter = 0
+
+    try:
+        while True:
+            t_loop = time.perf_counter()
+
+            if stop_event is not None and stop_event.is_set():
+                logging.info("Streaming stopped by user.")
                 break
 
-            # -- Record changed? (user stopped + restarted) -----------------
-            current_rec = lc.current_record
-            if current_rec != record:
-                logging.info(
-                    "Record changed %d → %d, resetting.", record, current_rec
-                )
-                record = current_rec
-                fs = lc.get_sampling_rate(record)
-                ts.reset(fs)
-                cursor = 0
+            try:
+                # -- Slow checks (every ~1 s) -----------------------------------
+                _slow_counter += 1
+                if _slow_counter >= _slow_every:
+                    _slow_counter = 0
 
-            # -- Read the LSL clock *before* querying LabChart --------------
-            fetch_clock = local_clock()
+                    if not lc.is_sampling:
+                        logging.warning("LabChart stopped sampling.")
+                        if cfg.status_queue is not None:
+                            cfg.status_queue.put({"t": "sampling_stopped"})
+                        break
 
-            # -- How many new samples? --------------------------------------
-            total_ticks = lc.get_record_length_ticks(record)
-            new_ticks = total_ticks - cursor
+                    current_rec = lc.current_record
+                    if current_rec != record:
+                        logging.info(
+                            "Record changed %d → %d, resetting.", record, current_rec
+                        )
+                        record = current_rec
+                        fs = lc.get_sampling_rate(record)
+                        ts.reset(fs)
+                        cursor = 0
 
-            if new_ticks <= 0:
-                time.sleep(cfg.poll_interval_sec)
-                continue
+                # -- Read the LSL clock *before* querying LabChart --------------
+                fetch_clock = local_clock()
 
-            # -- Bulk-fetch from each selected channel ----------------------
-            # GetChannelData uses 1-based start position (same as channel/record).
-            channel_data: List[tuple] = []
-            for idx in ch_indices:
-                raw = lc.get_channel_data(idx, record, cursor, new_ticks)
-                # COM returns a bare float when n_ticks == 1
-                if isinstance(raw, (int, float)):
-                    raw = (raw,)
-                channel_data.append(raw)
+                # -- How many new samples? --------------------------------------
+                total_ticks = lc.get_record_length_ticks(record)
+                new_ticks = total_ticks - cursor
 
-            # -- (Re-)anchor the timestamp mapper ---------------------------
-            if ts.needs_anchor():
-                ts.set_anchor(total_ticks - 1, fetch_clock)
-                logging.debug(
-                    "Anchor: tick %d ↔ LSL %.4f", total_ticks - 1, fetch_clock
-                )
+                if new_ticks <= 0:
+                    _sleep_remainder(t_loop, cfg.poll_interval_sec)
+                    continue
 
-            # -- Build chunk + per-sample timestamps, push in one call ------
-            # Use actual returned length in case the record grew between the
-            # length query and the data fetch (harmless race condition).
-            actual = min(len(cd) for cd in channel_data)
-            chunk = [
-                [float(channel_data[c][s]) for c in range(n_ch)]
-                for s in range(actual)
-            ]
-            stamps = [ts.stamp(cursor + s) for s in range(actual)]
-            outlet.push_chunk(chunk, stamps)
+                # -- Bulk-fetch from each selected channel ----------------------
+                channel_data: List[tuple] = []
+                for idx in ch_indices:
+                    raw = lc.get_channel_data(idx, record, cursor, new_ticks)
+                    if isinstance(raw, (int, float)):
+                        raw = (raw,)
+                    channel_data.append(raw)
 
-            cursor += actual
-            samples_pushed += actual
+                # -- (Re-)anchor the timestamp mapper ---------------------------
+                if ts.needs_anchor():
+                    ts.set_anchor(total_ticks - 1, fetch_clock)
 
-            # -- Periodic status update (every 1 s) -------------------------
-            if time.time() - t_log >= 1.0:
-                newest_stamp = ts.stamp(cursor - 1)
-                latency_ms = (local_clock() - newest_stamp) * 1000
-                logging.info(
-                    "Pushed %d total  |  batch=%d  |  %.1f Hz  |  "
-                    "latency ≈ %.0f ms",
-                    samples_pushed, new_ticks, fs, latency_ms,
-                )
-                if cfg.status_queue is not None:
-                    cfg.status_queue.put({
-                        "t": "stats",
-                        "samples": samples_pushed,
-                        "rate": fs,
-                        "n_ch": n_ch,
-                        "latency_ms": latency_ms,
-                    })
-                t_log = time.time()
+                # -- Build chunk + per-sample timestamps, push in one call ------
+                # Use actual returned length in case the record grew between the
+                # length query and the data fetch (harmless race condition).
+                actual = min(len(cd) for cd in channel_data)
+                chunk = [
+                    [float(channel_data[c][s]) for c in range(n_ch)]
+                    for s in range(actual)
+                ]
+                stamps = [ts.stamp(cursor + s) for s in range(actual)]
+                outlet.push_chunk(chunk, stamps)
 
-        except KeyboardInterrupt:
-            raise
-        except Exception:
-            logging.exception("Error in streaming loop (will retry)")
+                cursor += actual
+                samples_pushed += actual
 
-        time.sleep(cfg.poll_interval_sec)
+                # -- Periodic status update (every 1 s) -------------------------
+                if time.time() - t_log >= 1.0:
+                    newest_stamp = ts.stamp(cursor - 1)
+                    latency_ms = (local_clock() - newest_stamp) * 1000
+                    logging.info(
+                        "Pushed %d total  |  batch=%d  |  %.1f Hz  |  "
+                        "latency ≈ %.0f ms",
+                        samples_pushed, actual, fs, latency_ms,
+                    )
+                    if cfg.status_queue is not None:
+                        cfg.status_queue.put({
+                            "t": "stats",
+                            "rate": fs,
+                            "n_ch": n_ch,
+                            "latency_ms": latency_ms,
+                        })
+                    t_log = time.time()
+
+            except KeyboardInterrupt:
+                raise
+            except Exception:
+                logging.exception("Error in streaming loop (will retry)")
+
+            _sleep_remainder(t_loop, cfg.poll_interval_sec)
+
+    finally:
+        if _mm_set:
+            ctypes.windll.winmm.timeEndPeriod(1)
 
 
 # ---------------------------------------------------------------------------
