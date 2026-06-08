@@ -22,29 +22,29 @@ except ImportError as exc:
     sys.exit(1)
 
 
-# ── Palette ───────────────────────────────────────────────────────────────────
+# Palette
 
 BG  = "#0d0d0d"
 BG2 = "#141414"
 BG3 = "#1b1b1b"
 BG4 = "#222222"
 FG  = "#c8c8c8"
-FGA = "#484848"   # dim
-FGH = "#5a5a5a"   # column headers
-ACE = "#00c278"   # accent green  (connected / streaming)
-WRN = "#d4941a"   # amber         (warning)
-ERR = "#cc4444"   # red           (error / stop)
-SEP = "#222222"   # separator lines
+FGA = "#484848"   
+FGH = "#5a5a5a"   
+ACE = "#00c278"   
+WRN = "#d4941a"   
+ERR = "#cc4444"   
+SEP = "#222222"   
 
-MF = ("Consolas", 10)
-MS = ("Consolas", 9)
-MB = ("Consolas", 10, "bold")
-ML = ("Consolas", 12, "bold")
+MF = ("Arial", 10)
+MS = ("Arial", 9)
+MB = ("Arial", 10, "bold")
+ML = ("Arial", 12, "bold")
 
 PAD = 10
 
 
-# ── Widget helpers ────────────────────────────────────────────────────────────
+# Widget helpers
 
 def _dot(canvas: tk.Canvas, color: str, r: int = 4) -> None:
     s = r * 2
@@ -80,7 +80,7 @@ def _entry(parent, var, width=20, **kw) -> tk.Entry:
     )
 
 
-# ── Channel row ───────────────────────────────────────────────────────────────
+# Channel row
 
 class ChannelRow:
     """One row in the channel table."""
@@ -150,7 +150,7 @@ class ChannelRow:
         )
 
 
-# ── Main window ───────────────────────────────────────────────────────────────
+# Main window
 
 class App(tk.Tk):
 
@@ -173,7 +173,7 @@ class App(tk.Tk):
         self._stream_ui("off")
         self._poll()
 
-    # ── Layout ────────────────────────────────────────────────────────────────
+    #  Layout
 
     def _build(self):
         self.grid_columnconfigure(0, weight=1)
@@ -307,7 +307,7 @@ class App(tk.Tk):
         )
         self._empty.grid(row=0, column=0, columnspan=6, padx=PAD)
 
-    # ── State helpers ─────────────────────────────────────────────────────────
+    #  State helpers ─
 
     def _conn_ui(self, state: str):
         """state: 'off' | 'connecting' | 'on'"""
