@@ -497,11 +497,7 @@ class App(tk.Tk):
         elif t == "stats":
             self._sampling_ui(True)
             self._stats.config(
-                text=(
-                    f"{msg['n_ch']}ch @ {msg['rate']:.0f} Hz"
-                    f"  |  {msg['samples']:,} samples"
-                    f"  |  ~{msg['latency_ms']:.0f} ms"
-                ),
+                text=f"{msg['rate']:.0f} Hz  |  ~{msg['latency_ms']:.0f} ms latency",
                 fg=FGA,
             )
         elif t == "sampling_stopped":
