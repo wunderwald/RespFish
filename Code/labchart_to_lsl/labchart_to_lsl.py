@@ -182,7 +182,15 @@ class LabChartConnection:
     def connect(self):
         """Connect to a running LabChart instance."""
         try:
-            self.app = win32com.client.Dispatch("ADIChart.Application")
+            # Early binding: generates Python stubs from LabChart's type library so
+            # every method is called with the exact correct signature automatically.
+            try:
+                import win32com.client.gencache as gc
+                self.app = gc.EnsureDispatch("ADIChart.Application")
+                logging.info("LabChart connected (early binding)")
+            except Exception:
+                self.app = win32com.client.Dispatch("ADIChart.Application")
+                logging.info("LabChart connected (late binding fallback)")
         except Exception as e:
             raise RuntimeError(
                 "Could not connect to LabChart. "
@@ -262,86 +270,14 @@ class LabChartConnection:
         """
         Fetch raw data from one channel.
 
-        start_tick is 0-based; internally converted to whatever the COM API expects.
         Returns a tuple of floats (or a single float if n_ticks == 1).
         """
-        ch, rec, st, n = int(channel), int(record), int(start_tick), int(n_ticks)
-
-        # Try 4-param form: (channel, record, start, count)
-        try:
-            return self.doc.GetChannelData(ch, rec, st, n)
-        except Exception as e4:
-            if "0x8002000e" not in str(e4).lower() and "parameters" not in str(e4).lower():
-                raise
-
-        # Try 4-param with 1-based start
-        try:
-            return self.doc.GetChannelData(ch, rec, st + 1, n)
-        except Exception as e4b:
-            if "0x8002000e" not in str(e4b).lower() and "parameters" not in str(e4b).lower():
-                raise
-
-        # Try 2-param form: (channel, record) → returns entire record; slice in Python
-        try:
-            all_data = self.doc.GetChannelData(ch, rec)
-            if isinstance(all_data, (int, float)):
-                all_data = (all_data,)
-            logging.warning(
-                "GetChannelData requires 2 params (full-record fetch). "
-                "Check 'LabChart COM methods' log line for actual signature."
-            )
-            return tuple(all_data)[st:st + n]
-        except Exception as e2:
-            if "0x8002000e" not in str(e2).lower() and "parameters" not in str(e2).lower():
-                raise
-
-        # Try 3-param form: (channel, record, start) → returns from start to end
-        try:
-            all_data = self.doc.GetChannelData(ch, rec, st)
-            if isinstance(all_data, (int, float)):
-                all_data = (all_data,)
-            logging.warning("GetChannelData works with 3 params")
-            return tuple(all_data)[:n]
-        except Exception as e3:
-            if "0x8002000e" not in str(e3).lower() and "parameters" not in str(e3).lower():
-                raise
-
-        # Raw IDispatch Invoke — bypasses _ApplyTypes_ entirely.
-        # Try every plausible param count (0–5) with both METHOD and PROPERTYGET flags.
-        import pythoncom
-        try:
-            dispid = self.doc._oleobj_.GetIDsOfNames(0, 'GetChannelData')
-        except TypeError:
-            dispid = self.doc._oleobj_.GetIDsOfNames(['GetChannelData'])[0]
-
-        _bp = lambda e: "param" in str(e).lower()
-        for flags in (pythoncom.DISPATCH_METHOD, pythoncom.DISPATCH_PROPERTYGET):
-            for args in [(ch, rec, st, n), (ch, rec, st+1, n), (ch, rec, st), (ch, rec), (ch,), ()]:
-                try:
-                    raw = self.doc._oleobj_.Invoke(dispid, 0, flags, True, *args)
-                    logging.warning("GetChannelData raw Invoke: %dp flags=%d WORKED", len(args), flags)
-                    if isinstance(raw, (int, float)):
-                        raw = (raw,)
-                    data = tuple(raw)
-                    return data if len(args) == 4 else data[st:st + n]
-                except Exception as ei:
-                    if not _bp(ei):
-                        raise
-
-        # GetChannelData exhausted — try GetScopeChannelData (live scope buffer)
-        for args in [(ch, rec, st, n), (ch, rec, st), (ch, rec), (ch,)]:
-            try:
-                raw = self.doc.GetScopeChannelData(*args)
-                logging.warning("GetScopeChannelData: %dp WORKED", len(args))
-                if isinstance(raw, (int, float)):
-                    raw = (raw,)
-                data = tuple(raw)
-                return data if len(args) == 4 else data[st:st + n] if len(args) <= 2 else data[:n]
-            except Exception as es:
-                if not _bp(es):
-                    raise
-
-        raise RuntimeError("get_channel_data: no working call found — check WARNING lines above")
+        raw = self.doc.GetChannelData(
+            int(channel), int(record), int(start_tick), int(n_ticks)
+        )
+        if isinstance(raw, (int, float)):
+            return (raw,)
+        return tuple(raw)
 
     def get_units(self, channel: int, record: int) -> str:
         """Return the unit string for a channel."""
