@@ -270,10 +270,12 @@ class LabChartConnection:
         """
         Fetch raw data from one channel.
 
+        LabChart COM GetChannelData(flags, channel, record, startSample, numSamples).
+        flags=0 returns calibrated (scaled) data.
         Returns a tuple of floats (or a single float if n_ticks == 1).
         """
         raw = self.doc.GetChannelData(
-            int(channel), int(record), int(start_tick), int(n_ticks)
+            0, int(channel), int(record), int(start_tick), int(n_ticks)
         )
         if isinstance(raw, (int, float)):
             return (raw,)
@@ -440,7 +442,7 @@ def stream_loop(
             # GetChannelData uses 1-based start position (same as channel/record).
             channel_data: List[tuple] = []
             for idx in ch_indices:
-                raw = lc.get_channel_data(idx, record, cursor + 1, new_ticks)
+                raw = lc.get_channel_data(idx, record, cursor, new_ticks)
                 # COM returns a bare float when n_ticks == 1
                 if isinstance(raw, (int, float)):
                     raw = (raw,)
