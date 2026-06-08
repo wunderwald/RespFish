@@ -306,18 +306,42 @@ class LabChartConnection:
             if "0x8002000e" not in str(e3).lower() and "parameters" not in str(e3).lower():
                 raise
 
-        # Last resort: raw IDispatch Invoke — bypasses _ApplyTypes_ type coercion entirely.
-        # _ApplyTypes_ may be misreading the type library and sending the wrong param count.
+        # Raw IDispatch Invoke — bypasses _ApplyTypes_ entirely.
+        # Try every plausible param count (0–5) with both METHOD and PROPERTYGET flags.
         import pythoncom
-        dispids = self.doc._oleobj_.GetIDsOfNames(0, ['GetChannelData'])
-        raw = self.doc._oleobj_.Invoke(
-            dispids[0], 0, pythoncom.DISPATCH_METHOD, True,
-            ch, rec, st, n
-        )
-        logging.warning("GetChannelData works via raw Invoke with 4 params")
-        if isinstance(raw, (int, float)):
-            raw = (raw,)
-        return tuple(raw)
+        try:
+            dispid = self.doc._oleobj_.GetIDsOfNames(0, 'GetChannelData')
+        except TypeError:
+            dispid = self.doc._oleobj_.GetIDsOfNames(['GetChannelData'])[0]
+
+        _bp = lambda e: "param" in str(e).lower()
+        for flags in (pythoncom.DISPATCH_METHOD, pythoncom.DISPATCH_PROPERTYGET):
+            for args in [(ch, rec, st, n), (ch, rec, st+1, n), (ch, rec, st), (ch, rec), (ch,), ()]:
+                try:
+                    raw = self.doc._oleobj_.Invoke(dispid, 0, flags, True, *args)
+                    logging.warning("GetChannelData raw Invoke: %dp flags=%d WORKED", len(args), flags)
+                    if isinstance(raw, (int, float)):
+                        raw = (raw,)
+                    data = tuple(raw)
+                    return data if len(args) == 4 else data[st:st + n]
+                except Exception as ei:
+                    if not _bp(ei):
+                        raise
+
+        # GetChannelData exhausted — try GetScopeChannelData (live scope buffer)
+        for args in [(ch, rec, st, n), (ch, rec, st), (ch, rec), (ch,)]:
+            try:
+                raw = self.doc.GetScopeChannelData(*args)
+                logging.warning("GetScopeChannelData: %dp WORKED", len(args))
+                if isinstance(raw, (int, float)):
+                    raw = (raw,)
+                data = tuple(raw)
+                return data if len(args) == 4 else data[st:st + n] if len(args) <= 2 else data[:n]
+            except Exception as es:
+                if not _bp(es):
+                    raise
+
+        raise RuntimeError("get_channel_data: no working call found — check WARNING lines above")
 
     def get_units(self, channel: int, record: int) -> str:
         """Return the unit string for a channel."""
