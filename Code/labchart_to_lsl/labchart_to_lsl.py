@@ -197,6 +197,24 @@ class LabChartConnection:
                 "Please open or create a document first."
             )
         logging.info("Connected to LabChart document: %s", self.doc.Name)
+        self._log_com_methods()
+
+    def _log_com_methods(self):
+        """Dump every COM method name + param count so we can verify the API."""
+        try:
+            type_info = self.doc._oleobj_.GetTypeInfo(0)
+            attr = type_info.GetTypeAttr()
+            parts = []
+            for i in range(attr.cFuncs):
+                try:
+                    func = type_info.GetFuncDesc(i)
+                    names = type_info.GetNames(func.memid, 1)
+                    parts.append(f"{names[0]}({func.cParams}p)" if names else f"?({func.cParams}p)")
+                except Exception:
+                    pass
+            logging.info("LabChart COM methods: %s", ", ".join(parts))
+        except Exception as e:
+            logging.debug("COM type inspection unavailable: %s", e)
 
     # -- Metadata queries ---------------------------------------------------
 
@@ -254,12 +272,48 @@ class LabChartConnection:
         """
         Fetch raw data from one channel.
 
-        start_tick is 1-based (LabChart COM convention).
+        start_tick is 0-based; internally converted to whatever the COM API expects.
         Returns a tuple of floats (or a single float if n_ticks == 1).
         """
-        return self.doc.GetChannelData(
-            int(channel), int(record), int(start_tick), int(n_ticks)
+        ch, rec, st, n = int(channel), int(record), int(start_tick), int(n_ticks)
+
+        # Try 4-param form: (channel, record, start, count)
+        try:
+            return self.doc.GetChannelData(ch, rec, st, n)
+        except Exception as e4:
+            if "0x8002000e" not in str(e4).lower() and "parameters" not in str(e4).lower():
+                raise
+
+        # Try 4-param with 1-based start
+        try:
+            return self.doc.GetChannelData(ch, rec, st + 1, n)
+        except Exception as e4b:
+            if "0x8002000e" not in str(e4b).lower() and "parameters" not in str(e4b).lower():
+                raise
+
+        # Try 2-param form: (channel, record) → returns entire record; slice in Python
+        try:
+            all_data = self.doc.GetChannelData(ch, rec)
+            if isinstance(all_data, (int, float)):
+                all_data = (all_data,)
+            logging.warning(
+                "GetChannelData requires 2 params (full-record fetch). "
+                "Check 'LabChart COM methods' log line for actual signature."
+            )
+            return tuple(all_data)[st:st + n]
+        except Exception as e2:
+            if "0x8002000e" not in str(e2).lower() and "parameters" not in str(e2).lower():
+                raise
+
+        # Try 3-param form: (channel, record, start) → returns from start to end
+        all_data = self.doc.GetChannelData(ch, rec, st)
+        if isinstance(all_data, (int, float)):
+            all_data = (all_data,)
+        logging.warning(
+            "GetChannelData requires 3 params. "
+            "Check 'LabChart COM methods' log line for actual signature."
         )
+        return tuple(all_data)[:n]
 
     def get_units(self, channel: int, record: int) -> str:
         """Return the unit string for a channel."""
