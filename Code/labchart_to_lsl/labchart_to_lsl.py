@@ -254,9 +254,12 @@ class LabChartConnection:
         """
         Fetch raw data from one channel.
 
+        start_tick is 1-based (LabChart COM convention).
         Returns a tuple of floats (or a single float if n_ticks == 1).
         """
-        return self.doc.GetChannelData(channel, record, start_tick, n_ticks)
+        return self.doc.GetChannelData(
+            int(channel), int(record), int(start_tick), int(n_ticks)
+        )
 
     def get_units(self, channel: int, record: int) -> str:
         """Return the unit string for a channel."""
@@ -416,9 +419,10 @@ def stream_loop(
                 continue
 
             # -- Bulk-fetch from each selected channel ----------------------
+            # GetChannelData uses 1-based start position (same as channel/record).
             channel_data: List[tuple] = []
             for idx in ch_indices:
-                raw = lc.get_channel_data(idx, record, cursor, new_ticks)
+                raw = lc.get_channel_data(idx, record, cursor + 1, new_ticks)
                 # COM returns a bare float when n_ticks == 1
                 if isinstance(raw, (int, float)):
                     raw = (raw,)
