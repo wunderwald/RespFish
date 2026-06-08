@@ -200,23 +200,11 @@ class LabChartConnection:
         self._log_com_methods()
 
     def _log_com_methods(self):
-        """Dump every COM method name + param count so we can verify the API."""
-        try:
-            type_info = self.doc._oleobj_.GetTypeInfo(0)
-            attr = type_info.GetTypeAttr()
-            parts = []
-            for i in range(attr.cFuncs):
-                try:
-                    func = type_info.GetFuncDesc(i)
-                    names = type_info.GetNames(func.memid, 1)
-                    parts.append(f"{names[0]}({func.cParams}p)" if names else f"?({func.cParams}p)")
-                except Exception:
-                    pass
-            msg = "LabChart COM methods: " + ", ".join(parts)
-            print(msg, flush=True)
-            logging.warning(msg)
-        except Exception as e:
-            print(f"COM type inspection unavailable: {e}", flush=True)
+        """Dump every COM method/property name so we can verify the API."""
+        names = [m for m in dir(self.doc) if not m.startswith("_")]
+        msg = "LabChart doc members: " + ", ".join(names)
+        print(msg, flush=True)
+        logging.warning(msg)
 
     # -- Metadata queries ---------------------------------------------------
 
@@ -308,14 +296,28 @@ class LabChartConnection:
                 raise
 
         # Try 3-param form: (channel, record, start) → returns from start to end
-        all_data = self.doc.GetChannelData(ch, rec, st)
-        if isinstance(all_data, (int, float)):
-            all_data = (all_data,)
-        logging.warning(
-            "GetChannelData requires 3 params. "
-            "Check 'LabChart COM methods' log line for actual signature."
+        try:
+            all_data = self.doc.GetChannelData(ch, rec, st)
+            if isinstance(all_data, (int, float)):
+                all_data = (all_data,)
+            logging.warning("GetChannelData works with 3 params")
+            return tuple(all_data)[:n]
+        except Exception as e3:
+            if "0x8002000e" not in str(e3).lower() and "parameters" not in str(e3).lower():
+                raise
+
+        # Last resort: raw IDispatch Invoke — bypasses _ApplyTypes_ type coercion entirely.
+        # _ApplyTypes_ may be misreading the type library and sending the wrong param count.
+        import pythoncom
+        dispids = self.doc._oleobj_.GetIDsOfNames(0, ['GetChannelData'])
+        raw = self.doc._oleobj_.Invoke(
+            dispids[0], 0, pythoncom.DISPATCH_METHOD, True,
+            ch, rec, st, n
         )
-        return tuple(all_data)[:n]
+        logging.warning("GetChannelData works via raw Invoke with 4 params")
+        if isinstance(raw, (int, float)):
+            raw = (raw,)
+        return tuple(raw)
 
     def get_units(self, channel: int, record: int) -> str:
         """Return the unit string for a channel."""
