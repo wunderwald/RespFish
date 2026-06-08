@@ -212,9 +212,11 @@ class LabChartConnection:
                     parts.append(f"{names[0]}({func.cParams}p)" if names else f"?({func.cParams}p)")
                 except Exception:
                     pass
-            logging.info("LabChart COM methods: %s", ", ".join(parts))
+            msg = "LabChart COM methods: " + ", ".join(parts)
+            print(msg, flush=True)
+            logging.warning(msg)
         except Exception as e:
-            logging.debug("COM type inspection unavailable: %s", e)
+            print(f"COM type inspection unavailable: {e}", flush=True)
 
     # -- Metadata queries ---------------------------------------------------
 
