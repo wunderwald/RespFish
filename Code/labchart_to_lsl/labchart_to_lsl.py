@@ -214,11 +214,11 @@ class LabChartConnection:
         return self.doc.NumberOfRecords
 
     def get_channel_name(self, channel_index: int) -> str:
-        """channel_index is 0-based."""
+        """channel_index is 1-based (LabChart COM convention)."""
         try:
             return self.doc.GetChannelName(channel_index)
         except Exception:
-            return f"Ch{channel_index + 1}"
+            return f"Ch{channel_index}"
 
     def get_sampling_rate(self, record: int) -> float:
         """Return sampling rate (Hz) for the given record (all channels)."""
@@ -279,7 +279,7 @@ def create_lsl_outlet(
     Uses cfg.channels if set; otherwise streams all LabChart channels.
     """
     channels = cfg.channels or [
-        ChannelConfig(i, lc.get_channel_name(i)) for i in range(lc.n_channels)
+        ChannelConfig(i, lc.get_channel_name(i)) for i in range(1, lc.n_channels + 1)
     ]
     n_ch = len(channels)
     fs = lc.get_channel_rate(channels[0].index, record)
@@ -363,7 +363,7 @@ def stream_loop(
     fs = lc.get_sampling_rate(record)
 
     channels = cfg.channels or [
-        ChannelConfig(i, lc.get_channel_name(i)) for i in range(lc.n_channels)
+        ChannelConfig(i, lc.get_channel_name(i)) for i in range(1, lc.n_channels + 1)
     ]
     ch_indices = [c.index for c in channels]
     n_ch = len(ch_indices)

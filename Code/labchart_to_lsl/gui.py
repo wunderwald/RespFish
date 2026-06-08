@@ -145,7 +145,7 @@ class ChannelRow:
     def to_config(self) -> ChannelConfig:
         return ChannelConfig(
             index=self.index,
-            lsl_name=self.lsl_name.get().strip() or f"Ch{self.index + 1}",
+            lsl_name=self.lsl_name.get().strip() or f"Ch{self.index}",
             lsl_type=self.lsl_type.get().strip() or "Phys",
         )
 
@@ -413,7 +413,7 @@ class App(tk.Tk):
                     "rate":  lc.get_channel_rate(i, record),
                     "unit":  lc.get_units(i, record),
                 }
-                for i in range(lc.n_channels)
+                for i in range(1, lc.n_channels + 1)
             ]
             self._q.put({
                 "t": "connected", "lc": lc,
@@ -459,15 +459,19 @@ class App(tk.Tk):
         self._stream_ui("on")
 
     def _stream_worker(self, cfg: Config):
+        error = False
         try:
             pythoncom.CoInitialize()
-            record = self._lc.current_record
-            outlet = create_lsl_outlet(cfg, self._lc, record)
-            stream_loop(cfg, self._lc, outlet, stop_event=self._stop)
+            lc = LabChartConnection()
+            lc.connect()
+            record = lc.current_record
+            outlet = create_lsl_outlet(cfg, lc, record)
+            stream_loop(cfg, lc, outlet, stop_event=self._stop)
         except Exception as e:
+            error = True
             self._q.put({"t": "stream_err", "msg": str(e)})
         finally:
-            self._q.put({"t": "stream_end"})
+            self._q.put({"t": "stream_end", "error": error})
 
     # ── Queue polling ─────────────────────────────────────────────────────────
 
@@ -503,8 +507,9 @@ class App(tk.Tk):
         elif t == "sampling_stopped":
             self._sampling_ui(False)
         elif t == "stream_end":
-            self._stream_ui("off")
-            self._stats.config(text="")
+            if not msg.get("error"):
+                self._stream_ui("off")
+                self._stats.config(text="")
         elif t == "stream_err":
             self._stream_ui("err")
             self._stats.config(text=msg["msg"], fg=ERR)
