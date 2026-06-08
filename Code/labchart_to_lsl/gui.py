@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 try:
-    import pythoncom
+    import pythoncom # windows only! pip install pywin32
     from labchart_to_lsl import (
         LabChartConnection, Config, ChannelConfig,
         create_lsl_outlet, stream_loop,
