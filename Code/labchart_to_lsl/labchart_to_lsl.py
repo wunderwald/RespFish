@@ -205,7 +205,6 @@ class LabChartConnection:
                 "Please open or create a document first."
             )
         logging.info("Connected to LabChart document: %s", self.doc.Name)
-        self._log_com_methods()
 
     def _log_com_methods(self):
         """Dump every COM method/property name so we can verify the API."""
@@ -456,15 +455,18 @@ def stream_loop(
                 )
 
             # -- Build chunk + per-sample timestamps, push in one call ------
+            # Use actual returned length in case the record grew between the
+            # length query and the data fetch (harmless race condition).
+            actual = min(len(cd) for cd in channel_data)
             chunk = [
                 [float(channel_data[c][s]) for c in range(n_ch)]
-                for s in range(new_ticks)
+                for s in range(actual)
             ]
-            stamps = [ts.stamp(cursor + s) for s in range(new_ticks)]
+            stamps = [ts.stamp(cursor + s) for s in range(actual)]
             outlet.push_chunk(chunk, stamps)
 
-            cursor = total_ticks
-            samples_pushed += new_ticks
+            cursor += actual
+            samples_pushed += actual
 
             # -- Periodic status update (every 1 s) -------------------------
             if time.time() - t_log >= 1.0:
