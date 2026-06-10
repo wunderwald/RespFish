@@ -12,6 +12,6 @@
     "baseline":   "FRONTEND=baseline   electron ."
   },
   "devDependencies": {
-    "electron": "^35.0.0"
+    "electron": "^42.4.0"
   }
 }
