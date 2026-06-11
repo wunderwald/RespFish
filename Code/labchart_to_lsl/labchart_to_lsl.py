@@ -292,50 +292,48 @@ class LabChartConnection:
 # LSL outlet builder
 # ---------------------------------------------------------------------------
 
-def create_lsl_outlet(
+def create_lsl_outlets(
     cfg: Config, lc: LabChartConnection, record: int
-) -> StreamOutlet:
+) -> List[StreamOutlet]:
     """
-    Build an LSL StreamInfo + StreamOutlet for the configured channels.
+    Build one LSL StreamInfo + StreamOutlet per configured channel.
 
+    Stream name for channel N is  ``{cfg.stream_name}_{ch.lsl_name}``.
     Uses cfg.channels if set; otherwise streams all LabChart channels.
+    All selected channels must share the same sampling rate (LabChart
+    records a single tick clock per record).
     """
     channels = cfg.channels or [
         ChannelConfig(i, lc.get_channel_name(i)) for i in range(1, lc.n_channels + 1)
     ]
-    n_ch = len(channels)
     fs = lc.get_channel_rate(channels[0].index, record)
+    logging.info("Creating %d LSL outlets @ %.1f Hz", len(channels), fs)
 
-    logging.info("Creating LSL outlet: %d channels @ %.1f Hz", n_ch, fs)
-
-    info = StreamInfo(
-        name=cfg.stream_name,
-        type=cfg.stream_type,
-        channel_count=n_ch,
-        nominal_srate=fs,
-        channel_format="float32",
-        source_id=cfg.source_id,
-    )
-
-    # -- Channel metadata (XDF convention) ----------------------------------
-    channels_xml = info.desc().append_child("channels")
+    outlets: List[StreamOutlet] = []
     for ch_cfg in channels:
-        ch = channels_xml.append_child("channel")
-        ch.append_child_value("label", ch_cfg.lsl_name)
-        ch.append_child_value("unit", lc.get_units(ch_cfg.index, record))
-        ch.append_child_value("type", ch_cfg.lsl_type)
+        stream_name = f"{cfg.stream_name}_{ch_cfg.lsl_name}"
+        info = StreamInfo(
+            name=stream_name,
+            type=ch_cfg.lsl_type,
+            channel_count=1,
+            nominal_srate=fs,
+            channel_format="float32",
+            source_id=f"{cfg.source_id}_ch{ch_cfg.index}",
+        )
+        ch_xml = info.desc().append_child("channels").append_child("channel")
+        ch_xml.append_child_value("label", ch_cfg.lsl_name)
+        ch_xml.append_child_value("unit", lc.get_units(ch_cfg.index, record))
+        ch_xml.append_child_value("type", ch_cfg.lsl_type)
 
-    # -- Acquisition metadata -----------------------------------------------
-    acq = info.desc().append_child("acquisition")
-    acq.append_child_value("manufacturer", "ADInstruments")
-    acq.append_child_value("software", "LabChart 8")
-    acq.append_child_value("bridge", "labchart_to_lsl.py")
+        acq = info.desc().append_child("acquisition")
+        acq.append_child_value("manufacturer", "ADInstruments")
+        acq.append_child_value("software", "LabChart 8")
+        acq.append_child_value("bridge", "labchart_to_lsl.py")
 
-    outlet = StreamOutlet(info, chunk_size=0, max_buffered=360)
-    logging.info(
-        "LSL outlet live — visible on the network as '%s'", cfg.stream_name
-    )
-    return outlet
+        outlets.append(StreamOutlet(info, chunk_size=0, max_buffered=360))
+        logging.info("LSL outlet live: '%s'", stream_name)
+
+    return outlets
 
 
 # ---------------------------------------------------------------------------
@@ -374,7 +372,7 @@ def _sleep_remainder(t_start: float, interval: float) -> None:
 def stream_loop(
     cfg: Config,
     lc: LabChartConnection,
-    outlet: StreamOutlet,
+    outlets: List[StreamOutlet],
     stop_event: Optional[threading.Event] = None,
 ):
     """
@@ -383,7 +381,8 @@ def stream_loop(
     1. Sleep for ``poll_interval_sec``.
     2. Ask LabChart how many new ticks are available.
     3. Fetch them in one bulk read per channel (fast — one COM call each).
-    4. Compute per-sample timestamps and push the chunk to LSL.
+    4. Compute per-sample timestamps and push each channel's chunk to its
+       own LSL outlet.
 
     Exits when LabChart stops sampling or stop_event is set.
     Posts status dicts to cfg.status_queue when provided.
@@ -477,16 +476,14 @@ def stream_loop(
                 if ts.needs_anchor():
                     ts.set_anchor(total_ticks - 1, fetch_clock)
 
-                # -- Build chunk + per-sample timestamps, push in one call ------
+                # -- Build per-sample timestamps, push each channel separately --
                 # Use actual returned length in case the record grew between the
                 # length query and the data fetch (harmless race condition).
                 actual = min(len(cd) for cd in channel_data)
-                chunk = [
-                    [float(channel_data[c][s]) for c in range(n_ch)]
-                    for s in range(actual)
-                ]
                 stamps = [ts.stamp(cursor + s) for s in range(actual)]
-                outlet.push_chunk(chunk, stamps)
+                for i, outlet in enumerate(outlets):
+                    ch_samples = [[float(channel_data[i][s])] for s in range(actual)]
+                    outlet.push_chunk(ch_samples, stamps)
 
                 cursor += actual
                 samples_pushed += actual
@@ -497,14 +494,14 @@ def stream_loop(
                     latency_ms = (local_clock() - newest_stamp) * 1000
                     logging.info(
                         "Pushed %d total  |  batch=%d  |  %.1f Hz  |  "
-                        "latency ≈ %.0f ms",
-                        samples_pushed, actual, fs, latency_ms,
+                        "%d outlets  |  latency ≈ %.0f ms",
+                        samples_pushed, actual, fs, len(outlets), latency_ms,
                     )
                     if cfg.status_queue is not None:
                         cfg.status_queue.put({
                             "t": "stats",
                             "rate": fs,
-                            "n_ch": n_ch,
+                            "n_ch": len(outlets),
                             "latency_ms": latency_ms,
                         })
                     t_log = time.time()
@@ -598,11 +595,11 @@ def _run_cli():
     wait_for_sampling(lc, cfg.wait_for_sampling_timeout)
 
     record = lc.current_record
-    outlet = create_lsl_outlet(cfg, lc, record)
+    outlets = create_lsl_outlets(cfg, lc, record)
 
     try:
         while True:
-            stream_loop(cfg, lc, outlet)
+            stream_loop(cfg, lc, outlets)
             logging.info("Waiting for LabChart to resume sampling…")
             wait_for_sampling(lc, cfg.wait_for_sampling_timeout)
 
@@ -612,11 +609,11 @@ def _run_cli():
             if new_fs != old_fs:
                 logging.info(
                     "Sampling rate changed (%.1f → %.1f Hz), "
-                    "recreating LSL outlet.",
+                    "recreating LSL outlets.",
                     old_fs, new_fs,
                 )
-                del outlet
-                outlet = create_lsl_outlet(cfg, lc, new_record)
+                del outlets
+                outlets = create_lsl_outlets(cfg, lc, new_record)
             record = new_record
 
     except (KeyboardInterrupt, TimeoutError) as e:

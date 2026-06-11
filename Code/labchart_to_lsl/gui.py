@@ -10,7 +10,7 @@ try:
     import pythoncom # windows only! pip install pywin32
     from labchart_to_lsl import (
         LabChartConnection, Config, ChannelConfig,
-        create_lsl_outlet, stream_loop,
+        create_lsl_outlets, stream_loop,
     )
 except ImportError as exc:
     _r = tk.Tk()
@@ -212,7 +212,7 @@ class App(tk.Tk):
         _lbl(
             self._warn,
             "⚠   selected channels have different sampling rates"
-            " — only channels with the same rate can share one LSL stream",
+            " — all selected channels must share the same rate",
             fg=WRN, bg="#160f00",
         ).pack(side="left")
         # row 4 is reserved; _warn is shown/hidden via grid / grid_remove
@@ -441,7 +441,7 @@ class App(tk.Tk):
             messagebox.showerror(
                 "Rate mismatch",
                 "Selected channels have different sampling rates.\n\n"
-                "All channels in one LSL stream must share the same rate.\n"
+                "All selected channels must share the same rate.\n"
                 "Deselect the mismatched channels before streaming.",
             )
             return
@@ -465,8 +465,8 @@ class App(tk.Tk):
             lc = LabChartConnection()
             lc.connect()
             record = lc.current_record
-            outlet = create_lsl_outlet(cfg, lc, record)
-            stream_loop(cfg, lc, outlet, stop_event=self._stop)
+            outlets = create_lsl_outlets(cfg, lc, record)
+            stream_loop(cfg, lc, outlets, stop_event=self._stop)
         except Exception as e:
             error = True
             self._q.put({"t": "stream_err", "msg": str(e)})
