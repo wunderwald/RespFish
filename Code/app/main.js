@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, screen } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
@@ -210,7 +210,10 @@ ipcMain.on("stream:request-status", () => {
 // ── Scene window ──────────────────────────────────────────────────────────────
 
 function createWindow(frontend) {
-  mainWindow = new BrowserWindow({
+  const primary = screen.getPrimaryDisplay();
+  const secondary = screen.getAllDisplays().find(d => d.id !== primary.id);
+
+  const opts = {
     width: 1200,
     height: 820,
     minWidth: 600,
@@ -222,7 +225,15 @@ function createWindow(frontend) {
       contextIsolation: true,
       nodeIntegration: false,
     },
-  });
+  };
+
+  if (secondary) {
+    opts.x = secondary.bounds.x;
+    opts.y = secondary.bounds.y;
+    opts.fullscreen = true;
+  }
+
+  mainWindow = new BrowserWindow(opts);
   mainWindow.loadFile("index.html", { query: { frontend } });
   mainWindow.on("closed", () => {
     mainWindow = null;
