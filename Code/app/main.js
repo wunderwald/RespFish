@@ -12,9 +12,11 @@ let launcherWindow = null;
 
 function startBridge() {
   // Use the venv Python; fall back to system python3
-  const venvPython = path.join(
-    __dirname, "..", ".venv", "bin",
-    process.platform === "win32" ? "python.exe" : "python3"
+  const venvPython = process.platform === "win32"
+  ? path.join(
+    __dirname, "..", ".venv", "Scripts", "python.exe"
+  ) : path.join(
+    __dirname, "..", ".venv", "bin", "python3"
   );
   const bridgeScript = path.join(__dirname, "..", "lsl_ws_bridge", "main.py");
 
