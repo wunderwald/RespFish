@@ -104,12 +104,14 @@ if (frontend === 'ibreath') {
       </select>
     </span>
     <span id="ib-controls">
-      <button id="ib-start-btn"  disabled>Start</button>
-      <button id="ib-next-btn"   style="display:none">Next trial</button>
-      <button id="ib-abort-btn"  style="display:none">Abort trial</button>
-      <button id="ib-pause-btn"  style="display:none">Pause</button>
-      <button id="ib-play-btn"   style="display:none">Play</button>
-      <button id="ib-gaze-btn"   style="display:none" disabled>Recalibrate gaze</button>
+      <button id="ib-start-btn"       disabled>Start</button>
+      <button id="ib-next-btn"        style="display:none">Next trial</button>
+      <button id="ib-abort-btn"       style="display:none">Abort trial</button>
+      <button id="ib-pause-btn"       style="display:none">Pause</button>
+      <button id="ib-play-btn"        style="display:none">Play</button>
+      <button id="ib-gaze-btn"        style="display:none" disabled>Recalibrate gaze</button>
+      <button id="ib-cal-retry-btn"   style="display:none">Retry calibration</button>
+      <button id="ib-cal-default-btn" style="display:none">Use default calibration</button>
     </span>
   `;
 
@@ -138,6 +140,8 @@ if (frontend === 'ibreath') {
   const pauseBtn           = document.getElementById('ib-pause-btn');
   const playBtn            = document.getElementById('ib-play-btn');
   const gazeBtn            = document.getElementById('ib-gaze-btn');
+  const calRetryBtn        = document.getElementById('ib-cal-retry-btn');
+  const calDefaultBtn      = document.getElementById('ib-cal-default-btn');
 
   // ── Clocks ──────────────────────────────────────────────────────────────────
 
@@ -157,7 +161,7 @@ if (frontend === 'ibreath') {
 
   window.api.hud.onState(({ stateText, stateColor, trialText,
                              startEnabled, nextVisible, abortVisible, pauseVisible, playVisible, inputsLocked,
-                             experimentStartedAt: esa, stateTimer: st, gazeActive }) => {
+                             experimentStartedAt: esa, stateTimer: st, gazeActive, calFailed }) => {
     if (esa !== undefined) experimentStartedAt = esa;
     if (st  !== undefined) stateTimer          = st;
     if (stateText    !== undefined) stateEl.textContent        = stateText;
@@ -169,6 +173,10 @@ if (frontend === 'ibreath') {
     if (pauseVisible !== undefined) pauseBtn.style.display     = pauseVisible ? '' : 'none';
     if (playVisible  !== undefined) playBtn.style.display      = playVisible  ? '' : 'none';
     if (gazeActive   !== undefined) gazeBtn.style.display      = gazeActive   ? '' : 'none';
+    if (calFailed    !== undefined) {
+      calRetryBtn.style.display   = calFailed ? '' : 'none';
+      calDefaultBtn.style.display = calFailed ? '' : 'none';
+    }
     if (inputsLocked !== undefined) {
       subjectInput.disabled       = inputsLocked;
       questionTypeSelect.disabled = inputsLocked;
@@ -201,6 +209,8 @@ if (frontend === 'ibreath') {
   pauseBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'pause' }));
   playBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'play' }));
   gazeBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'recalibrateGaze' }));
+  calRetryBtn.addEventListener('click',   () => window.api.hud.sendAction({ type: 'retryCalibration' }));
+  calDefaultBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'useDefaultCalibration' }));
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 
@@ -302,9 +312,11 @@ if (frontend === 'ibreath') {
       <span id="bg-score">—</span>
     </span>
     <span id="ib-controls">
-      <button id="bg-start-btn"  disabled>Start</button>
-      <button id="bg-next-btn"   style="display:none">Start Game 2</button>
-      <button id="bg-abort-btn"  style="display:none">Abort</button>
+      <button id="bg-start-btn"       disabled>Start</button>
+      <button id="bg-next-btn"        style="display:none">Start Game 2</button>
+      <button id="bg-abort-btn"       style="display:none">Abort</button>
+      <button id="bg-cal-retry-btn"   style="display:none">Retry calibration</button>
+      <button id="bg-cal-default-btn" style="display:none">Use default calibration</button>
     </span>
   `;
 
@@ -326,9 +338,11 @@ if (frontend === 'ibreath') {
   const bgNatBpmEl   = document.getElementById('bg-natural-bpm');
   const bgBpmSrcEl   = document.getElementById('bg-bpm-source');
   const bgScoreEl    = document.getElementById('bg-score');
-  const bgStartBtn   = document.getElementById('bg-start-btn');
-  const bgNextBtn    = document.getElementById('bg-next-btn');
-  const bgAbortBtn   = document.getElementById('bg-abort-btn');
+  const bgStartBtn      = document.getElementById('bg-start-btn');
+  const bgNextBtn       = document.getElementById('bg-next-btn');
+  const bgAbortBtn      = document.getElementById('bg-abort-btn');
+  const bgCalRetryBtn   = document.getElementById('bg-cal-retry-btn');
+  const bgCalDefaultBtn = document.getElementById('bg-cal-default-btn');
 
   // Show natural-BPM field only for the natural condition
   bgNatBpmWrap.style.display = BG.GROUP === 'natural' ? '' : 'none';
@@ -382,13 +396,17 @@ if (frontend === 'ibreath') {
   // ── Receive state from scene window ─────────────────────────────────────────
 
   window.api.frontend.onState(({ stateText, score, startEnabled, startText,
-                                  nextVisible, abortVisible, inputsLocked }) => {
+                                  nextVisible, abortVisible, calFailed, inputsLocked }) => {
     if (stateText    !== undefined) bgStatusEl.textContent      = stateText;
     if (score        != null)       bgScoreEl.textContent       = score;
     if (startEnabled !== undefined) bgStartBtn.disabled         = !startEnabled;
     if (startText    !== undefined) bgStartBtn.textContent      = startText;
     if (nextVisible  !== undefined) bgNextBtn.style.display     = nextVisible  ? '' : 'none';
     if (abortVisible !== undefined) bgAbortBtn.style.display    = abortVisible ? '' : 'none';
+    if (calFailed    !== undefined) {
+      bgCalRetryBtn.style.display   = calFailed ? '' : 'none';
+      bgCalDefaultBtn.style.display = calFailed ? '' : 'none';
+    }
     if (inputsLocked !== undefined && inputsLocked) {
       bgSubjectEl.disabled = true;
       bgGroupEl.disabled   = true;
@@ -414,6 +432,8 @@ if (frontend === 'ibreath') {
   });
   bgNextBtn.addEventListener('click',  () => window.api.frontend.sendAction({ type: 'next' }));
   bgAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));
+  bgCalRetryBtn.addEventListener('click',   () => window.api.frontend.sendAction({ type: 'retryCalibration' }));
+  bgCalDefaultBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'useDefaultCalibration' }));
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 
