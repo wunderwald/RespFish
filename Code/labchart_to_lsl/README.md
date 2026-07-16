@@ -62,6 +62,7 @@ pip install pywin32 pylsl
 
 - **Channel table** — one row per LabChart channel with enable/disable checkbox, sampling rate, unit, and editable LSL name + type fields
 - **Rate mismatch warning** — shown automatically if enabled channels have different sampling rates (all channels in one LSL stream must share the same rate)
+- **Marker streams table** — continuously discovers LSL marker streams (string-typed, irregular-rate) on the network, independent of the LabChart connection. Enabled streams (checked by default) are listened to while streaming is active; each marker sample received writes a global LabChart comment (`AppendComment`, all channels) at the current live tick, using the marker's raw text verbatim. Streams can be toggled on/off live, and newly appearing/disappearing streams are reflected automatically without restarting.
 - **Status bar** — live sample count and latency estimate while streaming
 
 ## Headless / CLI mode
