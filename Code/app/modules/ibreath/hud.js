@@ -3,14 +3,16 @@
  * and exposes a clean property API so callers never touch the DOM directly.
  *
  * Setters:  stateText, stateColor, trialText,
- *           startEnabled, nextVisible, abortVisible, pauseVisible, inputsLocked, gazeActive
+ *           startEnabled, nextVisible, abortVisible, pauseVisible, playVisible,
+ *           calFailed, inputsLocked, gazeActive
  * Getters:  stateText, subjectCode, questionType
  */
 export class LocalHud {
   #stateEl; #trialEl; #subjectInput; #questionTypeSelect;
-  #startBtn; #nextBtn; #abortBtn; #pauseBtn; #playBtn;
+  #startBtn; #nextBtn; #abortBtn; #pauseBtn; #playBtn; #calRetryBtn; #calDefaultBtn;
 
-  constructor(container, subjectCode, { onStart, onNext, onAbort, onPause, onPlay }) {
+  constructor(container, subjectCode, { onStart, onNext, onAbort, onPause, onPlay,
+                                         onRetryCalibration, onUseDefaultCalibration }) {
     container.innerHTML = `
       <span id="ib-state-text">waiting for stream…</span>
       <span>
@@ -30,11 +32,13 @@ export class LocalHud {
         </select>
       </span>
       <span id="ib-controls">
-        <button id="ib-start-btn"  disabled>Start</button>
-        <button id="ib-next-btn"   style="display:none">Next trial</button>
-        <button id="ib-abort-btn"  style="display:none">Abort trial</button>
-        <button id="ib-pause-btn"  style="display:none">Pause</button>
-        <button id="ib-play-btn"   style="display:none">Play</button>
+        <button id="ib-start-btn"       disabled>Start</button>
+        <button id="ib-next-btn"        style="display:none">Next trial</button>
+        <button id="ib-abort-btn"       style="display:none">Abort trial</button>
+        <button id="ib-pause-btn"       style="display:none">Pause</button>
+        <button id="ib-play-btn"        style="display:none">Play</button>
+        <button id="ib-cal-retry-btn"   style="display:none">Retry calibration</button>
+        <button id="ib-cal-default-btn" style="display:none">Use default calibration</button>
       </span>
     `;
 
@@ -47,12 +51,16 @@ export class LocalHud {
     this.#abortBtn           = container.querySelector('#ib-abort-btn');
     this.#pauseBtn           = container.querySelector('#ib-pause-btn');
     this.#playBtn            = container.querySelector('#ib-play-btn');
+    this.#calRetryBtn        = container.querySelector('#ib-cal-retry-btn');
+    this.#calDefaultBtn      = container.querySelector('#ib-cal-default-btn');
 
     this.#startBtn.addEventListener('click', onStart);
     this.#nextBtn.addEventListener('click',  onNext);
     this.#abortBtn.addEventListener('click', onAbort);
     this.#pauseBtn.addEventListener('click', onPause ?? (() => {}));
     this.#playBtn.addEventListener('click',  onPlay  ?? (() => {}));
+    this.#calRetryBtn.addEventListener('click',   onRetryCalibration      ?? (() => {}));
+    this.#calDefaultBtn.addEventListener('click', onUseDefaultCalibration ?? (() => {}));
   }
 
   get stateText()      { return this.#stateEl.textContent; }
@@ -64,6 +72,10 @@ export class LocalHud {
   set abortVisible(v)  { this.#abortBtn.style.display = v ? '' : 'none'; }
   set pauseVisible(v)  { this.#pauseBtn.style.display = v ? '' : 'none'; }
   set playVisible(v)   { this.#playBtn.style.display  = v ? '' : 'none'; }
+  set calFailed(v)     {
+    this.#calRetryBtn.style.display   = v ? '' : 'none';
+    this.#calDefaultBtn.style.display = v ? '' : 'none';
+  }
   set inputsLocked(v)  {
     this.#subjectInput.disabled       = v;
     this.#questionTypeSelect.disabled = v;

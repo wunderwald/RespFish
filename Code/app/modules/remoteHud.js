@@ -17,6 +17,7 @@ export class RemoteHud {
     abortVisible:        false,
     pauseVisible:        false,
     playVisible:         false,
+    calFailed:           false,
     inputsLocked:        false,
     experimentStartedAt: null,
     stateTimer:          null,   // { startedAt: Date.now(), duration: seconds | null }
@@ -25,7 +26,8 @@ export class RemoteHud {
   #subjectCode = 'TEST';
   #group = 'target';
 
-  constructor({ onStart, onNext, onAbort, onResponse, onPause, onPlay, onRecalibrateGaze }) {
+  constructor({ onStart, onNext, onAbort, onResponse, onPause, onPlay, onRecalibrateGaze,
+                onRetryCalibration, onUseDefaultCalibration }) {
     window.api.hud.onAction(({ type, subjectCode, group, value,
                                debugGaze, autoAdvance, flashingImage, calibrationSecs,
                                showQuestions }) => {
@@ -39,6 +41,8 @@ export class RemoteHud {
         case 'pause':           onPause?.(); break;
         case 'play':            onPlay?.(); break;
         case 'recalibrateGaze': onRecalibrateGaze?.(); break;
+        case 'retryCalibration':      onRetryCalibration?.(); break;
+        case 'useDefaultCalibration': onUseDefaultCalibration?.(); break;
         case 'ready':           this.#push(); break;
       }
     });
@@ -53,6 +57,7 @@ export class RemoteHud {
   set abortVisible(v) { this.#snap.abortVisible  = v;   this.#push(); }
   set pauseVisible(v) { this.#snap.pauseVisible  = v;   this.#push(); }
   set playVisible(v)  { this.#snap.playVisible   = v;   this.#push(); }
+  set calFailed(v)    { this.#snap.calFailed     = v;   this.#push(); }
   set inputsLocked(v) { this.#snap.inputsLocked  = v;   this.#push(); }
   set gazeActive(v)   { this.#snap.gazeActive    = v;   this.#push(); }
   set experimentStartedAt(v) { this.#snap.experimentStartedAt = v; this.#push(); }
