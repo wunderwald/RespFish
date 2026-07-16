@@ -12,6 +12,9 @@ export const CONFIG = {
   // Calibration
   CALIBRATION_SECS: 30,     // seconds to record before first trial
 
+  // TODO: measure real min/max from pilot recordings and replace these placeholders
+  DEFAULT_CAL_RANGE: [0.2, 0.8],  // used if the experimenter chooses "use default" after a failed calibration
+
   // Trial timing
   MAX_NUM_TRIALS: 80,
   MAX_TRIAL_TIME: 30,       // seconds

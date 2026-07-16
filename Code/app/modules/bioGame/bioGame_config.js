@@ -15,6 +15,9 @@ export const CONFIG = {
   CALIBRATION_SECS:      30,
   COUNTDOWN_SECS:        3.75,  // 3 + 2 + 1 + GO! each 1s, GO 0.75s
 
+  // TODO: measure real min/max from pilot recordings and replace these placeholders
+  DEFAULT_CAL_RANGE:     [0.2, 0.8],  // used if the experimenter chooses "use default" after a failed calibration
+
   // ── Breath target ────────────────────────────────────────────────────────
   SLOW_BPM:              6,
 
