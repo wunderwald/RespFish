@@ -73,7 +73,10 @@ _check_dependencies()
 
 import win32com.client  # noqa: E402
 import pythoncom        # noqa: E402
-from pylsl import StreamInfo, StreamOutlet, local_clock  # noqa: E402
+from pylsl import (     # noqa: E402
+    StreamInfo, StreamOutlet, StreamInlet, local_clock,
+    resolve_streams, cf_string,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +89,21 @@ class ChannelConfig:
     index: int       # 0-based LabChart channel index
     lsl_name: str    # label written into LSL stream metadata
     lsl_type: str = "Phys"
+
+
+@dataclass(frozen=True)
+class MarkerStreamInfo:
+    """Description of one LSL marker stream discovered on the network."""
+    name: str
+    type: str
+    source_id: str
+    hostname: str
+    lsl_info: StreamInfo = field(compare=False, repr=False)
+
+    @property
+    def key(self) -> str:
+        """Stable identity for a stream across repeated discovery passes."""
+        return f"{self.source_id}|{self.name}|{self.hostname}"
 
 
 @dataclass
@@ -287,6 +305,18 @@ class LabChartConnection:
         except Exception:
             return ""
 
+    # -- Comment writing -----------------------------------------------------
+
+    def append_comment(self, text: str, channel: int = -1) -> None:
+        """
+        Insert a comment at LabChart's current live tick (the same effect as
+        pressing the "add comment" hotkey during sampling).
+
+        channel=-1 (default) writes a global comment visible on all channels.
+        channel>=0 (0-based) attaches the comment to a single channel only.
+        """
+        self.doc.AppendComment(text, channel)
+
 
 # ---------------------------------------------------------------------------
 # LSL outlet builder
@@ -334,6 +364,82 @@ def create_lsl_outlets(
         logging.info("LSL outlet live: '%s'", stream_name)
 
     return outlets
+
+
+# ---------------------------------------------------------------------------
+# Marker stream discovery + bridging (LSL markers -> LabChart comments)
+# ---------------------------------------------------------------------------
+
+def discover_marker_streams(timeout: float = 1.0) -> List[MarkerStreamInfo]:
+    """
+    Resolve LSL streams currently on the network and return the marker-like
+    ones: irregular rate (event-driven, not a fixed sampling rate) and
+    string-typed samples. Matched by stream properties rather than by name
+    so it isn't tied to one naming convention.
+    """
+    markers = []
+    for info in resolve_streams(wait_time=timeout):
+        if info.nominal_srate() == 0 and info.channel_format() == cf_string:
+            markers.append(MarkerStreamInfo(
+                name=info.name(),
+                type=info.type(),
+                source_id=info.source_id(),
+                hostname=info.hostname(),
+                lsl_info=info,
+            ))
+    return markers
+
+
+def marker_listener_loop(
+    marker: MarkerStreamInfo,
+    stop_event: threading.Event,
+    status_queue: Optional[queue.Queue] = None,
+):
+    """
+    Runs in its own thread and COM apartment (independent of any channel
+    streaming session): connects to LabChart, subscribes to one LSL marker
+    stream, and appends a global LabChart comment (channel=-1) for every
+    marker sample received. Exits when stop_event is set or the stream
+    disappears.
+    """
+    pythoncom.CoInitialize()
+    try:
+        lc = LabChartConnection()
+        lc.connect()
+        inlet = StreamInlet(marker.lsl_info)
+
+        logging.info("Marker listener started: '%s'", marker.name)
+        while not stop_event.is_set():
+            sample, _ = inlet.pull_sample(timeout=0.5)
+            if sample is None:
+                continue
+
+            text = str(sample[0])
+            try:
+                lc.append_comment(text)
+            except Exception:
+                logging.exception(
+                    "Failed to write LabChart comment for marker %r", text
+                )
+                continue
+
+            logging.info("Marker -> LabChart comment: %r (stream=%s)",
+                         text, marker.name)
+            if status_queue is not None:
+                status_queue.put({
+                    "t": "marker_event", "key": marker.key,
+                    "text": text, "stream": marker.name,
+                })
+    except Exception as e:
+        logging.exception("Marker listener error (stream=%s)", marker.name)
+        if status_queue is not None:
+            status_queue.put({
+                "t": "marker_err", "key": marker.key, "msg": str(e),
+            })
+    finally:
+        logging.info("Marker listener stopped: '%s'", marker.name)
+        if status_queue is not None:
+            status_queue.put({"t": "marker_stopped", "key": marker.key})
 
 
 # ---------------------------------------------------------------------------
