@@ -23,6 +23,8 @@ Two windows open:
 | **Subject** | Subject code written to the CSV filename. Locked once calibration begins. |
 | **Group** | `intero` or `extero` — written to `trialData.csv` as the `group` column. |
 | **Cal secs** | Calibration recording duration (default 10 s). |
+| **Retry calibration** | Appears only if calibration fails (no signal received). Restarts the calibration recording. |
+| **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder for CSV output. Default: `iBreathData/` inside the app folder. |
 | **Auto-advance** | Skip the READY state between trials — experiment runs continuously. |
 | **Show questions** | After each trial show a sync-detection question; record response in CSV. |
@@ -143,8 +145,10 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`).
 
 | Marker | Event |
 |---|---|
-| `calibration_start` | Calibration begins |
-| `calibration_end` | Calibration complete |
+| `calibration_start` | Calibration begins (re-sent for each retry attempt) |
+| `calibration_end` | Calibration recording window ends |
+| `calibration_failed` | Calibration recorded no samples — experimenter is prompted to retry or use defaults |
+| `calibration_default_used` | Experimenter chose to skip ahead using `CONFIG.DEFAULT_CAL_RANGE` after a failed calibration |
 | `display_start_t<N>` | Pre-trial animation starts for trial N |
 | `trial_start_t<N>` | Trial N begins |
 | `trial_end_t<N>` | Trial N ends normally |

@@ -30,8 +30,7 @@ cal.push(sample);
 if (cal.isDone) {
   const result = cal.finish();   // { min, max, sampleCount } | null
   if (!result) {
-    // no samples recorded (e.g. stream hiccup) — retry
-    cal.start();
+    // no samples recorded (e.g. stream hiccup) — caller decides what to do next
   } else {
     const [min, max] = [result.min, result.max];
   }
@@ -40,6 +39,13 @@ if (cal.isDone) {
 cal.progress;       // 0..1, elapsed fraction of durationSecs
 cal.remainingSecs;   // seconds left
 ```
+
+`RespCalibration` itself has no opinion on what to do when `finish()` returns
+`null` — that choice (retry vs. fall back to a default range) is up to the
+caller. [bioGame](bioGame.md) and [iBreath](ibreath.md) both surface it to the
+experimenter as a **Retry calibration** / **Use default calibration** choice
+in the HUD, falling back to each frontend's `CONFIG.DEFAULT_CAL_RANGE` when
+"use default" is chosen.
 
 `gain` narrows (or widens) the calibrated range around its recorded values —
 narrowing (the default, `0.8`) increases sensitivity over the calibrated
