@@ -38,6 +38,7 @@ npm run visualizer    # real-time waveform
 | baseline | Resting-state recording | [docs/baseline.md](docs/baseline.md) |
 | visualizer | Live signal waveform viewer | [docs/visualizer.md](docs/visualizer.md) |
 | signal | Signal processing utilities | [docs/signal.md](docs/signal.md) |
+| calibration | Respiration signal calibration | [docs/calibration.md](docs/calibration.md) |
 | stream | LSL bridge and marker output | [docs/stream.md](docs/stream.md) |
 | webgazer | Webcam-based gaze tracking | [docs/webgazer.md](docs/webgazer.md) |
 
