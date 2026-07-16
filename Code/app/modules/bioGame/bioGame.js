@@ -66,6 +66,7 @@ export default class BioGame {
   #smoother         = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
   #lastRaw          = 0;
   #calibration      = null;
+  #calFailed        = false;
   #normRange        = [0, 1];
 
   // ── Avatar state ──────────────────────────────────────────────────────────
@@ -171,6 +172,14 @@ export default class BioGame {
         if (this.#state === STATE.PLAYING) this.#endBlock(true);
         break;
 
+      case 'retryCalibration':
+        if (this.#state === STATE.CALIBRATING && this.#calFailed) this.#retryCalibration();
+        break;
+
+      case 'useDefaultCalibration':
+        if (this.#state === STATE.CALIBRATING && this.#calFailed) this.#useDefaultCalibration();
+        break;
+
       case 'ready':
         this.#pushState();
         break;
@@ -182,6 +191,7 @@ export default class BioGame {
   #beginCalibration() {
     this.#calibration = new RespCalibration({ durationSecs: this.#calibrationSecs });
     this.#calibration.start();
+    this.#calFailed = false;
     this.#smoother.reset();
     this.#inputsLocked = true;
     this.#blockIndex   = 0;
@@ -204,16 +214,37 @@ export default class BioGame {
     const result = this.#calibration.finish();
 
     if (!result) {
-      console.warn('[BioGame] calibration produced no samples — retrying');
-      this.#calibration.start();
+      console.warn('[BioGame] calibration produced no samples');
+      this.#markers.send('calibration_failed');
+      this.#calFailed = true;
+      this.#pushState({
+        stateText: '⚠ calibration failed — no signal received',
+        calFailed: true,
+      });
       return;
     }
 
-    this.#normRange = [result.min, result.max];
-    console.log(`[BioGame] norm range: [${this.#normRange[0].toFixed(3)}, ${this.#normRange[1].toFixed(3)}]`);
+    this.#completeCalibration([result.min, result.max]);
+  }
+
+  #completeCalibration(range) {
+    this.#normRange = range;
+    console.log(`[BioGame] norm range: [${range[0].toFixed(3)}, ${range[1].toFixed(3)}]`);
 
     this.#state = STATE.READY;
-    this.#pushState({ stateText: 'ready — press Space or Start', nextVisible: true });
+    this.#pushState({ stateText: 'ready — press Space or Start', nextVisible: true, calFailed: false });
+  }
+
+  #retryCalibration() {
+    this.#calibration.start();
+    this.#calFailed = false;
+    this.#markers.send('calibration_start');
+    this.#pushState({ stateText: 'calibrating…', calFailed: false });
+  }
+
+  #useDefaultCalibration() {
+    this.#markers.send('calibration_default_used');
+    this.#completeCalibration(CONFIG.DEFAULT_CAL_RANGE);
   }
 
   #startCountdown() {
@@ -282,7 +313,7 @@ export default class BioGame {
   #tick() {
     const now = performance.now();
 
-    if (this.#state === STATE.CALIBRATING) {
+    if (this.#state === STATE.CALIBRATING && !this.#calFailed) {
       if (this.#calibration.isDone) {
         this.#finishCalibration();
       }
@@ -529,6 +560,7 @@ export default class BioGame {
       startText:    'Start',
       nextVisible:  false,
       abortVisible: false,
+      calFailed:    false,
       inputsLocked: this.#inputsLocked,
       ...overrides,
     });

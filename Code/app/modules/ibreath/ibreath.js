@@ -46,6 +46,7 @@ export default class IBreath {
   // ── calibration ────────────────────────────────────────────────────────
   #calSamples = [];      // raw samples, fed to AsyncSignalGenerator for freq estimation
   #calibration = null;   // RespCalibration — derives the sync stimulus range
+  #calFailed = false;
 
   // ── signal pipeline ────────────────────────────────────────────────────
   #smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
@@ -102,6 +103,8 @@ export default class IBreath {
       onPause:           () => this.#onPause(),
       onPlay:            () => this.#onPlay(),
       onRecalibrateGaze: () => {},   // placeholder
+      onRetryCalibration:      () => this.#retryCalibration(),
+      onUseDefaultCalibration: () => this.#useDefaultCalibration(),
     };
     this.#hud = hudFactory
       ? hudFactory(callbacks)
@@ -193,6 +196,7 @@ export default class IBreath {
     this.#calSamples = [];
     this.#calibration = new RespCalibration({ durationSecs: CONFIG.CALIBRATION_SECS });
     this.#calibration.start();
+    this.#calFailed = false;
     this.#smoother.reset();
 
     this.#state = STATE.CALIBRATING;
@@ -213,18 +217,26 @@ export default class IBreath {
 
     const result = this.#calibration.finish();
     if (!result) {
-      console.warn('[IBreath] calibration produced no samples — retrying');
-      this.#calSamples = [];
-      this.#calibration.start();
+      console.warn('[IBreath] calibration produced no samples');
+      this.#markers.send('calibration_failed');
+      this.#calFailed = true;
+      this.#hud.stateText = '⚠ calibration failed — no signal received';
+      this.#hud.calFailed = true;
       return;
     }
+
+    this.#completeCalibration([result.min, result.max]);
+  }
+
+  #completeCalibration(range) {
+    this.#syncStimulusRange = range;
 
     const sampleRate = this.#calSamples.length / CONFIG.CALIBRATION_SECS;
     this.#asyncGen.calibrate(this.#calSamples, sampleRate, null);
 
-    this.#syncStimulusRange = [result.min, result.max];
-
     this.#hud.trialText = `0 / ${this.#trials.length}`;
+    this.#calFailed = false;
+    this.#hud.calFailed = false;
 
     if (CONFIG.AUTO_ADVANCE) {
       this.#advanceTrial();
@@ -235,6 +247,23 @@ export default class IBreath {
       this.#hud.stateText    = 'ready — press Space or Next trial to begin';
       this.#hud.nextVisible  = true;
     }
+  }
+
+  #retryCalibration() {
+    if (this.#state !== STATE.CALIBRATING || !this.#calFailed) return;
+    this.#calSamples = [];
+    this.#calibration.start();
+    this.#calFailed = false;
+    this.#hud.calFailed = false;
+    this.#hud.stateTimer = { startedAt: Date.now(), duration: CONFIG.CALIBRATION_SECS };
+    this.#hud.stateText  = 'calibrating…';
+    this.#markers.send('calibration_start');
+  }
+
+  #useDefaultCalibration() {
+    if (this.#state !== STATE.CALIBRATING || !this.#calFailed) return;
+    this.#markers.send('calibration_default_used');
+    this.#completeCalibration(CONFIG.DEFAULT_CAL_RANGE);
   }
 
   #advanceTrial() {
@@ -496,7 +525,7 @@ export default class IBreath {
   #update() {
     const now = performance.now();
 
-    if (this.#state === STATE.CALIBRATING) {
+    if (this.#state === STATE.CALIBRATING && !this.#calFailed) {
       if (this.#calibration.isDone) {
         this.#finishCalibration();
       }
