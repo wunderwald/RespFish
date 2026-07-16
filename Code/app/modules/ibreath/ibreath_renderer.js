@@ -40,7 +40,7 @@ export class IBreathRenderer {
 
     switch (state) {
       case STATE.IDLE:        this.#drawIdle(ctx, w, h); break;
-      case STATE.CALIBRATING: this.#drawCalibrating(ctx, w, h, now, data.calStartTime); break;
+      case STATE.CALIBRATING: this.#drawCalibrating(ctx, w, h, data.calProgress, data.calRemaining); break;
       case STATE.READY:       this.#drawReady(ctx, w, h); break;
       case STATE.DISPLAY:     this.#drawDisplayState(ctx, w, h, data.displayElapsed); break;
       case STATE.TRIAL:       this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive); break;
@@ -78,10 +78,7 @@ export class IBreathRenderer {
     this.#centerText(ctx, w / 2, h / 2, 'waiting for stream…', 'rgba(255,255,255,0.4)', 18);
   }
 
-  #drawCalibrating(ctx, w, h, now, calStartTime) {
-    const elapsed = now - calStartTime;
-    const progress = Math.min(elapsed / (CONFIG.CALIBRATION_SECS * 1000), 1);
-    const remaining = Math.max(0, Math.ceil(CONFIG.CALIBRATION_SECS - elapsed / 1000));
+  #drawCalibrating(ctx, w, h, progress, remaining) {
     const cx = w / 2, cy = h / 2;
     const r = 60;
 
