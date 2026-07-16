@@ -1,7 +1,9 @@
 """LabChart → LSL  —  channel selector and stream monitor."""
 
 import sys
+import time
 import queue
+import logging
 import threading
 import tkinter as tk
 from tkinter import messagebox
@@ -11,6 +13,7 @@ try:
     from labchart_to_lsl import (
         LabChartConnection, Config, ChannelConfig,
         create_lsl_outlets, stream_loop,
+        MarkerStreamInfo, discover_marker_streams, marker_listener_loop,
     )
 except ImportError as exc:
     _r = tk.Tk()
@@ -150,6 +153,53 @@ class ChannelRow:
         )
 
 
+# Marker row
+
+class MarkerRow:
+    """
+    One row in the marker-stream table. Lives in its own Frame (rather than
+    a shared grid) so rows can be added/removed independently as LSL marker
+    streams appear/disappear during continuous background discovery.
+    """
+
+    def __init__(self, parent: tk.Frame, marker: "MarkerStreamInfo", index: int):
+        self.marker = marker
+        self.key = marker.key
+
+        bg = BG2 if index % 2 == 0 else BG3
+        self.frame = tk.Frame(parent, bg=bg)
+        self.frame.pack(fill="x")
+
+        self.enabled = tk.BooleanVar(value=True)
+        tk.Checkbutton(
+            self.frame, variable=self.enabled,
+            bg=bg, activebackground=bg, selectcolor=BG4,
+            fg=ACE, activeforeground=ACE,
+            bd=0, highlightthickness=0, cursor="hand2",
+        ).pack(side="left", padx=(PAD, 2), pady=4)
+
+        _lbl(self.frame, marker.name, font=MF, fg=FG, bg=bg,
+             width=18, anchor="w").pack(side="left", padx=4)
+        _lbl(self.frame, marker.type or "—", bg=bg,
+             width=10, anchor="w").pack(side="left", padx=4)
+        _lbl(self.frame, marker.hostname or "—", bg=bg,
+             width=14, anchor="w").pack(side="left", padx=4)
+
+        self._count = 0
+        self._status = _lbl(self.frame, "—", bg=bg, width=26, anchor="w")
+        self._status.pack(side="left", padx=(4, PAD))
+
+    def on_event(self, text: str) -> None:
+        self._count += 1
+        self._status.config(text=f"{self._count}×  last: {text!r}", fg=ACE)
+
+    def on_error(self, msg: str) -> None:
+        self._status.config(text=msg, fg=ERR)
+
+    def destroy(self) -> None:
+        self.frame.destroy()
+
+
 # Main window
 
 class App(tk.Tk):
@@ -159,7 +209,7 @@ class App(tk.Tk):
         self.title("LabChart → LSL")
         self.configure(bg=BG)
         self.resizable(True, True)
-        self.minsize(680, 340)
+        self.minsize(680, 460)
 
         self._lc:     LabChartConnection | None = None
         self._rows:   list[ChannelRow] = []
@@ -168,10 +218,18 @@ class App(tk.Tk):
         self._q:      queue.Queue = queue.Queue()
         self._live:   bool = False
 
+        # Marker streams (LSL -> LabChart trigger comments). Discovery runs
+        # continuously in the background, independent of the LabChart
+        # connection; forwarding threads are only live while streaming.
+        self._marker_rows:    dict[str, MarkerRow] = {}
+        self._marker_threads: dict[str, threading.Thread] = {}
+        self._marker_stops:   dict[str, threading.Event] = {}
+
         self._build()
         self._conn_ui("off")
         self._stream_ui("off")
         self._poll()
+        threading.Thread(target=self._marker_discovery_worker, daemon=True).start()
 
     #  Layout
 
@@ -228,9 +286,19 @@ class App(tk.Tk):
         # row 6 — separator
         _sep(self).grid(row=6, column=0, sticky="ew")
 
-        # row 7 — stream settings + start button
+        # row 7 — marker streams (LSL -> LabChart trigger comments)
+        mk_area = tk.Frame(self, bg=BG)
+        mk_area.grid(row=7, column=0, sticky="ew")
+        _lbl(mk_area, "MARKER STREAMS  →  LABCHART TRIGGERS",
+             font=MB, fg=FGH, bg=BG).pack(anchor="w", padx=PAD, pady=(8, 4))
+        self._build_marker_area(mk_area)
+
+        # row 8 — separator
+        _sep(self).grid(row=8, column=0, sticky="ew")
+
+        # row 9 — stream settings + start button
         ctrl = tk.Frame(self, bg=BG2, padx=PAD, pady=PAD)
-        ctrl.grid(row=7, column=0, sticky="ew")
+        ctrl.grid(row=9, column=0, sticky="ew")
 
         _lbl(ctrl, "STREAM NAME", fg=FGH, bg=BG2).grid(
             row=0, column=0, sticky="w", padx=(0, 6))
@@ -248,12 +316,12 @@ class App(tk.Tk):
         self._start_btn.grid(row=0, column=4, sticky="e")
         ctrl.grid_columnconfigure(4, weight=1)
 
-        # row 8 — separator
-        _sep(self).grid(row=8, column=0, sticky="ew")
+        # row 10 — separator
+        _sep(self).grid(row=10, column=0, sticky="ew")
 
-        # row 9 — status bar
+        # row 11 — status bar
         sb = tk.Frame(self, bg=BG, padx=PAD, pady=7)
-        sb.grid(row=9, column=0, sticky="ew")
+        sb.grid(row=11, column=0, sticky="ew")
         self._stat_d = tk.Canvas(sb, width=8, height=8, bg=BG, highlightthickness=0)
         self._stat_d.pack(side="left", padx=(0, 6))
         self._stat_l = _lbl(sb, "idle", bg=BG)
@@ -306,6 +374,30 @@ class App(tk.Tk):
             bg=BG, pady=20,
         )
         self._empty.grid(row=0, column=0, columnspan=6, padx=PAD)
+
+    def _build_marker_area(self, parent: tk.Frame):
+        hdr = tk.Frame(parent, bg=BG2, pady=5)
+        hdr.pack(fill="x")
+        cols = [
+            ("",              2, "w"),
+            ("MARKER STREAM", 18, "w"),
+            ("TYPE",          10, "w"),
+            ("HOST",          14, "w"),
+            ("STATUS",        26, "w"),
+        ]
+        for text, width, anchor in cols:
+            _lbl(hdr, text, fg=FGH, bg=BG2, anchor=anchor, width=width).pack(
+                side="left", padx=4)
+
+        self._marker_frame = tk.Frame(parent, bg=BG)
+        self._marker_frame.pack(fill="x")
+
+        self._marker_empty = _lbl(
+            self._marker_frame,
+            "no marker streams found on the network",
+            bg=BG, pady=12,
+        )
+        self._marker_empty.pack()
 
     #  State helpers ─
 
@@ -425,6 +517,8 @@ class App(tk.Tk):
     def _on_start(self):
         if self._live:
             self._stop.set()
+            for key in list(self._marker_threads):
+                self._stop_marker_thread(key)
             self._start_btn.config(state="disabled")
             return
 
@@ -458,6 +552,10 @@ class App(tk.Tk):
         self._thread.start()
         self._stream_ui("on")
 
+        for row in self._marker_rows.values():
+            if row.enabled.get():
+                self._start_marker_thread(row.marker)
+
     def _stream_worker(self, cfg: Config):
         error = False
         try:
@@ -472,6 +570,77 @@ class App(tk.Tk):
             self._q.put({"t": "stream_err", "msg": str(e)})
         finally:
             self._q.put({"t": "stream_end", "error": error})
+
+    # ── Marker streams (LSL -> LabChart triggers) ───────────────────────────────
+
+    def _marker_discovery_worker(self):
+        """Runs forever in the background, independent of LabChart connection
+        state, periodically re-resolving LSL marker streams on the network."""
+        while True:
+            try:
+                streams = discover_marker_streams(timeout=1.5)
+                self._q.put({"t": "markers_found", "streams": streams})
+            except Exception:
+                logging.exception("Marker discovery error")
+            time.sleep(1.5)
+
+    def _reconcile_markers(self, streams: list):
+        """Add rows for newly-seen marker streams (checked by default) and
+        remove rows (stopping their listener thread, if any) for streams
+        that are no longer present. Existing rows keep their check state."""
+        seen = {m.key: m for m in streams}
+
+        for key, marker in seen.items():
+            if key not in self._marker_rows:
+                row = MarkerRow(self._marker_frame, marker, len(self._marker_rows))
+                row.enabled.trace_add(
+                    "write", lambda *_, k=key: self._on_marker_toggle(k))
+                self._marker_rows[key] = row
+                if self._live:
+                    self._start_marker_thread(marker)
+
+        for key in list(self._marker_rows):
+            if key not in seen:
+                self._stop_marker_thread(key)
+                self._marker_rows[key].destroy()
+                del self._marker_rows[key]
+
+        if self._marker_rows:
+            self._marker_empty.pack_forget()
+        else:
+            self._marker_empty.pack()
+
+    def _on_marker_toggle(self, key: str):
+        """Checking/unchecking a marker stream mid-session starts/stops just
+        that stream's listener thread, without touching any others."""
+        if not self._live:
+            return
+        row = self._marker_rows.get(key)
+        if row is None:
+            return
+        if row.enabled.get():
+            self._start_marker_thread(row.marker)
+        else:
+            self._stop_marker_thread(key)
+
+    def _start_marker_thread(self, marker: "MarkerStreamInfo"):
+        if marker.key in self._marker_threads:
+            return
+        stop_evt = threading.Event()
+        t = threading.Thread(
+            target=marker_listener_loop,
+            args=(marker, stop_evt, self._q),
+            daemon=True,
+        )
+        self._marker_stops[marker.key] = stop_evt
+        self._marker_threads[marker.key] = t
+        t.start()
+
+    def _stop_marker_thread(self, key: str):
+        evt = self._marker_stops.pop(key, None)
+        if evt is not None:
+            evt.set()
+        self._marker_threads.pop(key, None)
 
     # ── Queue polling ─────────────────────────────────────────────────────────
 
@@ -503,12 +672,29 @@ class App(tk.Tk):
         elif t == "sampling_stopped":
             self._sampling_ui(False)
         elif t == "stream_end":
+            for key in list(self._marker_threads):
+                self._stop_marker_thread(key)
             if not msg.get("error"):
                 self._stream_ui("off")
                 self._stats.config(text="")
         elif t == "stream_err":
             self._stream_ui("err")
             self._stats.config(text=msg["msg"], fg=ERR)
+        elif t == "markers_found":
+            self._reconcile_markers(msg["streams"])
+        elif t == "marker_event":
+            row = self._marker_rows.get(msg["key"])
+            if row is not None:
+                row.on_event(msg["text"])
+        elif t == "marker_err":
+            row = self._marker_rows.get(msg["key"])
+            if row is not None:
+                row.on_error(msg["msg"])
+            self._marker_threads.pop(msg["key"], None)
+            self._marker_stops.pop(msg["key"], None)
+        elif t == "marker_stopped":
+            self._marker_threads.pop(msg["key"], None)
+            self._marker_stops.pop(msg["key"], None)
 
 
 if __name__ == "__main__":
