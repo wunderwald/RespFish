@@ -13,6 +13,7 @@
  */
 
 import { GaussianSmoother } from '../signal/signalUtils.js';
+import { RespCalibration }  from '../calibration/calibration.js';
 import { MarkerStream }     from '../stream/markerStream.js';
 import { CONFIG, STATE }    from './bioGame_config.js';
 import { BioGameRenderer }  from './bioGame_renderer.js';
@@ -64,8 +65,7 @@ export default class BioGame {
   // ── Signal processing ─────────────────────────────────────────────────────
   #smoother         = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
   #lastRaw          = 0;
-  #calSamples       = [];
-  #calStartTime     = null;
+  #calibration      = null;
   #normRange        = [0, 1];
 
   // ── Avatar state ──────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ export default class BioGame {
     this.#smoother.push(rawValue);
 
     if (this.#state === STATE.CALIBRATING) {
-      this.#calSamples.push(this.#smoother.value);
+      this.#calibration.push(this.#smoother.value);
     }
   }
 
@@ -180,8 +180,8 @@ export default class BioGame {
   // ── State machine ─────────────────────────────────────────────────────────
 
   #beginCalibration() {
-    this.#calSamples   = [];
-    this.#calStartTime = performance.now();
+    this.#calibration = new RespCalibration({ durationSecs: this.#calibrationSecs });
+    this.#calibration.start();
     this.#smoother.reset();
     this.#inputsLocked = true;
     this.#blockIndex   = 0;
@@ -201,16 +201,15 @@ export default class BioGame {
 
   #finishCalibration() {
     this.#markers.send('calibration_end');
-    const lvls = this.#calSamples;
+    const result = this.#calibration.finish();
 
-    if (lvls.length === 0) {
+    if (!result) {
       console.warn('[BioGame] calibration produced no samples — retrying');
-      this.#calSamples   = [];
-      this.#calStartTime = performance.now();
+      this.#calibration.start();
       return;
     }
 
-    this.#normRange = [Math.min(...lvls) * 0.8, Math.max(...lvls) * 0.8];
+    this.#normRange = [result.min, result.max];
     console.log(`[BioGame] norm range: [${this.#normRange[0].toFixed(3)}, ${this.#normRange[1].toFixed(3)}]`);
 
     this.#state = STATE.READY;
@@ -284,7 +283,7 @@ export default class BioGame {
     const now = performance.now();
 
     if (this.#state === STATE.CALIBRATING) {
-      if (now - this.#calStartTime >= this.#calibrationSecs * 1000) {
+      if (this.#calibration.isDone) {
         this.#finishCalibration();
       }
     }
@@ -482,7 +481,6 @@ export default class BioGame {
 
   #buildRenderData(now, dt) {
     const blockTime  = this.#blockStartTime != null ? (now - this.#blockStartTime) / 1000 : 0;
-    const calElapsed = this.#calStartTime   != null ? (now - this.#calStartTime)   / 1000 : 0;
 
     let countdownValue = 3, countdownProgress = 0;
     if (this.#countdownStartTime != null) {
@@ -514,8 +512,8 @@ export default class BioGame {
       scrollSpeed:       this.#scrollSpeed,
       missCount:         this.#missCount,
       gameOver:          this.#gameOver,
-      calProgress:       clamp(calElapsed / this.#calibrationSecs, 0, 1),
-      calRemaining:      Math.max(0, Math.ceil(this.#calibrationSecs - calElapsed)),
+      calProgress:       this.#calibration?.progress ?? 0,
+      calRemaining:      Math.ceil(this.#calibration?.remainingSecs ?? this.#calibrationSecs),
       countdownValue,
       countdownProgress: clamp(countdownProgress, 0, 1),
     };

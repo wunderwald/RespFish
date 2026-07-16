@@ -20,6 +20,7 @@
 
 import { GaussianSmoother, AsyncSignalGenerator } from '../signal/signalUtils.js';
 import { AutocorrEstimator } from '../signal/breathRateEstimators.js';
+import { RespCalibration } from '../calibration/calibration.js';
 import { IBreathSound } from './ibreath_sound.js';
 import { CONFIG, STATE } from './config.js';
 import { makeTrialParams } from './trialParams.js';
@@ -43,9 +44,8 @@ export default class IBreath {
   #trialData = [];
 
   // ── calibration ────────────────────────────────────────────────────────
-  #calStartTime = null;
-  #calSamples = [];
-  #calStimulusLevels = [];
+  #calSamples = [];      // raw samples, fed to AsyncSignalGenerator for freq estimation
+  #calibration = null;   // RespCalibration — derives the sync stimulus range
 
   // ── signal pipeline ────────────────────────────────────────────────────
   #smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
@@ -140,7 +140,7 @@ export default class IBreath {
 
     if (this.#state === STATE.CALIBRATING) {
       this.#calSamples.push(rawValue);
-      this.#calStimulusLevels.push(this.#smoother.value);
+      this.#calibration.push(this.#smoother.value);
     } else if (this.#state === STATE.TRIAL) {
       this.#onTrialSample(rawValue);
     }
@@ -191,8 +191,8 @@ export default class IBreath {
     this.#trialIndex = 0;
     this.#trialData = [];
     this.#calSamples = [];
-    this.#calStimulusLevels = [];
-    this.#calStartTime = performance.now();
+    this.#calibration = new RespCalibration({ durationSecs: CONFIG.CALIBRATION_SECS });
+    this.#calibration.start();
     this.#smoother.reset();
 
     this.#state = STATE.CALIBRATING;
@@ -210,11 +210,19 @@ export default class IBreath {
 
   #finishCalibration() {
     this.#markers.send('calibration_end');
+
+    const result = this.#calibration.finish();
+    if (!result) {
+      console.warn('[IBreath] calibration produced no samples — retrying');
+      this.#calSamples = [];
+      this.#calibration.start();
+      return;
+    }
+
     const sampleRate = this.#calSamples.length / CONFIG.CALIBRATION_SECS;
     this.#asyncGen.calibrate(this.#calSamples, sampleRate, null);
 
-    const lvls = this.#calStimulusLevels;
-    this.#syncStimulusRange = [Math.min(...lvls) * 0.8, Math.max(...lvls) * 0.8];
+    this.#syncStimulusRange = [result.min, result.max];
 
     this.#hud.trialText = `0 / ${this.#trials.length}`;
 
@@ -489,7 +497,7 @@ export default class IBreath {
     const now = performance.now();
 
     if (this.#state === STATE.CALIBRATING) {
-      if (now - this.#calStartTime >= CONFIG.CALIBRATION_SECS * 1000) {
+      if (this.#calibration.isDone) {
         this.#finishCalibration();
       }
     }
@@ -568,7 +576,8 @@ export default class IBreath {
 
     try {
       this.#renderer.draw(this.#state, now, {
-        calStartTime:      this.#calStartTime,
+        calProgress:       this.#calibration?.progress ?? 0,
+        calRemaining:      Math.ceil(this.#calibration?.remainingSecs ?? CONFIG.CALIBRATION_SECS),
         itiStartTime:      this.#itiStartTime,
         itiDuration:       this.#itiDuration,
         displayElapsed:    this.#displayStartTime != null ? (now - this.#displayStartTime) / 1000 : 0,
