@@ -7,7 +7,7 @@ export const CONFIG = {
   SHOW_CURVE:            false,
   DATA_DIR:              'output_data/bio_game', // do not change
   SEND_MARKERS:          true,
-  MARKER_STREAM_URL:     'ws://localhost:8765',
+  MARKER_STREAM_URL:     'ws://localhost:9001',
 
   // ── Timing ───────────────────────────────────────────────────────────────
   BLOCK_DURATION_SECS:   300,   // 5 minutes per block
