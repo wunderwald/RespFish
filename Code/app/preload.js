@@ -89,6 +89,12 @@ contextBridge.exposeInMainWorld("api", {
   pickDir:  () => ipcRenderer.invoke("pick-directory"),
   readFile: (filePath) => ipcRenderer.invoke("read-file", filePath),
 
+  // Scene window self-management
+  window: {
+    minimize: () => ipcRenderer.send('window:minimize'),
+    restore:  () => ipcRenderer.send('window:restore'),
+  },
+
   // Launcher IPC — used only by the launcher window
   launcher: {
     select: (frontend) => ipcRenderer.send('launcher:select', frontend),
