@@ -28,6 +28,7 @@ import { LocalHud } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
 import { MarkerStream } from '../stream/markerStream.js';
+import { EyeLinkControl } from '../stream/eyelinkControl.js';
 
 export { CONFIG };
 
@@ -35,6 +36,8 @@ export default class IBreath {
   // ── state ──────────────────────────────────────────────────────────────
   #state = STATE.IDLE;
   #streamReady = false;
+  #respStatusText = 'waiting for stream…';
+  #eyelinkReady = false;
 
   // ── experiment data ────────────────────────────────────────────────────
   #subjectCode = CONFIG.SUBJECT_CODE;
@@ -90,6 +93,7 @@ export default class IBreath {
 
   // ── sub-modules ────────────────────────────────────────────────────────
   #markers = null;
+  #eyelinkControl = null;
   #hud = null;
   #renderer = null;
   #csv = null;
@@ -103,7 +107,7 @@ export default class IBreath {
       onResponse:        (v) => this.#onResponse(v),
       onPause:           () => this.#onPause(),
       onPlay:            () => this.#onPlay(),
-      onRecalibrateGaze: () => {},   // placeholder
+      onRecalibrateGaze: () => this.#beginEyeCalibration(),
       onRetryCalibration:      () => this.#retryCalibration(),
       onUseDefaultCalibration: () => this.#useDefaultCalibration(),
     };
@@ -116,6 +120,9 @@ export default class IBreath {
     this.#markers = CONFIG.SEND_MARKERS
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
       : { send() {} };
+    this.#eyelinkControl = new EyeLinkControl(CONFIG.EYELINK_CONTROL_URL, {
+      onStatus: (status) => this.#onEyelinkStatus(status),
+    });
     this.#sound = new IBreathSound();
     this.#sound.init().catch((e) => console.warn('[IBreath] sound init failed:', e));
     this.#bindKeys();
@@ -152,10 +159,8 @@ export default class IBreath {
 
   setStatus({ type, text }) {
     this.#streamReady = (type === 'connected');
-    if (this.#state === STATE.IDLE) {
-      this.#hud.stateText    = this.#streamReady ? 'stream ready' : text;
-      this.#hud.startEnabled = this.#streamReady;
-    }
+    this.#respStatusText = text;
+    this.#updateIdleReadiness();
   }
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────
@@ -518,6 +523,74 @@ export default class IBreath {
         this.#hud.playVisible = false;
         break;
     }
+  }
+
+  // ── Eye tracker recalibration ──────────────────────────────────────────
+
+  #updateIdleReadiness() {
+    if (this.#state !== STATE.IDLE) return;
+    const ready = this.#streamReady && this.#eyelinkReady;
+    this.#hud.startEnabled = ready;
+    this.#hud.stateText = !this.#streamReady
+      ? this.#respStatusText
+      : !this.#eyelinkReady
+        ? 'waiting for eye tracker calibration…'
+        : 'stream ready';
+  }
+
+  #onEyelinkStatus(status) {
+    if (status.state === 'calibrated' || status.state === 'recording') {
+      this.#eyelinkReady = true;
+    }
+    this.#updateIdleReadiness();
+
+    if (this.#state === STATE.EYETRACK_CAL && status.state === 'recording') {
+      this.#finishEyeCalibration();
+    }
+  }
+
+  #beginEyeCalibration() {
+    const blocked = [STATE.IDLE, STATE.CALIBRATING, STATE.DONE, STATE.EYETRACK_CAL];
+    if (blocked.includes(this.#state)) return;
+
+    if (this.#state === STATE.TRIAL) {
+      this.#abortTrial();               // flushes + marks the running trial aborted
+    } else if (this.#state === STATE.DISPLAY) {
+      this.#sound.stopDisplay();
+    } else if (this.#state === STATE.RESPONSE) {
+      this.#onResponse('timeout');      // records the pending response, flushes trial data
+    }
+    // ITI / READY / PAUSED: nothing pending to clean up.
+    this.#pausedFromState = null;
+
+    this.#state = STATE.EYETRACK_CAL;
+    this.#hud.stateTimer      = { startedAt: Date.now(), duration: null };
+    this.#hud.nextVisible     = false;
+    this.#hud.abortVisible    = false;
+    this.#hud.pauseVisible    = false;
+    this.#hud.playVisible     = false;
+    this.#hud.gazeCalibrating = true;
+    this.#hud.stateText       = 'recalibrating eye tracker — please wait…';
+
+    this.#markers.send('gaze_recalibration_start');
+    window.api.window.minimize();
+    this.#eyelinkControl.calibrate();
+  }
+
+  #finishEyeCalibration() {
+    this.#markers.send('gaze_recalibration_end');
+    this.#hud.gazeCalibrating = false;
+    window.api.window.restore();
+
+    if (this.#trialIndex >= this.#trials.length) {
+      this.#endExperiment();
+      return;
+    }
+    this.#state             = STATE.READY;
+    this.#hud.stateTimer    = { startedAt: Date.now(), duration: null };
+    this.#hud.pauseVisible  = false;
+    this.#hud.stateText     = 'ready — press Space or Next trial to begin';
+    this.#hud.nextVisible   = true;
   }
 
   #endExperiment() {
