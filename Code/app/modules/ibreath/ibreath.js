@@ -18,7 +18,7 @@
  *   csv.js         — file output
  */
 
-import { GaussianSmoother, AsyncSignalGenerator } from '../signal/signalUtils.js';
+import { GaussianSmoother, AsyncSignalGenerator, mapRange } from '../signal/signalUtils.js';
 import { AutocorrEstimator } from '../signal/breathRateEstimators.js';
 import { RespCalibration } from '../calibration/calibration.js';
 import { IBreathSound } from './ibreath_sound.js';
@@ -232,7 +232,7 @@ export default class IBreath {
     this.#syncStimulusRange = range;
 
     const sampleRate = this.#calSamples.length / CONFIG.CALIBRATION_SECS;
-    this.#asyncGen.calibrate(this.#calSamples, sampleRate, null);
+    this.#asyncGen.calibrate(this.#calSamples, sampleRate, this.#syncStimulusRange);
 
     this.#hud.trialText = `0 / ${this.#trials.length}`;
     this.#calFailed = false;
@@ -341,12 +341,15 @@ export default class IBreath {
     this.#markers.send(`trial_start_t${trial.trialIndex}`);
   }
 
-  #onTrialSample(scaled) {
+  #onTrialSample(rawValue) {
     const trial = this.#trials[this.#trialIndex];
     if (trial.synchronous) {
-      this.#syncSignal.push(scaled);
-      this.#stimulusLevel = this.#smoother.value;
-      this.#syncStimulusSignal.push(this.#stimulusLevel);
+      this.#syncSignal.push(rawValue);
+      const smoothedRaw = this.#smoother.value;
+      this.#syncStimulusSignal.push(smoothedRaw);
+      this.#stimulusLevel = Math.max(0, Math.min(1,
+        mapRange(smoothedRaw, this.#syncStimulusRange, [0, 1])
+      ));
     }
   }
 
