@@ -119,7 +119,8 @@ if (frontend === 'ibreath') {
 
   settingsBar.innerHTML = `
     <span class="label">settings</span>
-    <label><input type="checkbox" id="s-debug-gaze"      ${CONFIG.DEBUG_GAZE      ? 'checked' : ''}> show gaze position</label>
+    <label><input type="checkbox" id="s-use-eye-tracking"> use eye tracking</label>
+    <label id="debug-gaze-label"><input type="checkbox" id="s-debug-gaze"      ${CONFIG.DEBUG_GAZE      ? 'checked' : ''}> show gaze position</label>
     <label><input type="checkbox" id="s-auto-advance"    ${CONFIG.AUTO_ADVANCE    ? 'checked' : ''}> auto-advance trials</label>
     <label><input type="checkbox" id="s-flash-images"    ${CONFIG.FLASHING_IMAGE  ? 'checked' : ''}> include flash images</label>
     <label><input type="checkbox" id="s-show-questions"  ${CONFIG.SHOW_QUESTIONS  ? 'checked' : ''}> show questions</label>
@@ -142,6 +143,9 @@ if (frontend === 'ibreath') {
   const gazeBtn            = document.getElementById('ib-gaze-btn');
   const calRetryBtn        = document.getElementById('ib-cal-retry-btn');
   const calDefaultBtn      = document.getElementById('ib-cal-default-btn');
+  const useEyeTrackingBox  = document.getElementById('s-use-eye-tracking');
+  const debugGazeLabel     = document.getElementById('debug-gaze-label');
+  const gazeBarEl          = document.getElementById('gaze-bar');
 
   // ── Clocks ──────────────────────────────────────────────────────────────────
 
@@ -219,6 +223,21 @@ if (frontend === 'ibreath') {
   gazeBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'recalibrateGaze' }));
   calRetryBtn.addEventListener('click',   () => window.api.hud.sendAction({ type: 'retryCalibration' }));
   calDefaultBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'useDefaultCalibration' }));
+
+  // ── Eye tracking on/off — unchecked by default; hides all gaze-related UI ────
+
+  function applyEyeTrackingVisibility(enabled) {
+    gazeBarEl.style.display      = enabled ? '' : 'none';
+    debugGazeLabel.style.display = enabled ? '' : 'none';
+    if (!enabled) gazeBtn.style.display = 'none';
+  }
+  applyEyeTrackingVisibility(useEyeTrackingBox.checked);
+
+  useEyeTrackingBox.addEventListener('change', () => {
+    const enabled = useEyeTrackingBox.checked;
+    applyEyeTrackingVisibility(enabled);
+    window.api.hud.sendAction({ type: 'setUseEyeTracking', value: enabled });
+  });
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 

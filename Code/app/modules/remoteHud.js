@@ -28,7 +28,7 @@ export class RemoteHud {
   #group = 'target';
 
   constructor({ onStart, onNext, onAbort, onResponse, onPause, onPlay, onRecalibrateGaze,
-                onRetryCalibration, onUseDefaultCalibration }) {
+                onRetryCalibration, onUseDefaultCalibration, onSetUseEyeTracking }) {
     window.api.hud.onAction(({ type, subjectCode, group, value,
                                debugGaze, autoAdvance, flashingImage, calibrationSecs,
                                showQuestions }) => {
@@ -44,6 +44,7 @@ export class RemoteHud {
         case 'recalibrateGaze': onRecalibrateGaze?.(); break;
         case 'retryCalibration':      onRetryCalibration?.(); break;
         case 'useDefaultCalibration': onUseDefaultCalibration?.(); break;
+        case 'setUseEyeTracking':     onSetUseEyeTracking?.(value); break;
         case 'ready':           this.#push(); break;
       }
     });

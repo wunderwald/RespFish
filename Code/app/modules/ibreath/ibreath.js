@@ -38,6 +38,7 @@ export default class IBreath {
   #streamReady = false;
   #respStatusText = 'waiting for stream…';
   #eyelinkReady = false;
+  #useEyeTracking = false;   // off by default; toggled via the experimenter's "use eye tracking" checkbox
 
   // ── experiment data ────────────────────────────────────────────────────
   #subjectCode = CONFIG.SUBJECT_CODE;
@@ -110,6 +111,7 @@ export default class IBreath {
       onRecalibrateGaze: () => this.#beginEyeCalibration(),
       onRetryCalibration:      () => this.#retryCalibration(),
       onUseDefaultCalibration: () => this.#useDefaultCalibration(),
+      onSetUseEyeTracking:     (v) => this.#setUseEyeTracking(v),
     };
     this.#hud = hudFactory
       ? hudFactory(callbacks)
@@ -133,6 +135,7 @@ export default class IBreath {
   // ── Public interface ───────────────────────────────────────────────────
 
   pushGazeSample(channels) {
+    if (!this.#useEyeTracking) return;
     const wasEnabled = this.#gazeEnabled;
     if (!channels) {
       this.#gazeEnabled = false;
@@ -527,13 +530,23 @@ export default class IBreath {
 
   // ── Eye tracker recalibration ──────────────────────────────────────────
 
+  #setUseEyeTracking(enabled) {
+    this.#useEyeTracking = enabled;
+    if (!enabled) {
+      this.#gazeEnabled = false;
+      this.#hud.gazeActive = false;
+    }
+    this.#updateIdleReadiness();
+  }
+
   #updateIdleReadiness() {
     if (this.#state !== STATE.IDLE) return;
-    const ready = this.#streamReady && this.#eyelinkReady;
+    const eyelinkOk = !this.#useEyeTracking || this.#eyelinkReady;
+    const ready = this.#streamReady && eyelinkOk;
     this.#hud.startEnabled = ready;
     this.#hud.stateText = !this.#streamReady
       ? this.#respStatusText
-      : !this.#eyelinkReady
+      : !eyelinkOk
         ? 'waiting for eye tracker calibration…'
         : 'stream ready';
   }
@@ -550,6 +563,7 @@ export default class IBreath {
   }
 
   #beginEyeCalibration() {
+    if (!this.#useEyeTracking) return;
     const blocked = [STATE.IDLE, STATE.CALIBRATING, STATE.DONE, STATE.EYETRACK_CAL];
     if (blocked.includes(this.#state)) return;
 
