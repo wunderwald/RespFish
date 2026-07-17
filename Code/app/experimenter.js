@@ -109,7 +109,7 @@ if (frontend === 'ibreath') {
       <button id="ib-abort-btn"       style="display:none">Abort trial</button>
       <button id="ib-pause-btn"       style="display:none">Pause</button>
       <button id="ib-play-btn"        style="display:none">Play</button>
-      <button id="ib-gaze-btn"        style="display:none" disabled>Recalibrate gaze</button>
+      <button id="ib-gaze-btn"        style="display:none">Recalibrate gaze</button>
       <button id="ib-cal-retry-btn"   style="display:none">Retry calibration</button>
       <button id="ib-cal-default-btn" style="display:none">Use default calibration</button>
     </span>
@@ -159,9 +159,12 @@ if (frontend === 'ibreath') {
 
   // ── Receive state from scene window ─────────────────────────────────────────
 
+  let gazeActive      = false;
+  let gazeCalibrating = false;
+
   window.api.hud.onState(({ stateText, stateColor, trialText,
                              startEnabled, nextVisible, abortVisible, pauseVisible, playVisible, inputsLocked,
-                             experimentStartedAt: esa, stateTimer: st, gazeActive, calFailed }) => {
+                             experimentStartedAt: esa, stateTimer: st, gazeActive: ga, gazeCalibrating: gc, calFailed }) => {
     if (esa !== undefined) experimentStartedAt = esa;
     if (st  !== undefined) stateTimer          = st;
     if (stateText    !== undefined) stateEl.textContent        = stateText;
@@ -172,7 +175,12 @@ if (frontend === 'ibreath') {
     if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
     if (pauseVisible !== undefined) pauseBtn.style.display     = pauseVisible ? '' : 'none';
     if (playVisible  !== undefined) playBtn.style.display      = playVisible  ? '' : 'none';
-    if (gazeActive   !== undefined) gazeBtn.style.display      = gazeActive   ? '' : 'none';
+    if (ga !== undefined) gazeActive      = ga;
+    if (gc !== undefined) gazeCalibrating = gc;
+    if (ga !== undefined || gc !== undefined) {
+      gazeBtn.style.display = gazeActive ? '' : 'none';
+      gazeBtn.disabled      = !gazeActive || gazeCalibrating;
+    }
     if (calFailed    !== undefined) {
       calRetryBtn.style.display   = calFailed ? '' : 'none';
       calDefaultBtn.style.display = calFailed ? '' : 'none';
