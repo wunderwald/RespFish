@@ -54,6 +54,7 @@ export const CONFIG = {
 
   // Gaze input (optional LSL stream via second bridge)
   GAZE_STREAM_URL: 'ws://localhost:8766',
+  EYELINK_CONTROL_URL: 'ws://localhost:9002',   // eyelink_to_lsl/run_bridge.py control API
   DEBUG_GAZE: false,      // overlay a dot at the current gaze position
 
   // Marker output (LSL via WebSocket)
@@ -73,5 +74,6 @@ export const STATE = {
   RESPONSE: 'response',   // post-trial question (SHOW_QUESTIONS only)
   ITI: 'iti',
   PAUSED: 'paused',    // experimenter paused mid-experiment
+  EYETRACK_CAL: 'eyetrack_cal',  // eye tracker recalibration in progress
   DONE: 'done',
 };
