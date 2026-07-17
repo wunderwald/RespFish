@@ -9,6 +9,7 @@ Lightweight LSL signal sources for development and testing.
 | `mic_breath.py` | Respiration (1ch) | Live mic input — extracts breath envelope and streams it to LSL |
 | `mouse_y_to_lsl.py` | Respiration (1ch) | Mouse Y position mapped to `[0, 1]` and streamed to LSL |
 | `send_marker.py` | Markers (1ch string) | Interactive prompt — type text, Enter sends it as an LSL marker |
+| `log_markers.py` | Markers (any) | Logs events from all marker streams on the network, rescanning to pick up new ones dynamically |
 
 All scripts require `pylsl` (`pip install pylsl`). 
 
@@ -29,4 +30,7 @@ python mouse_y_to_lsl.py
 
 # Interactive marker sender
 python send_marker.py [--name markers_sim]
+
+# Log all marker streams (rescans for new streams every 2s by default)
+python log_markers.py [--type Markers] [--interval 2] [--out markers_log.csv]
 ```
