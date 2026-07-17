@@ -15,47 +15,8 @@ Connects an SR Research EyeLink eye tracker to LSL (Lab Streaming Layer). Gaze i
 `pylink` ships as a compiled extension inside the EyeLink Developer Kit. Make sure its directory is on `PYTHONPATH` before importing.
 
 > [!IMPORTANT]
-> **PsychoPy needs its own virtual environment.** As of 2026, PsychoPy's PyPI metadata restricts it to `>=3.10, <3.13` — it will not install (or will misbehave) on a newer or older system Python. Don't install these requirements into your global/system Python or a shared project env. Instead, create a dedicated `.venv` inside `eyelink_to_lsl/` using Python 3.10, and always run the bridge (or any experiment script that imports it) through that venv.
->
-> **1. Create the venv** (run once, from inside `eyelink_to_lsl/`):
->
-> ```bash
-> # macOS / Linux — replace python3.10 with the path to a 3.10 interpreter if it's not on PATH
-> python3.10 -m venv .venv
-> source .venv/bin/activate
-> pip install pylsl psychopy
-> deactivate
-> ```
->
-> ```bat
-> :: Windows — replace py -3.10 with your Python 3.10 launcher if needed
-> py -3.10 -m venv .venv
-> .venv\Scripts\activate
-> pip install pylsl psychopy
-> deactivate
-> ```
->
-> Also install `pylink` from the EyeLink Developer Kit into this same `.venv` (see above).
->
-> **2. Create a launcher script** so you never have to remember to activate the venv by hand. Save it in `eyelink_to_lsl/` next to your experiment script (e.g. `run_experiment.py`):
->
-> `run_experiment.sh` (macOS / Linux):
-> ```bash
-> #!/usr/bin/env bash
-> cd "$(dirname "$0")"
-> source .venv/bin/activate
-> python run_experiment.py "$@"
-> ```
-> Make it executable once with `chmod +x run_experiment.sh`, then launch the bridge with `./run_experiment.sh`.
->
-> `run_experiment.bat` (Windows):
-> ```bat
-> @echo off
-> cd /d "%~dp0"
-> call .venv\Scripts\activate.bat
-> python run_experiment.py %*
-> ```
-> Launch it by double-clicking `run_experiment.bat` or running it from a command prompt.
+> **PsychoPy needs its own virtual environment.** As of 2026, PsychoPy's PyPI metadata restricts it to `>=3.10, <3.13` — it will not install (or will misbehave) on a newer or older system Python. Don't install these requirements into your global/system Python or a shared project env. Instead, create a dedicated `.venv` inside `eyelink_to_lsl/` using Python 3.11.9, and always run the bridge (or any experiment script that imports it) through that venv.
+
 
 ---
 
