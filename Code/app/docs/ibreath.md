@@ -69,8 +69,8 @@ The `[READY]` step is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is
 ## Trial design
 
 - **80 trials** per session, balanced in blocks of 4: 2 sync, 1 async-slow, 1 async-fast.
-- **Synchronous trials** — cloud animation tracks the Gaussian-smoothed breath signal directly.
-- **Asynchronous trials** — cloud follows a sine wave fitted to the participant's calibration breath, shifted in time (slow: ×1.1, fast: ×0.9 speed factor).
+- **Synchronous trials** — cloud animation tracks the Gaussian-smoothed breath signal, rescaled into `[0, 1]` using the calibration range (see [calibration](calibration.md)).
+- **Asynchronous trials** — cloud follows a sine wave fitted to the participant's calibration breath, shifted in time (slow: ×1.1, fast: ×0.9 speed factor). Its output is separately rescaled to match the `[0, 1]`-space intensity actually observed during sync trials (`MAP_ASYNC_RANGE_TO_SYNC_RANGE`), so async and sync trials feel comparably intense.
 - **Flash stimulus** (`FLASHING_IMAGE`) — a lightning image appears on 50 % of trials at a random time between `FLASH_TIME_MIN` and `FLASH_TIME_MAX` seconds into the trial.
 - **Sync detection** (`SHOW_QUESTIONS`) — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` seconds. Non-responses are recorded as `timeout`.
 
@@ -91,6 +91,7 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | `MAX_NUM_TRIALS` | `80` | Total trial count |
 | `MAX_TRIAL_TIME` | `30` | Trial auto-ends after this many seconds |
 | `CALIBRATION_SECS` | `10` | Duration of the calibration recording |
+| `MAP_ASYNC_RANGE_TO_SYNC_RANGE` | `true` | Rescale async trials' synthetic signal to the `[0, 1]`-space intensity actually observed during sync trials, so both feel comparably intense |
 
 ---
 
@@ -166,7 +167,7 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`).
 
 ## Signal input
 
-Any LSL stream pushing normalised `[0, 1]` floats is supported.
+Any LSL stream is supported — the raw signal doesn't need to already be normalised. It's rescaled into `[0, 1]` using the calibration-derived range (see [calibration](calibration.md)), the same way bioGame does.
 
 For testing, use:
 

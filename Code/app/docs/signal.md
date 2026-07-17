@@ -35,7 +35,8 @@ import { AsyncSignalGenerator } from './modules/signal/signalUtils.js';
 import { AutocorrEstimator }    from './modules/signal/breathRateEstimators.js';
 
 const gen = new AsyncSignalGenerator({ estimator: new AutocorrEstimator() });
-gen.calibrate(signalArray, sampleRate, syncRange);  // syncRange = [min, max] or null
+gen.calibrate(signalArray, sampleRate, syncRange);  // syncRange = [min, max] in [0,1] display
+                                                     // space (NOT raw signal units), or null
 gen.setSpeedFactor(1.1);   // > 1 = slower,  < 1 = faster
 const level = gen.sample(tSeconds);  // ~[0, 1]
 ```

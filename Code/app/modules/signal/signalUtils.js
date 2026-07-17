@@ -225,8 +225,10 @@ export class AsyncSignalGenerator {
    * Run the estimator on a calibration signal and store results.
    * @param {Float32Array|number[]} signal      Calibration samples
    * @param {number}                sampleRate  Samples per second
-   * @param {[number,number]|null}  syncRange   [min, max] of sync stimulus
-   *                                            (pass null to skip range mapping)
+   * @param {[number,number]|null}  syncRange   Output range for sample(), in the same [0,1]
+   *                                            display space the caller renders/sonifies —
+   *                                            NOT the raw signal's native scale
+   *                                            (pass null to use the sine's natural [0, amp] range)
    */
   calibrate(signal, sampleRate, syncRange = null) {
     const arr = signal instanceof Float32Array ? signal : new Float32Array(signal);
