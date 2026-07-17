@@ -11,6 +11,7 @@ Connects an SR Research EyeLink eye tracker to LSL (Lab Streaming Layer). Gaze i
 | `pylink` | SR Research EyeLink Developer Kit — **not** the PyPI `pylink` package |
 | `pylsl` | `pip install pylsl` |
 | `psychopy` | `pip install psychopy` |
+| `websockets` | `pip install websockets` — only needed to run `run_bridge.py`'s control API |
 
 `pylink` ships as a compiled extension inside the EyeLink Developer Kit. Make sure its directory is on `PYTHONPATH` before importing.
 
@@ -91,6 +92,38 @@ bridge.request_calibrate()
 ```
 
 The pump thread will finish its current sample, stop recording, run a full calibration on Screen 2 (blocking until the operator accepts on PC 3), then resume recording automatically. The LSL stream continues; the gap during calibration will appear as missing samples (`-1.0, -1.0`).
+
+---
+
+## Running the bridge as a controllable process
+
+`run_bridge.py` wraps `EyeLinkLSLBridge` in a long-running process with a JSON-over-WebSocket control API, so experimenter tooling — e.g. apps in [`../app/`](../app/) — can drive calibration and recording without embedding pylink/PsychoPy itself. This mirrors the `ws://` control convention already used by [`../lsl_ws_bridge/`](../lsl_ws_bridge/).
+
+On Windows, start it via the venv wrapper:
+
+```bat
+start_bridge.bat --edf-filename sub01
+```
+
+Or directly:
+
+```bash
+.venv/bin/python run_bridge.py --edf-filename sub01
+```
+
+On startup it opens the PsychoPy window, connects to the EyeLink Host, runs an initial calibration, and starts recording — then serves the control WebSocket (default `ws://localhost:9002`) for the rest of the session. Defaults (host IP, screen size, ports, auto-calibrate/auto-start) live in `config.py`; see `--help` for the full list of overrides.
+
+**Protocol** — client sends `{"type": "..."}`, server replies/broadcasts `{"type": "status", "state": ..., "recording": bool, ...}`:
+
+| Command | Effect |
+|---|---|
+| `calibrate` | Recalibrate. Non-blocking (via `request_calibrate()`) if already recording; otherwise calibrates inline. |
+| `start` | Start recording (no-op if already recording). |
+| `stop` | Stop recording (no-op if not recording). |
+| `status` | Request an immediate status snapshot. |
+| `shutdown` | Stop recording, transfer the EDF file, disconnect the tracker, and exit. |
+
+A status snapshot (`state` ∈ `connected`, `calibrating`, `calibrated`, `recording`, `stopped`, `disconnected`) is sent to every client on connect and broadcast to all connected clients whenever the bridge's lifecycle state changes — so a client doesn't need to poll to know when a recalibration it triggered has finished.
 
 ---
 
