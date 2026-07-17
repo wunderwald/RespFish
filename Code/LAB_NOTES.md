@@ -39,5 +39,6 @@ The basic steps for running RespFish experiments:
 1. Physiological data acquisition: Start ADI hardware and LabChart (on EEG PC), press Start in LabChart.
 2. Physiological data streaming: On the EEG PC, open LabChartLSL, click connect, select the channels to be streamed, give them a name, start streaming.
 3. Presentation setup: On the presentation PC, open RespFish, select the experiment, set parameters like SubjectID,  select the physiological data stream. Don't press start yet.
-4. Recording: Open LabRecorder on the EEG PC and select the streams to be recorded (physiological data, markers and in future gaze). Set output paths and hit the Start button.
-5. Run experiment: Click start on the presentation PC.
+4. *Optionally connect eye tracker*: make sure the EyeLink PC is on and connected to the network. Start the EyeLink to LSL bridge using the batch script. The bridge passes control messages received via ws to the tracker device and forwards gaze samples to lsl (which are then forwarded to ws by the lsl_to_ws bridge). Select the gaze stream in the experimenter control.
+5. Recording: Open LabRecorder on the EEG PC and select the streams to be recorded (physiological data, markers and in future gaze). Set output paths and hit the Start button.
+6. Run experiment: Click start on the presentation PC.
