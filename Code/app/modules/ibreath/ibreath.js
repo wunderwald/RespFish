@@ -51,7 +51,8 @@ export default class IBreath {
   // ── signal pipeline ────────────────────────────────────────────────────
   #smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
   #asyncGen = new AsyncSignalGenerator({ estimator: new AutocorrEstimator() });
-  #syncStimulusRange = [0.3, 0.4];
+  #syncStimulusRange = [0.3, 0.4];   // raw native-scale window — used to rescale the live signal into [0,1]
+  #syncDisplayRange = [0, 1];        // [0,1]-space window the sync display actually occupied — async's output target
 
   // ── per-trial state ────────────────────────────────────────────────────
   #trialStartTime = null;
@@ -232,7 +233,7 @@ export default class IBreath {
     this.#syncStimulusRange = range;
 
     const sampleRate = this.#calSamples.length / CONFIG.CALIBRATION_SECS;
-    this.#asyncGen.calibrate(this.#calSamples, sampleRate, this.#syncStimulusRange);
+    this.#asyncGen.calibrate(this.#calSamples, sampleRate, this.#syncDisplayRange);
 
     this.#hud.trialText = `0 / ${this.#trials.length}`;
     this.#calFailed = false;
@@ -284,7 +285,7 @@ export default class IBreath {
         this.#asyncGen.calibrate(
           new Float32Array(this.#calSamples),
           this.#calSamples.length / CONFIG.CALIBRATION_SECS,
-          this.#syncStimulusRange
+          this.#syncDisplayRange
         );
       }
     }
@@ -365,10 +366,17 @@ export default class IBreath {
       );
       const sampleRate = cleanSignal.length /
         ((performance.now() - this.#trialStartTime) / 1000);
-      this.#asyncGen.calibrate(cleanSignal, sampleRate, this.#syncStimulusRange);
 
-      const lvls = this.#syncStimulusSignal;
-      this.#syncStimulusRange = [Math.min(...lvls), Math.max(...lvls)];
+      const rawLvls = this.#syncStimulusSignal;
+      const rawMin = Math.min(...rawLvls), rawMax = Math.max(...rawLvls);
+      this.#syncDisplayRange = [
+        Math.max(0, Math.min(1, mapRange(rawMin, this.#syncStimulusRange, [0, 1]))),
+        Math.max(0, Math.min(1, mapRange(rawMax, this.#syncStimulusRange, [0, 1]))),
+      ];
+
+      this.#asyncGen.calibrate(cleanSignal, sampleRate, this.#syncDisplayRange);
+
+      this.#syncStimulusRange = [rawMin, rawMax];
     }
 
     trial.flashShown = this.#flashShown;
