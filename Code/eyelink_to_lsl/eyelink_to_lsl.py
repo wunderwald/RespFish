@@ -27,7 +27,7 @@ Trigger recalibration at any point via bridge.request_calibrate().
 import logging
 import threading
 import time
-from typing import Protocol, runtime_checkable
+from typing import Callable, Protocol, runtime_checkable
 
 import pylink # !!! SR Research EyeLink Developer Kit (NOT the PyPI pylink package)
 from pylsl import StreamInfo, StreamOutlet, local_clock
@@ -202,6 +202,13 @@ class EyeLinkLSLBridge:
     display : CalibrationDisplay, optional
         Custom calibration display. If omitted, PsychopyCalibrationDisplay
         is constructed automatically from `window`.
+    on_state : callable, optional
+        Called with a single state-name string whenever the bridge's
+        lifecycle state changes: "connected", "calibrating", "calibrated",
+        "recording", "stopped", "disconnected". Useful for driving a
+        control API (e.g. broadcasting status over WebSocket) without
+        polling. May be called from the pump thread; keep it fast and
+        non-blocking. Exceptions raised by it are logged and swallowed.
     """
 
     def __init__(
@@ -213,6 +220,7 @@ class EyeLinkLSLBridge:
         sample_rate: float = NOMINAL_RATE,
         edf_filename: str = "session",
         display: CalibrationDisplay | None = None,
+        on_state: "Callable[[str], None] | None" = None,
     ):
         self.host_ip = host_ip
         self.screen_w = screen_w
@@ -232,6 +240,7 @@ class EyeLinkLSLBridge:
         self._thread: threading.Thread | None = None
         self._running = False
         self._eye = pylink.RIGHT_EYE  # updated after connect()
+        self._on_state = on_state
 
         # Set by request_calibrate(); consumed inside the pump loop.
         self._calib_requested = threading.Event()
@@ -239,6 +248,11 @@ class EyeLinkLSLBridge:
     # ------------------------------------------------------------------ #
     #  Public API                                                          #
     # ------------------------------------------------------------------ #
+
+    @property
+    def is_recording(self) -> bool:
+        """True while the LSL pump thread is active."""
+        return self._running
 
     def connect(self) -> None:
         """Open connection to the EyeLink Host and configure the tracker."""
@@ -265,6 +279,7 @@ class EyeLinkLSLBridge:
         self._display.setup(self._tracker)
         self._setup_lsl_outlet()
         log.info("Connected. Eye(s) available: %s", eye)
+        self._emit_state("connected")
 
     def calibrate(self) -> None:
         """
@@ -274,8 +289,10 @@ class EyeLinkLSLBridge:
         The experiment display will show calibration targets.
         """
         log.info("Starting calibration ...")
+        self._emit_state("calibrating")
         self._tracker.doTrackerSetup()
         log.info("Calibration complete.")
+        self._emit_state("calibrated")
 
     def request_calibrate(self) -> None:
         """
@@ -298,6 +315,7 @@ class EyeLinkLSLBridge:
         )
         self._thread.start()
         log.info("EyeLink -> LSL pump started.")
+        self._emit_state("recording")
 
     def stop(self) -> None:
         """Stop the pump thread and end EyeLink recording."""
@@ -308,6 +326,7 @@ class EyeLinkLSLBridge:
         pylink.endRealTimeMode()
         self._tracker.stopRecording()
         log.info("EyeLink -> LSL pump stopped.")
+        self._emit_state("stopped")
 
     def disconnect(self) -> None:
         """Transfer the EDF file to PC 1, close the tracker, tear down graphics."""
@@ -325,10 +344,19 @@ class EyeLinkLSLBridge:
 
         self._display.teardown()
         log.info("EyeLink disconnected.")
+        self._emit_state("disconnected")
 
     # ------------------------------------------------------------------ #
     #  Internal                                                            #
     # ------------------------------------------------------------------ #
+
+    def _emit_state(self, state: str) -> None:
+        if self._on_state is None:
+            return
+        try:
+            self._on_state(state)
+        except Exception:
+            log.exception("on_state callback raised for state=%r", state)
 
     def _start_recording(self) -> None:
         # startRecording(samples_to_file, events_to_file,
@@ -362,6 +390,7 @@ class EyeLinkLSLBridge:
 
         self._start_recording()
         log.info("Recording resumed after recalibration.")
+        self._emit_state("recording")
 
     def _setup_lsl_outlet(self) -> None:
         info = StreamInfo(
