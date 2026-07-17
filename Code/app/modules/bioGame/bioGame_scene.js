@@ -23,7 +23,7 @@ export const SCENES = {
     },
 
     sounds: {
-      ambience: 'sounds/ambience.wav',
+      ambience: 'sounds/whale.wav',
       noise:    'sounds/breath.wav',
       collect:  ['sounds/collect1.wav', 'sounds/collect2.wav', 'sounds/collect3.wav', 'sounds/collect4.wav'],
       miss:     'sounds/miss.wav',
