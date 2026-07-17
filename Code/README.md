@@ -26,7 +26,7 @@ Multiple machines can stream data to LSL simultaneously. Only the stream selecte
 |---|---|
 | [app/](app/) | Electron experiment app — frontends, modules, docs |
 | [lsl_ws_bridge/](lsl_ws_bridge/) | Bridges LSL streams to the app over WebSocket |
-| [simulation/](simulation/) | LSL signal sources for testing: simulated resp, simulated gaze, mic, mouse |
+| [simulation/](simulation/) | LSL signal sources for testing: simulated resp, simulated gaze, mic, mouse, marker sending and logging |
 | [eyelink_to_lsl/](eyelink_to_lsl/) | SR Research EyeLink → LSL bridge |
 | [labchart_to_lsl/](labchart_to_lsl/) | Windows-only LabChart → LSL forwarding module |
 | [raspi/](raspi/) | Raspberry Pi analog-to-LSL script |
