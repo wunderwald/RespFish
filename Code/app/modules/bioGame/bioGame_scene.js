@@ -33,7 +33,7 @@ export const SCENES = {
   jungle: {
     id:        'jungle',
     label:     'Jungle',
-    avatarSrc: 'fishy.png',
+    avatarSrc: 'images/monkey.png',
 
     bg: {
       gradTop: '#081208',
