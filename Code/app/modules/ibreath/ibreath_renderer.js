@@ -36,7 +36,10 @@ export class IBreathRenderer {
     const w = canvas.width;
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    this.#caustics.draw(ctx, w, h, now / 1000);
+
+    // Keep the display screen quiet while the EyeLink calibration window
+    // (a separate process) may be sharing this monitor.
+    if (state !== STATE.EYETRACK_CAL) this.#caustics.draw(ctx, w, h, now / 1000);
 
     switch (state) {
       case STATE.IDLE:        this.#drawIdle(ctx, w, h); break;
@@ -47,6 +50,7 @@ export class IBreathRenderer {
       case STATE.RESPONSE:    this.#drawResponse(ctx, w, h, now, data.responseStartTime, data.questionType); break;
       case STATE.ITI:         this.#drawITI(ctx, w, h, now, data.itiStartTime, data.itiDuration); break;
       case STATE.PAUSED:      this.#drawPaused(ctx, w, h, now); break;
+      case STATE.EYETRACK_CAL: this.#drawEyeCal(ctx, w, h); break;
       case STATE.DONE:        this.#drawDone(ctx, w, h, data.trialCount, data.subjectCode); break;
     }
 
@@ -241,6 +245,14 @@ export class IBreathRenderer {
     ctx.restore();
 
     this.#centerText(ctx, cx, cy + unit * 0.22, 'paused', 'rgba(255,255,255,0.28)', 16);
+  }
+
+  #drawEyeCal(ctx, w, h) {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, w, h);
+    this.#centerText(ctx, w / 2, h / 2,
+      'Recalibrating eye tracker — please wait…',
+      'rgba(255,255,255,0.4)', 18);
   }
 
   #drawDone(ctx, w, h, trialCount, subjectCode) {
