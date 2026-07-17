@@ -22,6 +22,7 @@ export class RemoteHud {
     experimentStartedAt: null,
     stateTimer:          null,   // { startedAt: Date.now(), duration: seconds | null }
     gazeActive:          false,
+    gazeCalibrating:     false,
   };
   #subjectCode = 'TEST';
   #group = 'target';
@@ -60,6 +61,7 @@ export class RemoteHud {
   set calFailed(v)    { this.#snap.calFailed     = v;   this.#push(); }
   set inputsLocked(v) { this.#snap.inputsLocked  = v;   this.#push(); }
   set gazeActive(v)   { this.#snap.gazeActive    = v;   this.#push(); }
+  set gazeCalibrating(v) { this.#snap.gazeCalibrating = v; this.#push(); }
   set experimentStartedAt(v) { this.#snap.experimentStartedAt = v; this.#push(); }
   set stateTimer(v)          { this.#snap.stateTimer = v;          this.#push(); }
   get subjectCode()          { return this.#subjectCode; }
