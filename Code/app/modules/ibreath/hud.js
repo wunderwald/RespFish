@@ -83,6 +83,7 @@ export class LocalHud {
   set experimentStartedAt(_v) {}
   set stateTimer(_v) {}
   set gazeActive(_v) {}   // no gaze button in local HUD
+  set gazeCalibrating(_v) {}   // no gaze button in local HUD
   get subjectCode()    { return this.#subjectInput.value.trim() || 'TEST'; }
   get group()          { return this.#questionTypeSelect.value; }
 }
