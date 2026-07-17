@@ -207,6 +207,16 @@ ipcMain.on("stream:request-status", () => {
   controlWindow?.webContents.send("stream:request-status");
 });
 
+// Scene window self-management (e.g. minimize while an external calibration
+// window needs the display, restore once it's done).
+ipcMain.on("window:minimize", () => {
+  mainWindow?.minimize();
+});
+ipcMain.on("window:restore", () => {
+  mainWindow?.restore();
+  mainWindow?.focus();
+});
+
 // ── Scene window ──────────────────────────────────────────────────────────────
 
 function createWindow(frontend) {
